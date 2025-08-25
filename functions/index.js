@@ -1,32 +1,20 @@
-/**
- * Import function triggers from their respective submodules:
- *
- * const {onCall} = require("firebase-functions/v2/https");
- * const {onDocumentWritten} = require("firebase-functions/v2/firestore");
- *
- * See a full list of supported triggers at https://firebase.google.com/docs/functions
- */
+import {onRequest} from 'firebase-functions/v2/https';
+import {getFirestore} from 'firebase-admin/firestore';
+import {initializeApp} from 'firebase-admin/app';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
 
-const {setGlobalOptions} = require("firebase-functions");
-const {onRequest} = require("firebase-functions/https");
-const logger = require("firebase-functions/logger");
+initializeApp();
+const db = getFirestore();
 
-// For cost control, you can set the maximum number of containers that can be
-// running at the same time. This helps mitigate the impact of unexpected
-// traffic spikes by instead downgrading performance. This limit is a
-// per-function limit. You can override the limit for each function using the
-// `maxInstances` option in the function's options, e.g.
-// `onRequest({ maxInstances: 5 }, (req, res) => { ... })`.
-// NOTE: setGlobalOptions does not apply to functions using the v1 API. V1
-// functions should each use functions.runWith({ maxInstances: 10 }) instead.
-// In the v1 API, each function can only serve one request per container, so
-// this will be the maximum concurrent request count.
-setGlobalOptions({ maxInstances: 10 });
-
-// Create and deploy your first functions
-// https://firebase.google.com/docs/functions/get-started
-
-// exports.helloWorld = onRequest((request, response) => {
-//   logger.info("Hello logs!", {structuredData: true});
-//   response.send("Hello from Firebase!");
-// });
+export const login = onRequest(async (request, response) => {
+  response.set('Access-Control-Allow-Origin', '*'); // For testing
+  if (request.method !== 'POST') return response.status(405).send('Method Not Allowed');
+  const {username, password} = request.body;
+  const userSnap = await db.collection('users').where('username', '==', username).get();
+  if (userSnap.empty) return response.status(401).send('Invalid credentials');
+  const user = userSnap.docs[0].data();
+  if (!bcrypt.compareSync(password, user.password_hash)) return response.status(401).send('Invalid credentials');
+  const token = jwt.sign({id: user.id, role: user.role}, process.env.JWT_SECRET, {expiresIn: '1h'});
+  response.json({token});
+});
