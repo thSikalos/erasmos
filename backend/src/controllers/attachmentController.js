@@ -1,12 +1,102 @@
 const pool = require('../config/db');
+const AWS = require('aws-sdk');
+const path = require('path');
+const crypto = require('crypto');
 
-// (Σημείωση: Η λογική του upload θα προστεθεί εδώ όταν συνδέσουμε το multer)
+// AWS S3 Configuration
+const s3 = new AWS.S3({
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+    region: process.env.AWS_REGION || 'eu-west-1'
+});
 
-// --- GET ALL ATTACHMENTS FOR AN APPLICATION ---
-const getAttachments = async (req, res) => {
-    const { applicationId } = req.params;
+// Generate unique filename
+const generateFileName = (originalName) => {
+    const timestamp = Date.now();
+    const random = crypto.randomBytes(8).toString('hex');
+    const ext = path.extname(originalName);
+    return `${timestamp}-${random}${ext}`;
+};
+
+// --- UPLOAD FILE ---
+const uploadFile = async (req, res) => {
     try {
-        const query = "SELECT id, file_name, created_at FROM attachments WHERE application_id = $1 ORDER BY created_at DESC";
+        console.log('Upload started, req.file:', req.file);
+        console.log('Upload started, req.params:', req.params);
+        
+        if (!req.file) {
+            return res.status(400).json({ message: 'No file uploaded' });
+        }
+
+        const { applicationId } = req.params;
+        const userId = req.user.id;
+        const file = req.file;
+
+        console.log('Processing file:', file.originalname, 'Size:', file.size);
+
+        // Generate unique filename
+        const fileName = generateFileName(file.originalname);
+        const s3Key = `attachments/${applicationId}/${fileName}`;
+
+        console.log('Uploading to S3, key:', s3Key);
+
+        // Upload to S3
+        const uploadParams = {
+            Bucket: process.env.S3_BUCKET_NAME,
+            Key: s3Key,
+            Body: file.buffer,
+            ContentType: file.mimetype,
+            ServerSideEncryption: 'AES256'
+        };
+
+        const s3Result = await s3.upload(uploadParams).promise();
+        console.log('S3 upload successful:', s3Result.Location);
+
+        // Save to database
+        const dbQuery = `
+            INSERT INTO attachments 
+            (application_id, uploaded_by, filename, original_filename, file_path, s3_key, file_size, mime_type, file_category) 
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) 
+            RETURNING *
+        `;
+        
+        console.log('Saving to database...');
+        const dbResult = await pool.query(dbQuery, [
+            applicationId,
+            userId,
+            fileName,
+            file.originalname,
+            s3Result.Location,
+            s3Key,
+            file.size,
+            file.mimetype,
+            'document'
+        ]);
+
+        console.log('Database save successful');
+
+        res.status(201).json({
+            message: 'File uploaded successfully',
+            attachment: dbResult.rows[0]
+        });
+
+    } catch (error) {
+        console.error('Upload error:', error);
+        res.status(500).json({ message: 'Upload failed', error: error.message });
+    }
+};
+
+// --- GET ATTACHMENTS ---
+const getAttachments = async (req, res) => {
+    try {
+        const { applicationId } = req.params;
+        
+        const query = `
+            SELECT id, filename, original_filename, file_size, mime_type, file_category, created_at
+            FROM attachments 
+            WHERE application_id = $1 
+            ORDER BY created_at DESC
+        `;
         const result = await pool.query(query, [applicationId]);
         res.json(result.rows);
     } catch (err) {
@@ -15,20 +105,194 @@ const getAttachments = async (req, res) => {
     }
 };
 
-// --- DELETE AN ATTACHMENT ---
-const deleteAttachment = async (req, res) => {
-    const { id } = req.params;
-    // (Εδώ θα έπρεπε να υπάρχει και λογική διαγραφής του αρχείου από το cloud)
+// --- GET DOWNLOAD URL ---
+const getDownloadUrl = async (req, res) => {
     try {
-        await pool.query("DELETE FROM attachments WHERE id = $1", [id]);
-        res.json({ message: 'Attachment deleted successfully.' });
-    } catch (err) {
-        console.error(err.message);
-        res.status(500).send('Server Error');
+        const { id } = req.params;
+
+        // Get attachment info
+        const attachmentQuery = `SELECT s3_key, filename FROM attachments WHERE id = $1`;
+        const attachmentResult = await pool.query(attachmentQuery, [id]);
+        
+        if (attachmentResult.rows.length === 0) {
+            return res.status(404).json({ message: 'File not found' });
+        }
+
+        const attachment = attachmentResult.rows[0];
+
+        // Generate signed URL
+        const signedUrl = s3.getSignedUrl('getObject', {
+            Bucket: process.env.S3_BUCKET_NAME,
+            Key: attachment.s3_key,
+            Expires: 3600 // 1 hour
+        });
+
+        res.json({ 
+            url: signedUrl, 
+            filename: attachment.filename 
+        });
+
+    } catch (error) {
+        console.error('Download URL error:', error);
+        res.status(500).json({ message: 'Failed to generate download URL' });
+    }
+};
+
+// --- DELETE ATTACHMENT ---
+const deleteAttachment = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const userId = req.user.id;
+        const userRole = req.user.role;
+
+        // Get attachment info
+        const attachmentQuery = `SELECT * FROM attachments WHERE id = $1`;
+        const attachmentResult = await pool.query(attachmentQuery, [id]);
+        
+        if (attachmentResult.rows.length === 0) {
+            return res.status(404).json({ message: 'Attachment not found' });
+        }
+
+        const attachment = attachmentResult.rows[0];
+
+        // Check permissions
+        if (userRole !== 'Admin' && attachment.uploaded_by !== userId) {
+            return res.status(403).json({ message: 'Not authorized to delete this file' });
+        }
+
+        // Delete from S3
+        await s3.deleteObject({
+            Bucket: process.env.S3_BUCKET_NAME,
+            Key: attachment.s3_key
+        }).promise();
+
+        // Delete from database
+        await pool.query('DELETE FROM attachments WHERE id = $1', [id]);
+
+        res.json({ message: 'File deleted successfully' });
+
+    } catch (error) {
+        console.error('Delete error:', error);
+        res.status(500).json({ message: 'Failed to delete file' });
+    }
+};
+
+// --- GET FILE CATEGORIES ---
+const getFileCategories = async (req, res) => {
+    try {
+        const categories = [
+            {
+                name: 'document',
+                description: 'Έγγραφα',
+                allowed_extensions: ['pdf', 'doc', 'docx', 'txt'],
+                max_file_size: 10485760 // 10MB
+            },
+            {
+                name: 'image',
+                description: 'Εικόνες',
+                allowed_extensions: ['jpg', 'jpeg', 'png'],
+                max_file_size: 5242880 // 5MB
+            }
+        ];
+        res.json(categories);
+    } catch (error) {
+        console.error('Get categories error:', error);
+        res.status(500).json({ message: 'Failed to get file categories' });
+    }
+};
+
+// --- ADMIN: GET FILE ANALYTICS ---
+const getFileAnalytics = async (req, res) => {
+    try {
+        if (req.user.role !== 'Admin') {
+            return res.status(403).json({ message: 'Admin access required' });
+        }
+
+        const analytics = {
+            total_files: 0,
+            total_size: 0,
+            files_by_type: {}
+        };
+
+        res.json(analytics);
+    } catch (error) {
+        console.error('Analytics error:', error);
+        res.status(500).json({ message: 'Failed to get analytics' });
+    }
+};
+
+// --- UPLOAD ATTACHMENTS TO S3 (for application creation) ---
+const uploadAttachmentsToS3 = async (applicationId, attachments, userId) => {
+    const uploadPromises = attachments.map(async (fileInfo) => {
+        try {
+            // Convert file data back to buffer if needed
+            let fileBuffer;
+            if (fileInfo.file instanceof File) {
+                // In case we get a File object, convert to buffer
+                fileBuffer = Buffer.from(await fileInfo.file.arrayBuffer());
+            } else if (Buffer.isBuffer(fileInfo.file)) {
+                fileBuffer = fileInfo.file;
+            } else {
+                throw new Error('Invalid file format');
+            }
+
+            // Generate unique filename
+            const fileName = generateFileName(fileInfo.name);
+            const s3Key = `attachments/${applicationId}/${fileName}`;
+
+            // Upload to S3
+            const uploadParams = {
+                Bucket: process.env.S3_BUCKET_NAME,
+                Key: s3Key,
+                Body: fileBuffer,
+                ContentType: fileInfo.type,
+                ServerSideEncryption: 'AES256'
+            };
+
+            const s3Result = await s3.upload(uploadParams).promise();
+
+            // Save to database
+            const dbQuery = `
+                INSERT INTO attachments 
+                (application_id, uploaded_by, filename, original_filename, file_path, s3_key, file_size, mime_type, file_category) 
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) 
+                RETURNING *
+            `;
+            
+            const dbResult = await pool.query(dbQuery, [
+                applicationId,
+                userId,
+                fileName,
+                fileInfo.name,
+                s3Result.Location,
+                s3Key,
+                fileInfo.size,
+                fileInfo.type,
+                fileInfo.category || 'document'
+            ]);
+
+            return dbResult.rows[0];
+        } catch (error) {
+            console.error(`Error uploading file ${fileInfo.name}:`, error);
+            throw error;
+        }
+    });
+
+    try {
+        const results = await Promise.all(uploadPromises);
+        return results;
+    } catch (error) {
+        console.error('Error uploading attachments:', error);
+        throw error;
     }
 };
 
 module.exports = {
+    uploadFile,
     getAttachments,
-    deleteAttachment
+    getDownloadUrl,
+    deleteAttachment,
+    getFileCategories,
+    getFileAnalytics,
+    uploadAttachmentsToS3
 };

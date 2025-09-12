@@ -61,17 +61,72 @@ const getCustomerById = async (req, res) => {
     }
 };
 
-// --- GET CUSTOMER BY AFM (Active only) ---
+// --- GET CUSTOMER BY AFM (Active only) with Applications ---
 const getCustomerByAfm = async (req, res) => { 
-    const { afm } = req.params; 
+    const { afm } = req.params;
+    const { id: userId, role: userRole } = req.user;
+    
     try { 
         const customer = await pool.query("SELECT * FROM customers WHERE afm = $1 AND deleted_at IS NULL", [afm]); 
         if (customer.rows.length === 0) { 
             return res.status(404).json({ message: 'Customer not found' }); 
-        } 
-        res.json(customer.rows[0]); 
+        }
+        
+        const customerData = customer.rows[0];
+        
+        // Get customer's applications with proper permissions
+        let applicationsQuery;
+        let queryParams = [customerData.id];
+        let paramIndex = 2;
+        
+        const baseQuery = `
+            SELECT 
+                app.id, app.status, app.created_at, app.total_commission, 
+                app.contract_end_date, app.is_paid_by_company,
+                co.name as company_name, co.id as company_id,
+                u.name as associate_name, u.id as associate_id
+            FROM applications app
+            JOIN companies co ON app.company_id = co.id
+            JOIN users u ON app.user_id = u.id
+            WHERE app.customer_id = $1
+        `;
+        
+        if (userRole === 'Secretary') {
+            // Secretary inherits TeamLeader's data access
+            const effectiveUserId = await getEffectiveUserId(req.user);
+            const teamMembersResult = await pool.query('SELECT id FROM users WHERE parent_user_id = $1', [effectiveUserId]);
+            const teamMemberIds = teamMembersResult.rows.map(user => user.id);
+            const allUserIds = [effectiveUserId, ...teamMemberIds];
+            
+            if (allUserIds.length > 0) {
+                applicationsQuery = `${baseQuery} AND app.user_id = ANY($2::int[]) ORDER BY app.created_at DESC`;
+                queryParams.push(allUserIds);
+            } else {
+                // No team members
+                applicationsQuery = `${baseQuery} AND 1=0 ORDER BY app.created_at DESC`; // Return no results
+            }
+        } else if (userRole === 'TeamLeader' || userRole === 'Admin') {
+            const teamMembersResult = await pool.query('SELECT id FROM users WHERE parent_user_id = $1', [userId]);
+            const teamMemberIds = teamMembersResult.rows.map(user => user.id);
+            const allUserIds = [userId, ...teamMemberIds];
+            
+            applicationsQuery = `${baseQuery} AND app.user_id = ANY($2::int[]) ORDER BY app.created_at DESC`;
+            queryParams.push(allUserIds);
+        } else {
+            // Associate role - only own applications
+            applicationsQuery = `${baseQuery} AND app.user_id = $2 ORDER BY app.created_at DESC`;
+            queryParams.push(userId);
+        }
+        
+        const applicationsResult = await pool.query(applicationsQuery, queryParams);
+        
+        // Add applications to customer data
+        customerData.applications = applicationsResult.rows;
+        customerData.applications_count = applicationsResult.rows.length;
+        
+        res.json(customerData); 
     } catch (err) { 
-        console.error(err.message); 
+        console.error('Error in getCustomerByAfm:', err.message); 
         res.status(500).send('Server Error'); 
     } 
 };

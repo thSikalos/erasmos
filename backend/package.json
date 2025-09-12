@@ -13,14 +13,17 @@
   "type": "commonjs",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.62.0",
+    "aws-sdk": "^2.1692.0",
     "bcryptjs": "^3.0.2",
     "cors": "^2.8.5",
     "dotenv": "^17.2.2",
     "exceljs": "^4.4.0",
     "express": "^5.1.0",
     "jsonwebtoken": "^9.0.2",
+    "multer": "^2.0.2",
     "pdfkit": "^0.17.2",
-    "pg": "^8.16.3"
+    "pg": "^8.16.3",
+    "sharp": "^0.34.3"
   },
   "devDependencies": {
     "nodemon": "^3.1.10"
