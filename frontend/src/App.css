@@ -1,0 +1,260 @@
+/* --- ΓΕΝΙΚΑ ΣΤΥΛ --- */
+body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; background-color: #f0f2f5;}
+.App { text-align: left; }
+.error-message { color: red; text-align: center; margin-top: 1rem; }
+.success-message { color: green; text-align: center; margin-top: 1rem; }
+.form-group { margin-bottom: 1rem; }
+label { display: block; margin-bottom: 0.5rem; color: #555; }
+input, select { width: 100%; padding: 0.5rem; border-radius: 4px; border: 1px solid #ccc; box-sizing: border-box; font-size: 1rem; }
+button { width: 100%; padding: 0.75rem; border: none; border-radius: 4px; background-color: #007bff; color: white; font-size: 1rem; cursor: pointer; }
+button:hover { background-color: #0056b3; }
+h1, h2, h3 { text-align: center; color: #333; }
+h3 { margin-top: 0; border-bottom: 1px solid #eee; padding-bottom: 0.5rem; }
+
+
+/* --- LAYOUT & SIDEBAR --- */
+.app-layout { display: flex; min-height: 100vh; }
+.sidebar { width: 250px; background-color: #343a40; color: white; display: flex; flex-direction: column; position: fixed; height: 100%; }
+.sidebar-header { padding: 1.5rem; text-align: center; border-bottom: 1px solid #495057; }
+.sidebar-header h3 { margin: 0; }
+.sidebar-nav { flex-grow: 1; padding: 1rem 0; }
+.sidebar-nav a { display: block; color: #adb5bd; text-decoration: none; padding: 0.75rem 1.5rem; transition: background-color 0.2s, color 0.2s; }
+.sidebar-nav a:hover { background-color: #495057; color: white; }
+.sidebar-nav a.active { background-color: #007bff; color: white; }
+.sidebar-footer { padding: 1.5rem; border-top: 1px solid #495057; }
+.logout-button-sidebar { background-color: #dc3545; }
+.logout-button-sidebar:hover { background-color: #c82333; }
+.main-content { margin-left: 250px; flex-grow: 1; padding: 2rem; }
+
+/* --- ΣΕΛΙΔΕΣ --- */
+.login-container { display: flex; justify-content: center; align-items: center; width: 100%; height: 100vh; }
+.login-form { background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); width: 100%; max-width: 400px; }
+.form-container, .detail-container, .dashboard-container { background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); width: 100%; margin: 0; align-self: flex-start; }
+.dashboard-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #eee; padding-bottom: 1rem; }
+.dashboard-header div { display: flex; align-items: center; }
+.applications-table { width: 100%; border-collapse: collapse; margin-top: 2rem; font-size: 0.9rem; }
+.applications-table th, .applications-table td { border: 1px solid #ddd; padding: 0.75rem; text-align: left; }
+.applications-table th { background-color: #f8f9fa; }
+.applications-table tbody tr:nth-child(even) { background-color: #f2f2f2; }
+.button-new { background-color: #28a745; color: white !important; padding: 0.5rem 1rem; border-radius: 4px; text-decoration: none; margin-right: 1rem; font-size: 0.875rem; }
+.button-new:hover { background-color: #218838; }
+
+/* Detail Page */
+.detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin: 2rem 0; }
+.detail-item { background-color: #f8f9fa; padding: 1rem; border-radius: 4px; }
+
+/* Payments Page */
+.payment-section, .history-section { margin-top: 2rem; }
+.payment-summary { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #eee; }
+
+/* Admin Page */
+.admin-grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 2rem; }
+.admin-section { background-color: #f8f9fa; padding: 1.5rem; border-radius: 8px; }
+.inline-form { display: flex; gap: 1rem; align-items: center; }
+.inline-form input { flex-grow: 1; }
+.inline-form button { width: auto; }
+.data-list { list-style: none; padding: 0; margin-top: 1rem; max-height: 300px; overflow-y: auto; }
+.data-list li { background-color: white; padding: 0.75rem; border: 1px solid #ddd; border-radius: 4px; margin-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: center; font-size: 0.9rem; }
+.data-list em { color: #6c757d; }
+
+/* Action Buttons */
+.action-buttons { display: flex; gap: 0.5rem; }
+.action-buttons button { width: auto; padding: 0.3rem 0.6rem; font-size: 0.8rem; }
+.button-edit { background-color: #ffc107; }
+.button-edit:hover { background-color: #e0a800; }
+.button-delete { background-color: #dc3545; }
+.button-delete:hover { background-color: #c82333; }
+
+/* Forms */
+.form-actions { display: flex; gap: 1rem; }
+.button-secondary { background-color: #6c757d; }
+.button-secondary:hover { background-color: #5a6268; }
+.inline-checkbox { display: flex; align-items: center; gap: 0.5rem; }
+.inline-checkbox input { width: auto; }
+.checkbox-group { display: flex; flex-direction: column; gap: 0.5rem; }
+
+/* Danger Zone */
+.danger-zone { margin-top: 2rem; padding-top: 2rem; border-top: 2px solid #dc3545; }
+.danger-zone button { width: auto; max-width: 200px; }
+
+/* --- Stats Grid --- */
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+.stat-card {
+    background-color: #fff;
+    padding: 1.5rem;
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+    display: flex;
+    align-items: center;
+}
+.stat-card-info h4 {
+    margin: 0 0 0.5rem 0;
+    color: #6c757d;
+    font-size: 1rem;
+    font-weight: 500;
+    text-align: left;
+}
+.stat-card-info p {
+    margin: 0;
+    font-size: 2rem;
+    font-weight: 700;
+    color: #343a40;
+    text-align: left;
+}
+/* --- Filters Grid --- */
+.filters-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 1rem;
+}
+/* --- Pending Reason Box --- */
+.pending-reason-box {
+    background-color: #fff3cd;
+    border: 1px solid #ffeeba;
+    color: #856404;
+    padding: 1rem;
+    border-radius: 4px;
+    margin-bottom: 2rem;
+}
+
+/* --- Modal Styles --- */
+.modal-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+.modal {
+    background: white;
+    padding: 2rem;
+    border-radius: 8px;
+    width: 90%;
+    max-width: 500px;
+}
+.modal textarea {
+    width: 100%;
+    box-sizing: border-box;
+}
+/* --- Comments Section --- */
+.comments-list {
+    margin-top: 1rem;
+    max-height: 400px;
+    overflow-y: auto;
+    border: 1px solid #eee;
+    padding: 1rem;
+    border-radius: 4px;
+}
+.comment {
+    padding: 0.75rem;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+    background-color: #f1f1f1;
+}
+.comment.own-comment {
+    background-color: #e1f5fe;
+    margin-left: 50px;
+}
+.comment p { margin: 0.25rem 0; }
+.comment small { color: #666; }
+.comment-form { margin-top: 1rem; }
+.comment-form textarea { width: 100%; box-sizing: border-box; margin-bottom: 0.5rem; }
+.comment-form button { width: auto; }
+/* --- Charts --- */
+.charts-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+    margin-top: 1rem;
+}
+.chart-container {
+    padding: 1rem;
+    border: 1px solid #eee;
+    border-radius: 8px;
+    position: relative; /* <--- Η ΜΑΓΙΚΗ ΠΡΟΣΘΗΚΗ */
+    height: 400px; /* <--- ΚΑΙ ΑΥΤΗ */
+}
+
+@media (max-width: 900px) {
+    .charts-grid {
+        grid-template-columns: 1fr;
+    }
+}
+/* --- Notifications --- */
+.notification-bell {
+    position: relative;
+    padding: 1rem 1.5rem;
+    cursor: pointer;
+}
+.notification-count {
+    position: absolute;
+    top: 12px;
+    right: 18px;
+    background-color: red;
+    color: white;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 0.75rem;
+    font-weight: bold;
+}
+.sidebar-footer {
+    position: relative; /* Απαραίτητο για το notification panel */
+    padding: 1.5rem;
+    border-top: 1px solid #495057;
+}
+
+.notification-panel {
+    position: absolute;
+    bottom: 100%; /* Εμφανίζεται πάνω από το footer */
+    left: 0;
+    width: 300px;
+    background-color: #fff;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    box-shadow: 0 -4px 12px rgba(0,0,0,0.15);
+    color: #333;
+    max-height: 400px;
+    overflow-y: auto;
+    z-index: 1000;
+}
+.notification-item {
+    padding: 1rem;
+    border-bottom: 1px solid #eee;
+}
+.notification-item:last-child {
+    border-bottom: none;
+}
+.notification-item p {
+    margin: 0 0 0.5rem 0;
+    font-size: 0.9rem;
+}
+.button-mark-read {
+    background: none;
+    border: 1px solid #ccc;
+    color: #333;
+    padding: 2px 6px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    margin-left: 1rem;
+}
+.notification-item.read p {
+    opacity: 0.6;
+}
+.completed-list li {
+    opacity: 0.6;
+    text-decoration: line-through;
+}
