@@ -1,5 +1,6 @@
 const pool = require('../config/db');
 const ExcelJS = require('exceljs');
+const { getEffectiveUserId } = require('../utils/userUtils');
 
 const createApplication = async (req, res) => {
   const { company_id, field_values, contract_end_date, customerDetails, is_personal } = req.body;
@@ -250,13 +251,23 @@ const getApplications = async (req, res) => {
             LEFT JOIN application_values av ON app.id = av.application_id
             LEFT JOIN fields f ON av.field_id = f.id
         `;
-        if (userRole === 'TeamLeader' || userRole === 'Admin') {
+        
+        if (userRole === 'Secretary') {
+            // Secretary inherits TeamLeader's data access
+            const effectiveUserId = await getEffectiveUserId(req.user);
+            const teamMembersResult = await pool.query('SELECT id FROM users WHERE parent_user_id = $1', [effectiveUserId]);
+            const teamMemberIds = teamMembersResult.rows.map(user => user.id);
+            const allUserIds = [effectiveUserId, ...teamMemberIds];
+            query = `${baseQuery} WHERE app.user_id = ANY($1::int[]) GROUP BY app.id, cust.full_name, co.name, u.name ORDER BY app.created_at DESC;`;
+            queryParams = [allUserIds];
+        } else if (userRole === 'TeamLeader' || userRole === 'Admin') {
             const teamMembersResult = await pool.query('SELECT id FROM users WHERE parent_user_id = $1', [userId]);
             const teamMemberIds = teamMembersResult.rows.map(user => user.id);
             const allUserIds = [userId, ...teamMemberIds];
             query = `${baseQuery} WHERE app.user_id = ANY($1::int[]) GROUP BY app.id, cust.full_name, co.name, u.name ORDER BY app.created_at DESC;`;
             queryParams = [allUserIds];
         } else {
+            // Associate role
             query = `${baseQuery} WHERE app.user_id = $1 GROUP BY app.id, cust.full_name, co.name, u.name ORDER BY app.created_at DESC;`;
             queryParams = [userId];
         }
@@ -294,7 +305,20 @@ const getRenewals = async (req, res) => {
         let userFilter;
         let queryParams = [];
         let paramIndex = 1;
-        if (userRole === 'TeamLeader' || userRole === 'Admin') {
+        
+        if (userRole === 'Secretary') {
+            // Secretary inherits TeamLeader's data access
+            const effectiveUserId = await getEffectiveUserId(req.user);
+            const teamMembersResult = await pool.query(`SELECT id FROM users WHERE parent_user_id = $${paramIndex++}`, [effectiveUserId]);
+            const teamMemberIds = teamMembersResult.rows.map(user => user.id);
+            const allUserIds = [effectiveUserId, ...teamMemberIds];
+           
+            if (allUserIds.length === 0) {
+                return res.json([]);
+            }
+            userFilter = `app.user_id = ANY($${paramIndex++}::int[])`;
+            queryParams.push(allUserIds);
+        } else if (userRole === 'TeamLeader' || userRole === 'Admin') {
             const teamMembersResult = await pool.query(`SELECT id FROM users WHERE parent_user_id = $${paramIndex++}`, [userId]);
             const teamMemberIds = teamMembersResult.rows.map(user => user.id);
             const allUserIds = [userId, ...teamMemberIds];
@@ -306,6 +330,7 @@ const getRenewals = async (req, res) => {
             userFilter = `app.user_id = ANY($${paramIndex++}::int[])`;
             queryParams.push(allUserIds);
         } else {
+            // Associate role
             userFilter = `app.user_id = $${paramIndex++}`;
             queryParams.push(userId);
         }

@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const authMiddleware = require('../middleware/authMiddleware');
+const financeAuthMiddleware = require('../middleware/financeAuthMiddleware');
 const { 
     createPaymentStatement, 
     createClawback,
@@ -10,6 +11,7 @@ const {
 } = require('../controllers/paymentController');
 
 router.use(authMiddleware);
+router.use(financeAuthMiddleware);
 
 // --- Statements ---
 router.post('/statements', createPaymentStatement);

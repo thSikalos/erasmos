@@ -1,4 +1,5 @@
 const pool = require('../config/db');
+const { getEffectiveUserId } = require('../utils/userUtils');
 
 // --- GET CUSTOMERS (ACTIVE ONLY) ---
 const getAllCustomers = async (req, res) => {
@@ -11,13 +12,22 @@ const getAllCustomers = async (req, res) => {
                          FROM customers c JOIN users u ON c.created_by_user_id = u.id WHERE c.deleted_at IS NULL`;
         
         let whereClauses = [];
-        if (userRole === 'TeamLeader' || userRole === 'Admin') {
+        if (userRole === 'Secretary') {
+            // Secretary inherits TeamLeader's data access
+            const effectiveUserId = await getEffectiveUserId(req.user);
+            const teamMembersResult = await pool.query('SELECT id FROM users WHERE parent_user_id = $1', [effectiveUserId]);
+            const teamMemberIds = teamMembersResult.rows.map(user => user.id);
+            const allUserIds = [effectiveUserId, ...teamMemberIds];
+            whereClauses.push(`c.created_by_user_id = ANY($1::int[])`);
+            queryParams.push(allUserIds);
+        } else if (userRole === 'TeamLeader' || userRole === 'Admin') {
             const teamMembersResult = await pool.query('SELECT id FROM users WHERE parent_user_id = $1', [userId]);
             const teamMemberIds = teamMembersResult.rows.map(user => user.id);
             const allUserIds = [userId, ...teamMemberIds];
             whereClauses.push(`c.created_by_user_id = ANY($1::int[])`);
             queryParams.push(allUserIds);
         } else {
+            // Associate role
             whereClauses.push(`c.created_by_user_id = $1`);
             queryParams.push(userId);
         }

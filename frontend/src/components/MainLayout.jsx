@@ -63,8 +63,12 @@ const MainLayout = () => {
                     <NavLink to="/application/new" className="nav-button-new">Νέα Αίτηση</NavLink>
                     <NavLink to="/customers">Πελατολόγιο</NavLink>
                     <NavLink to="/renewals">Ανανεώσεις</NavLink>
-                    <NavLink to="/reporting">Αναφορές</NavLink>
-                    <NavLink to="/payments">Πληρωμές</NavLink>
+                    {user?.role !== 'Secretary' && (
+                        <NavLink to="/reporting">Αναφορές</NavLink>
+                    )}
+                    {user?.role !== 'Secretary' && (
+                        <NavLink to="/payments">Πληρωμές</NavLink>
+                    )}
                     <NavLink to="/notifications">Ειδοποιήσεις</NavLink>
                     {(user?.role === 'Admin' || user?.role === 'TeamLeader') && (
                       <NavLink to="/commissions">Αμοιβές</NavLink>
