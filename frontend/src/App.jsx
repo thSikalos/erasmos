@@ -14,6 +14,7 @@ import AdminRecycleBinPage from './pages/AdminRecycleBinPage';
 import AdminUsersPage from './pages/AdminUsersPage';
 import AdminBillingSettingsPage from './pages/AdminBillingSettingsPage';
 import AdminInvoicingPage from './pages/AdminInvoicingPage';
+import AdminTermsPage from './pages/AdminTermsPage';
 import CommissionsPage from './pages/CommissionsPage';
 import RenewalsPage from './pages/RenewalsPage';
 import CustomersPage from './pages/CustomersPage';
@@ -23,6 +24,7 @@ import NotificationsPage from './pages/NotificationsPage';
 import MainLayout from './components/MainLayout';
 import ProtectedRoute from './components/ProtectedRoute';
 import FinanceProtectedRoute from './components/FinanceProtectedRoute';
+import TermsGuard from './components/TermsGuard';
 import TermsPage from './pages/TermsPage';
 import './App.css';
 
@@ -59,6 +61,7 @@ function App() {
           <Route path="/admin/users" element={<AdminUsersPage />} />
           <Route path="/admin/billing-settings" element={<AdminBillingSettingsPage />} />
           <Route path="/admin/invoicing" element={<AdminInvoicingPage />} />
+          <Route path="/admin/terms" element={<AdminTermsPage />} />
         </Route>
       </Route>
       <Route path="/" element={<Navigate to="/dashboard" />} />

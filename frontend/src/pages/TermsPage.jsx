@@ -1,12 +1,32 @@
-import React, { useContext, useState } from 'react';
+import React, { useContext, useState, useEffect } from 'react';
 import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
+import ReactMarkdown from 'react-markdown';
 import '../App.css';
 
 const TermsPage = () => {
-    const { userAcceptedTerms } = useContext(AuthContext);
+    const { token, userAcceptedTerms } = useContext(AuthContext);
     const [loading, setLoading] = useState(false);
     const [scrolledToBottom, setScrolledToBottom] = useState(false);
+    const [terms, setTerms] = useState(null);
+    const [loadingTerms, setLoadingTerms] = useState(true);
+    const [error, setError] = useState('');
+
+    useEffect(() => {
+        fetchCurrentTerms();
+    }, []);
+
+    const fetchCurrentTerms = async () => {
+        try {
+            const response = await axios.get('http://localhost:3000/api/terms/current');
+            setTerms(response.data);
+        } catch (err) {
+            console.error('Error fetching terms:', err);
+            setError('Σφάλμα κατά τη φόρτωση των όρων χρήσης');
+        } finally {
+            setLoadingTerms(false);
+        }
+    };
 
     const handleScroll = (e) => {
         const element = e.target;
@@ -16,22 +36,76 @@ const TermsPage = () => {
     };
 
     const handleAccept = async () => {
+        if (!token) {
+            setError('Δεν είστε συνδεδεμένος');
+            return;
+        }
+
         setLoading(true);
         try {
-            const res = await axios.post('http://localhost:3000/api/users/accept-terms', {});
-            // Παίρνουμε το νέο token από το backend και ενημερώνουμε το context
-            userAcceptedTerms(res.data.token);
+            const config = {
+                headers: { Authorization: `Bearer ${token}` }
+            };
+            const response = await axios.post('http://localhost:3000/api/terms/accept', {}, config);
+            
+            // Use the context's userAcceptedTerms function to properly handle the new token
+            if (response.data.token) {
+                userAcceptedTerms(response.data.token);
+            } else {
+                // Fallback if no token returned
+                window.location.href = '/dashboard';
+            }
         } catch (err) {
             console.error("Failed to accept terms", err);
-            alert("An error occurred. Please try again.");
+            setError("Σφάλμα κατά την αποδοχή των όρων. Δοκιμάστε ξανά.");
             setLoading(false);
         }
     };
 
+    if (loadingTerms) {
+        return (
+            <div className="login-container">
+                <style>
+                    {`
+                        @keyframes spin {
+                            0% { transform: rotate(0deg); }
+                            100% { transform: rotate(360deg); }
+                        }
+                    `}
+                </style>
+                <div className="form-container" style={{maxWidth: '700px', textAlign: 'center'}}>
+                    <h2>Φόρτωση όρων χρήσης...</h2>
+                    <div style={{margin: '20px 0'}}>
+                        <div style={{
+                            border: '3px solid #f3f4f6',
+                            borderTop: '3px solid #667eea',
+                            borderRadius: '50%',
+                            width: '40px',
+                            height: '40px',
+                            animation: 'spin 1s linear infinite',
+                            margin: '0 auto'
+                        }}></div>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="login-container">
             <div className="form-container" style={{maxWidth: '700px'}}>
-                <h2>Όροι Χρήσης & Πολιτική Προστασίας Δεδομένων (GDPR)</h2>
+                <h2>{terms?.title || 'Όροι Χρήσης'}</h2>
+                {error && (
+                    <div style={{
+                        background: '#fee2e2',
+                        color: '#dc2626',
+                        padding: '15px',
+                        borderRadius: '8px',
+                        marginBottom: '20px'
+                    }}>
+                        {error}
+                    </div>
+                )}
                 <div 
                     style={{
                         textAlign: 'left', 
@@ -45,47 +119,14 @@ const TermsPage = () => {
                     }}
                     onScroll={handleScroll}
                 >
-                    <h3>1. ΑΠΟΔΟΧΗ ΟΡΩΝ</h3>
-                    <p>Η χρήση της εφαρμογής Έρασμος συνιστά αποδοχή των παρόντων όρων χρήσης και της πολιτικής προστασίας δεδομένων.</p>
-                    
-                    <h3>2. ΧΡΗΣΗ ΤΗΣ ΠΛΑΤΦΟΡΜΑΣ</h3>
-                    <p>Η πλατφόρμα προορίζεται για τη διαχείριση εργασιών, πελατών, και παρακολούθηση προμηθειών. Ο χρήστης αναλαμβάνει την ευθύνη για τη σωστή και νόμιμη χρήση.</p>
-
-                    <h3>3. ΠΡΟΣΤΑΣΙΑ ΔΕΔΟΜΕΝΩΝ (GDPR)</h3>
-                    <p><strong>Συλλογή Δεδομένων:</strong> Συλλέγουμε προσωπικά δεδομένα που είναι απαραίτητα για τη λειτουργία της πλατφόρμας:</p>
-                    <ul>
-                        <li>Στοιχεία χρήστη (όνομα, email, ρόλος)</li>
-                        <li>Στοιχεία πελατών και εταιρειών</li>
-                        <li>Οικονομικά στοιχεία (προμήθειες, πληρωμές)</li>
-                        <li>Τεχνικά δεδομένα (IP address, user agent) για λόγους ασφαλείας</li>
-                    </ul>
-                    
-                    <p><strong>Σκοπός Επεξεργασίας:</strong> Τα δεδομένα χρησιμοποιούνται για:</p>
-                    <ul>
-                        <li>Παροχή υπηρεσιών της πλατφόρμας</li>
-                        <li>Υπολογισμό και καταβολή προμηθειών</li>
-                        <li>Στατιστικά και αναφορές</li>
-                        <li>Ασφάλεια και αποτροπή κατάχρησης</li>
-                    </ul>
-
-                    <p><strong>Νομική Βάση:</strong> Η επεξεργασία βασίζεται στη συναίνεση και το έννομο συμφέρον για την εκτέλεση συμβάσεων.</p>
-
-                    <p><strong>Διατήρηση:</strong> Τα δεδομένα διατηρούνται όσο διάστημα είναι απαραίτητο για τους σκοπούς επεξεργασίας και σύμφωνα με τις νομικές υποχρεώσεις.</p>
-
-                    <p><strong>Δικαιώματά σας:</strong> Έχετε δικαίωμα πρόσβασης, διόρθωσης, διαγραφής, περιορισμού επεξεργασίας, φορητότητας δεδομένων και εναντίωσης.</p>
-
-                    <h3>4. ΑΣΦΑΛΕΙΑ</h3>
-                    <p>Εφαρμόζουμε κατάλληλα τεχνικά και οργανωτικά μέτρα για την προστασία των δεδομένων σας.</p>
-
-                    <h3>5. ΑΛΛΑΓΕΣ ΣΤΟΥΣ ΟΡΟΥΣ</h3>
-                    <p>Διατηρούμε το δικαίωμα τροποποίησης των παρόντων όρων. Οι χρήστες θα ενημερώνονται για σημαντικές αλλαγές.</p>
-
-                    <h3>6. ΕΠΙΚΟΙΝΩΝΙΑ</h3>
-                    <p>Για οποιαδήποτε ερώτηση ή άσκηση των δικαιωμάτων σας, επικοινωνήστε με τον διαχειριστή της πλατφόρμας.</p>
-
+                    {terms ? (
+                        <ReactMarkdown>{terms.content}</ReactMarkdown>
+                    ) : (
+                        <p>Δεν ήταν δυνατή η φόρτωση των όρων χρήσης.</p>
+                    )}
                     <hr style={{margin: '1.5rem 0'}} />
                     <p style={{fontSize: '12px', color: '#666'}}>
-                        Ημερομηνία τελευταίας ενημέρωσης: {new Date().toLocaleDateString('el-GR')}
+                        Έκδοση: {terms?.version} | Ημερομηνία ισχύος: {terms?.effective_date ? new Date(terms.effective_date).toLocaleDateString('el-GR') : 'N/A'}
                     </p>
                 </div>
                 
@@ -101,16 +142,45 @@ const TermsPage = () => {
                     </label>
                 </div>
 
-                <button 
-                    onClick={handleAccept} 
-                    disabled={loading || !scrolledToBottom}
-                    style={{
-                        backgroundColor: scrolledToBottom ? '#007bff' : '#ccc',
-                        cursor: scrolledToBottom ? 'pointer' : 'not-allowed'
-                    }}
-                >
-                    {loading ? 'Επεξεργασία...' : 'Αποδέχομαι τους Όρους'}
-                </button>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                    <button 
+                        onClick={handleAccept} 
+                        disabled={loading || !scrolledToBottom}
+                        style={{
+                            backgroundColor: scrolledToBottom ? '#28a745' : '#ccc',
+                            color: 'white',
+                            border: 'none',
+                            padding: '15px 30px',
+                            borderRadius: '6px',
+                            cursor: scrolledToBottom ? 'pointer' : 'not-allowed',
+                            fontWeight: '600',
+                            fontSize: '16px',
+                            flex: 3
+                        }}
+                    >
+                        {loading ? 'Επεξεργασία...' : '✅ Αποδέχομαι τους Όρους'}
+                    </button>
+                    
+                    <button 
+                        onClick={() => {
+                            window.location.href = '/dashboard';
+                        }}
+                        disabled={loading}
+                        style={{
+                            backgroundColor: '#6c757d',
+                            color: 'white',
+                            border: 'none',
+                            padding: '12px 18px',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            fontWeight: '500',
+                            fontSize: '14px',
+                            flex: 1
+                        }}
+                    >
+                        ❌ Απόρριψη
+                    </button>
+                </div>
             </div>
         </div>
     );

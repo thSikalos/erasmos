@@ -44,6 +44,13 @@ const AdminPage = () => {
             icon: '🧾',
             link: '/admin/invoicing',
             color: 'from-pink-500 to-rose-600'
+        },
+        {
+            title: 'Διαχείριση Όρων Χρήσης',
+            description: 'Δημιούργησε νέες εκδόσεις των όρων χρήσης και παρακολούθησε την αποδοχή τους από τους χρήστες.',
+            icon: '📄',
+            link: '/admin/terms',
+            color: 'from-purple-500 to-indigo-600'
         }
     ];
 
@@ -357,7 +364,7 @@ const AdminPage = () => {
             <div className="admin-stats">
                 <div className="stat-card">
                     <div className="stat-icon">📝</div>
-                    <div className="stat-number">6</div>
+                    <div className="stat-number">7</div>
                     <div className="stat-label">Διαθέσιμες Λειτουργίες</div>
                 </div>
                 <div className="stat-card">

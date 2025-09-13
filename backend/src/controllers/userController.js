@@ -183,14 +183,29 @@ const getUserAgreement = async (req, res) => {
 const generateAgreementPdf = async (req, res) => {
     const { id } = req.params;
     try {
-        // Get detailed agreement info
+        // Get user's terms acceptance info from new system
         const result = await pool.query(
-            `SELECT * FROM user_agreements_detailed WHERE user_id = $1`,
+            `SELECT 
+                u.name as user_name, 
+                u.email as user_email,
+                uta.accepted_at,
+                uta.ip_address,
+                uta.user_agent,
+                t.version as terms_version,
+                t.title as terms_title,
+                t.content as terms_content,
+                t.effective_date
+            FROM users u
+            LEFT JOIN user_terms_acceptance uta ON u.id = uta.user_id
+            LEFT JOIN terms_of_service t ON uta.terms_id = t.id
+            WHERE u.id = $1 AND uta.accepted_at IS NOT NULL
+            ORDER BY uta.accepted_at DESC
+            LIMIT 1`,
             [id]
         );
         
         if (result.rows.length === 0) {
-            return res.status(404).json({ message: 'No agreement found for this user' });
+            return res.status(404).json({ message: 'No terms acceptance found for this user' });
         }
         
         const agreement = result.rows[0];

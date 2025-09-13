@@ -19,6 +19,7 @@ const notificationsRoutes = require('./routes/notificationsRoutes');
 const remindersRoutes = require('./routes/remindersRoutes');
 const attachmentRoutes = require('./routes/attachmentRoutes');
 const adminBillingRoutes = require('./routes/adminBillingRoutes'); // <-- ΝΕΟ
+const termsRoutes = require('./routes/termsRoutes');
 
 const app = express();
 const PORT = 3000;
@@ -51,6 +52,7 @@ app.use('/api/notifications', notificationsRoutes);
 app.use('/api/reminders', remindersRoutes);
 app.use('/api/attachments', attachmentRoutes);
 app.use('/api/admin-billing', adminBillingRoutes); // <-- ΝΕΟ
+app.use('/api/terms', termsRoutes);
 app.use('/api/ai', aiRoutes);
 
 app.listen(PORT, () => { console.log(`Server is running on http://localhost:${PORT}`); });
