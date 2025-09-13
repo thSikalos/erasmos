@@ -46,6 +46,7 @@ const Header = () => {
     };
 
     const handleLogout = () => {
+        setIsProfileMenuOpen(false);
         logout();
         navigate('/login');
     };
@@ -136,7 +137,7 @@ const Header = () => {
                         box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
                         max-height: 400px;
                         overflow-y: auto;
-                        z-index: 1001;
+                        z-index: 10000;
                     }
 
                     .header-notification-item {
@@ -198,7 +199,7 @@ const Header = () => {
                         border-radius: 12px;
                         box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
                         overflow: hidden;
-                        z-index: 1001;
+                        z-index: 10000;
                     }
 
                     .profile-menu-item {
@@ -214,6 +215,8 @@ const Header = () => {
                         background: none;
                         width: 100%;
                         cursor: pointer;
+                        pointer-events: auto;
+                        text-align: left;
                     }
 
                     .profile-menu-item:hover {
@@ -311,7 +314,7 @@ const Header = () => {
                         left: 0;
                         width: 100%;
                         height: 100%;
-                        z-index: 1000;
+                        z-index: 999;
                         background: transparent;
                     }
                 `}
@@ -338,7 +341,7 @@ const Header = () => {
                         {unreadCount > 0 && <span className="notification-count-header">{unreadCount}</span>}
 
                         {isNotificationPanelOpen && (
-                            <div className="header-notification-panel">
+                            <div className="header-notification-panel" onClick={(e) => e.stopPropagation()}>
                                 {notifications.length > 0 ? notifications.map(notif => (
                                     <div key={notif.id} className={`header-notification-item ${notif.status}`}>
                                         <p onClick={() => handleNotificationClick(notif)}>{notif.message}</p>
@@ -359,7 +362,7 @@ const Header = () => {
                         👤 Προφίλ
 
                         {isProfileMenuOpen && (
-                            <div className="header-profile-menu">
+                            <div className="header-profile-menu" onClick={(e) => e.stopPropagation()}>
                                 <Link to="/profile" className="profile-menu-item" onClick={() => setIsProfileMenuOpen(false)}>
                                     👤 Το Προφίλ μου
                                 </Link>
