@@ -6,6 +6,7 @@ const {
     createPaymentStatement,
     createClawback,
     getStatements,
+    getStatement,
     updateStatementStatus,
     generateStatementPdf,
     deletePaymentStatement,
@@ -24,6 +25,7 @@ router.post('/statements', (req, res, next) => {
     next();
 }, createPaymentStatement);
 router.get('/statements', getStatements);
+router.get('/statements/:id', getStatement);
 router.get('/statements/:id/pdf', generateStatementPdf);
 router.patch('/statements/:id/status', updateStatementStatus);
 

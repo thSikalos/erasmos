@@ -297,6 +297,7 @@ const getApplications = async (req, res) => {
             queryParams = [userId];
         }
         const result = await pool.query(query, queryParams);
+        console.log('Sample app with fields:', result.rows[0]?.fields);
         res.json(result.rows);
     } catch (err) {
         console.error(err.message);

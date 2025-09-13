@@ -487,6 +487,52 @@ const editPaymentStatement = async (req, res) => {
     }
 };
 
+// --- GET SINGLE PAYMENT STATEMENT ---
+const getStatement = async (req, res) => {
+    const { id } = req.params;
+    const userId = req.user.id;
+
+    try {
+        // Get statement details with recipient info
+        const statementQuery = `
+            SELECT
+                ps.id,
+                ps.recipient_id,
+                ps.total_amount,
+                ps.payment_status,
+                ps.created_at,
+                ps.paid_date,
+                ps.creator_id,
+                u.name as recipient_name,
+                ARRAY_AGG(DISTINCT si.application_id) as application_ids
+            FROM payment_statements ps
+            JOIN users u ON ps.recipient_id = u.id
+            LEFT JOIN statement_items si ON ps.id = si.statement_id
+            WHERE ps.id = $1
+            GROUP BY ps.id, u.name
+        `;
+
+        const result = await pool.query(statementQuery, [id]);
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ message: 'Payment statement not found' });
+        }
+
+        const statement = result.rows[0];
+
+        // Check if user has permission (must be creator or admin)
+        if (statement.creator_id !== userId && req.user.role !== 'Admin') {
+            return res.status(403).json({ message: 'Not authorized to access this statement' });
+        }
+
+        res.json(statement);
+
+    } catch (err) {
+        console.error('Error fetching payment statement:', err.message);
+        res.status(500).json({ message: 'Server error' });
+    }
+};
+
 // --- MARK PAYMENT STATEMENT AS PAID ---
 const markStatementAsPaid = async (req, res) => {
     const { id } = req.params;
@@ -539,6 +585,7 @@ module.exports = {
     createPaymentStatement,
     createClawback,
     getStatements,
+    getStatement,
     updateStatementStatus,
     generateStatementPdf,
     deletePaymentStatement,
