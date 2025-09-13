@@ -54,6 +54,11 @@ const AdminInvoicingPage = () => {
         window.open(url, '_blank');
     };
 
+    const handleDownloadExcel = (invoiceId) => {
+        const url = `http://localhost:3000/api/admin-billing/invoices/${invoiceId}/excel?token=${token}`;
+        window.open(url, '_blank');
+    };
+
     return (
         <div className="modern-admin-invoicing-container">
             <style>
@@ -414,6 +419,23 @@ const AdminInvoicingPage = () => {
                         box-shadow: 0 6px 20px rgba(239, 68, 68, 0.4);
                     }
 
+                    .excel-button {
+                        padding: 8px 16px;
+                        background: linear-gradient(135deg, #16a085, #0f7864);
+                        color: white;
+                        border: none;
+                        border-radius: 8px;
+                        font-weight: 600;
+                        cursor: pointer;
+                        transition: all 0.3s ease;
+                        box-shadow: 0 4px 15px rgba(22, 160, 133, 0.3);
+                        font-size: 0.9rem;
+                    }
+                    .excel-button:hover {
+                        transform: translateY(-2px);
+                        box-shadow: 0 6px 20px rgba(22, 160, 133, 0.4);
+                    }
+
                     .loading-state {
                         text-align: center;
                         padding: 40px;
@@ -614,12 +636,20 @@ const AdminInvoicingPage = () => {
                                         <td>{inv.application_count}</td>
                                         <td><strong>{parseFloat(inv.total_charge).toFixed(2)} €</strong></td>
                                         <td>
-                                            <button 
-                                                onClick={() => handleDownloadPdf(inv.id)} 
-                                                className="pdf-button"
-                                            >
-                                                📄 PDF
-                                            </button>
+                                            <div style={{display: 'flex', gap: '5px', flexWrap: 'wrap'}}>
+                                                <button
+                                                    onClick={() => handleDownloadPdf(inv.id)}
+                                                    className="pdf-button"
+                                                >
+                                                    📄 PDF
+                                                </button>
+                                                <button
+                                                    onClick={() => handleDownloadExcel(inv.id)}
+                                                    className="excel-button"
+                                                >
+                                                    📊 Excel
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}

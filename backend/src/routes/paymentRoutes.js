@@ -9,6 +9,7 @@ const {
     getStatement,
     updateStatementStatus,
     generateStatementPdf,
+    generateStatementExcel,
     deletePaymentStatement,
     editPaymentStatement,
     markStatementAsPaid
@@ -27,6 +28,7 @@ router.post('/statements', (req, res, next) => {
 router.get('/statements', getStatements);
 router.get('/statements/:id', getStatement);
 router.get('/statements/:id/pdf', generateStatementPdf);
+router.get('/statements/:id/excel', generateStatementExcel);
 router.patch('/statements/:id/status', updateStatementStatus);
 
 // New statement management endpoints

@@ -2,6 +2,7 @@ const pool = require('../config/db');
 const documentGenerator = require('../utils/documentGenerator');
 const fs = require('fs');
 const path = require('path');
+const ExcelJS = require('exceljs');
 
 // --- GENERATE PDF FOR A STATEMENT (ENTERPRISE VERSION) ---
 const generateStatementPdf = async (req, res) => {
@@ -27,14 +28,16 @@ const generateStatementPdf = async (req, res) => {
                 a.id as application_id,
                 c.full_name as customer_name,
                 comp.name as company_name,
-                CASE 
+                CASE
                     WHEN si.field_id IS NOT NULL THEN f.label
                     ELSE 'Αίτηση'
                 END as item_type,
-                CASE 
+                CASE
                     WHEN si.field_id IS NOT NULL THEN COALESCE(cf.commission_amount, 0)
                     ELSE COALESCE(a.total_commission, 0)
-                END as commission_amount
+                END as commission_amount,
+                a.id as sort_application_id,
+                COALESCE(f.label, 'ZZZZZ') as sort_field_label
             FROM statement_items si
             JOIN applications a ON si.application_id = a.id
             JOIN customers c ON a.customer_id = c.id
@@ -42,7 +45,7 @@ const generateStatementPdf = async (req, res) => {
             LEFT JOIN fields f ON si.field_id = f.id
             LEFT JOIN company_fields cf ON si.field_id = cf.field_id AND a.company_id = cf.company_id
             WHERE si.statement_id = $1
-            ORDER BY a.id, f.label
+            ORDER BY sort_application_id, sort_field_label
         `;
         const itemsRes = await pool.query(itemsQuery, [id]);
         const items = itemsRes.rows;
@@ -504,7 +507,7 @@ const getStatement = async (req, res) => {
                 ps.paid_date,
                 ps.creator_id,
                 u.name as recipient_name,
-                ARRAY_AGG(DISTINCT si.application_id) as application_ids
+                ARRAY_AGG(DISTINCT si.application_id) FILTER (WHERE si.application_id IS NOT NULL) as application_ids
             FROM payment_statements ps
             JOIN users u ON ps.recipient_id = u.id
             LEFT JOIN statement_items si ON ps.id = si.statement_id
@@ -581,6 +584,132 @@ const markStatementAsPaid = async (req, res) => {
     }
 };
 
+// --- GENERATE EXCEL FOR A STATEMENT ---
+const generateStatementExcel = async (req, res) => {
+    const { id } = req.params;
+    try {
+        // Fetch statement data
+        const statementQuery = `
+            SELECT ps.*,
+                   r.name as recipient_name, r.email as recipient_email, r.phone as recipient_phone
+            FROM payment_statements ps
+            JOIN users r ON ps.recipient_id = r.id
+            WHERE ps.id = $1
+        `;
+        const statementRes = await pool.query(statementQuery, [id]);
+        if (statementRes.rows.length === 0) {
+            return res.status(404).send('Statement not found');
+        }
+        const statement = statementRes.rows[0];
+
+        // Fetch statement items with field-level details
+        const itemsQuery = `
+            SELECT DISTINCT
+                a.id as application_id,
+                c.full_name as customer_name,
+                comp.name as company_name,
+                CASE
+                    WHEN si.field_id IS NOT NULL THEN f.label
+                    ELSE 'Αίτηση'
+                END as item_type,
+                CASE
+                    WHEN si.field_id IS NOT NULL THEN COALESCE(cf.commission_amount, 0)
+                    ELSE COALESCE(a.total_commission, 0)
+                END as commission_amount,
+                a.id as sort_application_id,
+                COALESCE(f.label, 'ZZZZZ') as sort_field_label
+            FROM statement_items si
+            JOIN applications a ON si.application_id = a.id
+            JOIN customers c ON a.customer_id = c.id
+            JOIN companies comp ON a.company_id = comp.id
+            LEFT JOIN fields f ON si.field_id = f.id
+            LEFT JOIN company_fields cf ON si.field_id = cf.field_id AND a.company_id = cf.company_id
+            WHERE si.statement_id = $1
+            ORDER BY sort_application_id, sort_field_label
+        `;
+        const itemsRes = await pool.query(itemsQuery, [id]);
+        const items = itemsRes.rows;
+
+        // Create a new workbook and worksheet
+        const workbook = new ExcelJS.Workbook();
+        const worksheet = workbook.addWorksheet('Ταμειακή Κατάσταση');
+
+        // Add headers
+        worksheet.columns = [
+            { header: 'Αριθμός Αίτησης', key: 'application_id', width: 15 },
+            { header: 'Πελάτης', key: 'customer_name', width: 30 },
+            { header: 'Εταιρία', key: 'company_name', width: 25 },
+            { header: 'Τύπος', key: 'item_type', width: 20 },
+            { header: 'Προμήθεια (€)', key: 'commission_amount', width: 15 }
+        ];
+
+        // Style the header row
+        worksheet.getRow(1).eachCell((cell) => {
+            cell.font = { bold: true };
+            cell.fill = {
+                type: 'pattern',
+                pattern: 'solid',
+                fgColor: { argb: 'FFE0E0E0' }
+            };
+        });
+
+        // Add data rows
+        items.forEach((item) => {
+            worksheet.addRow({
+                application_id: item.application_id,
+                customer_name: item.customer_name,
+                company_name: item.company_name,
+                item_type: item.item_type,
+                commission_amount: parseFloat(item.commission_amount)
+            });
+        });
+
+        // Add summary section
+        const summaryRowStart = worksheet.lastRow.number + 2;
+
+        worksheet.getCell(`A${summaryRowStart}`).value = 'Σύνολο Προμηθειών:';
+        worksheet.getCell(`A${summaryRowStart}`).font = { bold: true };
+        worksheet.getCell(`E${summaryRowStart}`).value = parseFloat(statement.subtotal) - parseFloat(statement.bonus_amount || 0);
+        worksheet.getCell(`E${summaryRowStart}`).numFmt = '€#,##0.00';
+
+        if (statement.bonus_amount && parseFloat(statement.bonus_amount) > 0) {
+            worksheet.getCell(`A${summaryRowStart + 1}`).value = 'Bonus:';
+            worksheet.getCell(`A${summaryRowStart + 1}`).font = { bold: true };
+            worksheet.getCell(`E${summaryRowStart + 1}`).value = parseFloat(statement.bonus_amount);
+            worksheet.getCell(`E${summaryRowStart + 1}`).numFmt = '€#,##0.00';
+        }
+
+        worksheet.getCell(`A${summaryRowStart + 2}`).value = 'Υποσύνολο:';
+        worksheet.getCell(`A${summaryRowStart + 2}`).font = { bold: true };
+        worksheet.getCell(`E${summaryRowStart + 2}`).value = parseFloat(statement.subtotal);
+        worksheet.getCell(`E${summaryRowStart + 2}`).numFmt = '€#,##0.00';
+
+        if (statement.vat_amount && parseFloat(statement.vat_amount) > 0) {
+            worksheet.getCell(`A${summaryRowStart + 3}`).value = 'ΦΠΑ 24%:';
+            worksheet.getCell(`A${summaryRowStart + 3}`).font = { bold: true };
+            worksheet.getCell(`E${summaryRowStart + 3}`).value = parseFloat(statement.vat_amount);
+            worksheet.getCell(`E${summaryRowStart + 3}`).numFmt = '€#,##0.00';
+        }
+
+        worksheet.getCell(`A${summaryRowStart + 4}`).value = 'Σύνολο:';
+        worksheet.getCell(`A${summaryRowStart + 4}`).font = { bold: true };
+        worksheet.getCell(`E${summaryRowStart + 4}`).value = parseFloat(statement.total_amount);
+        worksheet.getCell(`E${summaryRowStart + 4}`).numFmt = '€#,##0.00';
+
+        // Set response headers for Excel file
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename="tameiaki_katastasi_${id}.xlsx"`);
+
+        // Write to response
+        await workbook.xlsx.write(res);
+        res.end();
+
+    } catch (err) {
+        console.error("Excel Generation Error:", err.message);
+        res.status(500).send('Could not generate Excel file');
+    }
+};
+
 module.exports = {
     createPaymentStatement,
     createClawback,
@@ -588,6 +717,7 @@ module.exports = {
     getStatement,
     updateStatementStatus,
     generateStatementPdf,
+    generateStatementExcel,
     deletePaymentStatement,
     editPaymentStatement,
     markStatementAsPaid

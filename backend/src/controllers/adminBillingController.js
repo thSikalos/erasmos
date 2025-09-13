@@ -2,6 +2,7 @@ const pool = require('../config/db');
 const PDFDocument = require('pdfkit');
 const path = require('path');
 const documentGenerator = require('../utils/documentGenerator');
+const ExcelJS = require('exceljs');
 
 const getBillingSettings = async (req, res) => {
     try {
@@ -256,10 +257,95 @@ const generateInvoicePdf = async (req, res) => {
     }
 };
 
+const generateInvoiceExcel = async (req, res) => {
+    const { id } = req.params;
+
+    try {
+        // Fetch invoice data with team leader details
+        const invoiceQuery = `
+            SELECT i.*, u.name as team_leader_name, u.email as team_leader_email, u.afm as team_leader_afm
+            FROM team_leader_invoices i
+            JOIN users u ON i.team_leader_id = u.id
+            WHERE i.id = $1
+        `;
+        const invoiceRes = await pool.query(invoiceQuery, [id]);
+
+        if (invoiceRes.rows.length === 0) {
+            return res.status(404).send('Invoice not found');
+        }
+
+        const invoice = invoiceRes.rows[0];
+
+        // Create a new workbook and worksheet
+        const workbook = new ExcelJS.Workbook();
+        const worksheet = workbook.addWorksheet('Τιμολόγιο');
+
+        // Add header information
+        worksheet.getCell('A1').value = 'ΤΙΜΟΛΟΓΙΟ';
+        worksheet.getCell('A1').font = { bold: true, size: 16 };
+
+        worksheet.getCell('A3').value = 'Αριθμός:';
+        worksheet.getCell('B3').value = invoice.id;
+        worksheet.getCell('A4').value = 'Ημερομηνία:';
+        worksheet.getCell('B4').value = new Date(invoice.issue_date).toLocaleDateString('el-GR');
+
+        worksheet.getCell('A6').value = 'Team Leader:';
+        worksheet.getCell('B6').value = invoice.team_leader_name;
+        worksheet.getCell('A7').value = 'Email:';
+        worksheet.getCell('B7').value = invoice.team_leader_email;
+        worksheet.getCell('A8').value = 'ΑΦΜ:';
+        worksheet.getCell('B8').value = invoice.team_leader_afm;
+
+        // Add financial details
+        worksheet.getCell('A10').value = 'Περίοδος:';
+        worksheet.getCell('B10').value = `${new Date(invoice.period_start).toLocaleDateString('el-GR')} - ${new Date(invoice.period_end).toLocaleDateString('el-GR')}`;
+
+        worksheet.getCell('A12').value = 'Αιτήσεις:';
+        worksheet.getCell('B12').value = invoice.total_applications;
+
+        worksheet.getCell('A13').value = 'Υποσύνολο:';
+        worksheet.getCell('B13').value = parseFloat(invoice.subtotal);
+        worksheet.getCell('B13').numFmt = '€#,##0.00';
+
+        if (invoice.discount_amount && parseFloat(invoice.discount_amount) > 0) {
+            worksheet.getCell('A14').value = 'Έκπτωση:';
+            worksheet.getCell('B14').value = -parseFloat(invoice.discount_amount);
+            worksheet.getCell('B14').numFmt = '€#,##0.00';
+        }
+
+        worksheet.getCell('A15').value = 'ΦΠΑ 24%:';
+        worksheet.getCell('B15').value = parseFloat(invoice.vat_amount);
+        worksheet.getCell('B15').numFmt = '€#,##0.00';
+
+        worksheet.getCell('A16').value = 'ΣΥΝΟΛΟ:';
+        worksheet.getCell('B16').value = parseFloat(invoice.total_amount);
+        worksheet.getCell('B16').numFmt = '€#,##0.00';
+        worksheet.getCell('A16').font = { bold: true };
+        worksheet.getCell('B16').font = { bold: true };
+
+        // Set column widths
+        worksheet.getColumn('A').width = 20;
+        worksheet.getColumn('B').width = 25;
+
+        // Set response headers for Excel file
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename="timologio_${invoice.id}.xlsx"`);
+
+        // Write to response
+        await workbook.xlsx.write(res);
+        res.end();
+
+    } catch (err) {
+        console.error('Excel Generation Error:', err.message);
+        res.status(500).send('Could not generate Excel file');
+    }
+};
+
 module.exports = {
     getBillingSettings,
     updateBillingSettings,
     generateInvoice,
     getInvoices,
-    generateInvoicePdf
+    generateInvoicePdf,
+    generateInvoiceExcel
 };

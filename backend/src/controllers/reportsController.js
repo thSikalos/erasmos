@@ -257,9 +257,110 @@ const exportDetailedReport = async (req, res) => {
     }
 };
 
+const exportDetailedReportPdf = async (req, res) => {
+    const { id: userId, role: userRole } = req.user;
+    const { startDate, endDate, associateId, companyId } = req.query;
+    try {
+        let queryParams = [];
+        let paramIndex = 1;
+        let baseQuery = `
+            FROM applications app
+            JOIN customers cust ON app.customer_id = cust.id
+            JOIN companies co ON app.company_id = co.id
+            JOIN users u ON app.user_id = u.id
+        `;
+        let whereClauses = [];
+        if (userRole === 'Secretary') {
+            // Secretary inherits TeamLeader's data access
+            const effectiveUserId = await getEffectiveUserId(req.user);
+            const teamMembersResult = await pool.query(`SELECT id FROM users WHERE parent_user_id = $${paramIndex++}`, [effectiveUserId]);
+            const teamMemberIds = teamMembersResult.rows.map(user => user.id);
+            const allUserIds = [effectiveUserId, ...teamMemberIds];
+            whereClauses.push(`app.user_id = ANY($${paramIndex++}::int[])`);
+            queryParams.push(allUserIds);
+        } else if (userRole === 'TeamLeader' || userRole === 'Admin') {
+            const teamMembersResult = await pool.query(`SELECT id FROM users WHERE parent_user_id = $${paramIndex++}`, [userId]);
+            const teamMemberIds = teamMembersResult.rows.map(user => user.id);
+            const allUserIds = [userId, ...teamMemberIds];
+            whereClauses.push(`app.user_id = ANY($${paramIndex++}::int[])`);
+            queryParams.push(allUserIds);
+        } else {
+            // Associate role
+            whereClauses.push(`app.user_id = $${paramIndex++}`);
+            queryParams.push(userId);
+        }
+        if (startDate) {
+            whereClauses.push(`app.created_at >= $${paramIndex++}`);
+            queryParams.push(startDate);
+        }
+        if (endDate) {
+            whereClauses.push(`app.created_at <= $${paramIndex++}`);
+            queryParams.push(endDate);
+        }
+        if (associateId) {
+            whereClauses.push(`app.user_id = $${paramIndex++}`);
+            queryParams.push(associateId);
+        }
+        if (companyId) {
+            whereClauses.push(`app.company_id = $${paramIndex++}`);
+            queryParams.push(companyId);
+        }
+
+        const whereString = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
+
+        const detailsQuery = `
+            SELECT app.id, app.created_at, u.name as associate_name, cust.full_name as customer_name, co.name as company_name, app.status, app.total_commission
+            ${baseQuery}
+            ${whereString}
+            ORDER BY app.created_at DESC
+        `;
+        const detailsResult = await pool.query(detailsQuery, queryParams);
+
+        // Fetch summary data
+        const summaryQuery = `
+            SELECT COUNT(*) as total_applications, COALESCE(SUM(app.total_commission), 0) as total_commission
+            ${baseQuery}
+            ${whereString}
+        `;
+        const summaryResult = await pool.query(summaryQuery, queryParams);
+
+        // Prepare data for the new document generator
+        const documentData = {
+            details: detailsResult.rows,
+            summary: {
+                total_applications: parseInt(summaryResult.rows[0].total_applications),
+                total_commission: parseFloat(summaryResult.rows[0].total_commission)
+            },
+            filters: {
+                startDate,
+                endDate,
+                associateId,
+                companyId
+            },
+            issuerId: userId
+        };
+
+        // Generate PDF using the new enterprise system
+        const doc = await documentGenerator.generatePDF('reports', documentData);
+
+        // Set response headers
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', 'attachment; filename="αναλυτικη_αναφορα.pdf"');
+
+        // Pipe the document to response
+        doc.pipe(res);
+        doc.end();
+
+    } catch (err) {
+        console.error('PDF Generation Error:', err.message);
+        res.status(500).send('Could not generate PDF');
+    }
+};
+
 module.exports = {
     getDashboardStats,
     getDetailedReport,
     exportDetailedReport,
+    exportDetailedReportPdf,
     getChartData
 };

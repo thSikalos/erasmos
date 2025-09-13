@@ -71,6 +71,15 @@ const ReportingPage = () => {
         window.open(url, '_blank');
     };
 
+    const handleExportPdf = () => {
+        const queryParams = new URLSearchParams({
+            token: token,
+            ...filters
+        }).toString();
+        const url = `http://localhost:3000/api/reports/detailed/export/pdf?${queryParams}`;
+        window.open(url, '_blank');
+    };
+
     const getStatusBadge = (status) => {
         const statusMap = {
             'Προς Καταχώρηση': { emoji: '⏳', class: 'pending' },
@@ -410,6 +419,41 @@ const ReportingPage = () => {
                         box-shadow: 0 8px 25px rgba(16, 185, 129, 0.4);
                     }
 
+                    .pdf-export-button {
+                        padding: 12px 24px;
+                        background: linear-gradient(135deg, #ef4444, #dc2626);
+                        color: white;
+                        border: none;
+                        border-radius: 12px;
+                        font-weight: 600;
+                        cursor: pointer;
+                        transition: all 0.3s ease;
+                        box-shadow: 0 4px 15px rgba(239, 68, 68, 0.3);
+                        border: 1px solid rgba(255, 255, 255, 0.2);
+                        position: relative;
+                        overflow: hidden;
+                    }
+
+                    .pdf-export-button::before {
+                        content: '';
+                        position: absolute;
+                        top: 0;
+                        left: -100%;
+                        width: 100%;
+                        height: 100%;
+                        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+                        transition: all 0.5s ease;
+                    }
+
+                    .pdf-export-button:hover::before {
+                        left: 100%;
+                    }
+
+                    .pdf-export-button:hover {
+                        transform: translateY(-2px);
+                        box-shadow: 0 8px 25px rgba(239, 68, 68, 0.4);
+                    }
+
                     .applications-table {
                         width: 100%;
                         background: rgba(255, 255, 255, 0.8);
@@ -640,9 +684,14 @@ const ReportingPage = () => {
                 <div className="card-content">
                     <div className="results-header">
                         <h3 className="card-title">📋 Αναλυτικά Αποτελέσματα</h3>
-                        <button onClick={handleExport} className="export-button">
-                            📊 Εξαγωγή σε Excel
-                        </button>
+                        <div style={{display: 'flex', gap: '10px', flexWrap: 'wrap'}}>
+                            <button onClick={handleExport} className="export-button">
+                                📊 Εξαγωγή σε Excel
+                            </button>
+                            <button onClick={handleExportPdf} className="pdf-export-button">
+                                📄 Εξαγωγή σε PDF
+                            </button>
+                        </div>
                     </div>
                     
                     {details.length > 0 ? (

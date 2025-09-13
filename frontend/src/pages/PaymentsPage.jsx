@@ -2,6 +2,8 @@ import React, { useState, useEffect, useContext, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
+import ToastNotification from '../components/ToastNotification';
+import ConfirmationModal from '../components/ConfirmationModal';
 
 const PaymentsPage = () => {
     const { token, user } = useContext(AuthContext);
@@ -15,6 +17,8 @@ const PaymentsPage = () => {
     const [successMessage, setSuccessMessage] = useState('');
     const [editingStatement, setEditingStatement] = useState(null);
     const [displayFields, setDisplayFields] = useState([]);
+    const [toast, setToast] = useState(null);
+    const [confirmModal, setConfirmModal] = useState(null);
 
     const fetchData = async () => {
         if (!token) return;
@@ -41,6 +45,24 @@ const PaymentsPage = () => {
     useEffect(() => {
         fetchData();
     }, [token, user]);
+
+    // Toast utility functions
+    const showToast = (type, title, message, duration = 5000) => {
+        setToast({ type, title, message, duration });
+    };
+
+    const hideToast = () => {
+        setToast(null);
+    };
+
+    // Modal utility functions
+    const showConfirmModal = (title, message, type, onConfirm) => {
+        setConfirmModal({ title, message, type, onConfirm });
+    };
+
+    const hideConfirmModal = () => {
+        setConfirmModal(null);
+    };
 
     const handleAppSelection = (appId) => {
         const newSelection = new Set(selectedAppIds);
@@ -83,25 +105,30 @@ const PaymentsPage = () => {
                 await axios.put(`http://localhost:3000/api/payments/statements/${editingStatement}`, {
                     application_ids: Array.from(selectedAppIds)
                 }, config);
-                setSuccessMessage(`Statement #${editingStatement} updated successfully!`);
+                showToast('success', 'Επιτυχής Ενημέρωση', `Η ταμειακή κατάσταση #${editingStatement} ενημερώθηκε επιτυχώς!`);
                 setEditingStatement(null);
             } else {
                 const response = await axios.post('http://localhost:3000/api/payments/statements', {
                     recipient_id: parseInt(selectedAssociateId),
                     application_ids: Array.from(selectedAppIds)
                 }, config);
-                setSuccessMessage(`Statement #${response.data.statementId} created successfully!`);
+                showToast('success', 'Επιτυχής Δημιουργία', `Η ταμειακή κατάσταση #${response.data.statementId} δημιουργήθηκε επιτυχώς!`);
             }
             setSelectedAppIds(new Set());
             fetchData();
         } catch (error) {
             console.error("Failed to create/update statement", error);
-            setPaymentError(error.response?.data?.message || 'An unknown error occurred.');
+            showToast('error', 'Σφάλμα Λειτουργίας', error.response?.data?.message || 'Παρουσιάστηκε άγνωστο σφάλμα.');
         }
     };
 
     const handleDownloadPdf = (statementId) => {
         const url = `http://localhost:3000/api/payments/statements/${statementId}/pdf?token=${token}`;
+        window.open(url, '_blank');
+    };
+
+    const handleDownloadExcel = (statementId) => {
+        const url = `http://localhost:3000/api/payments/statements/${statementId}/excel?token=${token}`;
         window.open(url, '_blank');
     };
 
@@ -127,36 +154,44 @@ const PaymentsPage = () => {
         return `${statusInfo.emoji} ${statusInfo.text}`;
     };
 
-    const handleDeleteStatement = async (statementId) => {
-        if (!window.confirm('Είστε σίγουροι ότι θέλετε να διαγράψετε αυτή την ταμειακή κατάσταση;')) {
-            return;
-        }
-
-        try {
-            const config = { headers: { Authorization: `Bearer ${token}` } };
-            await axios.delete(`http://localhost:3000/api/payments/statements/${statementId}`, config);
-            setSuccessMessage('Η ταμειακή κατάσταση διαγράφηκε επιτυχώς!');
-            fetchData(); // Refresh data
-        } catch (error) {
-            console.error("Failed to delete statement", error);
-            setPaymentError('Σφάλμα κατά τη διαγραφή της ταμειακής κατάστασης');
-        }
+    const handleDeleteStatement = (statementId) => {
+        showConfirmModal(
+            "Διαγραφή Ταμειακής Κατάστασης",
+            "Είστε σίγουροι ότι θέλετε να διαγράψετε αυτή την ταμειακή κατάσταση; Αυτή η ενέργεια δεν μπορεί να αναιρεθεί.",
+            "danger",
+            async () => {
+                hideConfirmModal();
+                try {
+                    const config = { headers: { Authorization: `Bearer ${token}` } };
+                    await axios.delete(`http://localhost:3000/api/payments/statements/${statementId}`, config);
+                    showToast('success', 'Επιτυχής Διαγραφή', 'Η ταμειακή κατάσταση διαγράφηκε επιτυχώς!');
+                    fetchData(); // Refresh data
+                } catch (error) {
+                    console.error("Failed to delete statement", error);
+                    showToast('error', 'Σφάλμα Διαγραφής', error.response?.data?.message || 'Σφάλμα κατά τη διαγραφή της ταμειακής κατάστασης');
+                }
+            }
+        );
     };
 
-    const handleMarkAsPaid = async (statementId) => {
-        if (!window.confirm('Είστε σίγουροι ότι θέλετε να μαρκάρετε αυτή την ταμειακή ως πληρωμένη;')) {
-            return;
-        }
-
-        try {
-            const config = { headers: { Authorization: `Bearer ${token}` } };
-            await axios.patch(`http://localhost:3000/api/payments/statements/${statementId}/mark-paid`, {}, config);
-            setSuccessMessage('Η ταμειακή κατάσταση μαρκαρίστηκε ως πληρωμένη!');
-            fetchData(); // Refresh data
-        } catch (error) {
-            console.error("Failed to mark as paid", error);
-            setPaymentError('Σφάλμα κατά το μαρκάρισμα ως πληρωμένη');
-        }
+    const handleMarkAsPaid = (statementId) => {
+        showConfirmModal(
+            "Μαρκάρισμα ως Πληρωμένη",
+            "Είστε σίγουροι ότι θέλετε να μαρκάρετε αυτή την ταμειακή κατάσταση ως πληρωμένη; Αυτή η ενέργεια δεν μπορεί να αναιρεθεί.",
+            "warning",
+            async () => {
+                hideConfirmModal();
+                try {
+                    const config = { headers: { Authorization: `Bearer ${token}` } };
+                    await axios.patch(`http://localhost:3000/api/payments/statements/${statementId}/mark-paid`, {}, config);
+                    showToast('success', 'Επιτυχής Ενημέρωση', 'Η ταμειακή κατάσταση μαρκαρίστηκε ως πληρωμένη!');
+                    fetchData(); // Refresh data
+                } catch (error) {
+                    console.error("Failed to mark as paid", error);
+                    showToast('error', 'Σφάλμα Ενημέρωσης', error.response?.data?.message || 'Σφάλμα κατά το μαρκάρισμα ως πληρωμένη');
+                }
+            }
+        );
     };
 
     const handleEditStatement = async (statementId) => {
@@ -168,13 +203,20 @@ const PaymentsPage = () => {
             // Set the editing state
             setEditingStatement(statementId);
             setSelectedAssociateId(statement.recipient_id.toString());
-            setSelectedAppIds(new Set(statement.application_ids));
+            // Handle potentially null or empty application_ids
+            const appIds = statement.application_ids || [];
+            setSelectedAppIds(new Set(appIds.filter(id => id !== null)));
 
             // Scroll to the form
-            document.getElementById('payment-form').scrollIntoView({ behavior: 'smooth' });
+            const formElement = document.getElementById('payment-form');
+            if (formElement) {
+                formElement.scrollIntoView({ behavior: 'smooth' });
+            }
+
+            showToast('info', 'Επεξεργασία Ταμειακής', 'Η ταμειακή κατάσταση φορτώθηκε για επεξεργασία');
         } catch (error) {
             console.error("Failed to load statement for editing", error);
-            setPaymentError('Σφάλμα κατά τη φόρτωση της ταμειακής για επεξεργασία');
+            showToast('error', 'Σφάλμα Επεξεργασίας', error.response?.data?.message || 'Σφάλμα κατά τη φόρτωση της ταμειακής για επεξεργασία');
         }
     };
 
@@ -505,6 +547,23 @@ const PaymentsPage = () => {
                     .pdf-button:hover {
                         transform: translateY(-2px);
                         box-shadow: 0 6px 20px rgba(239, 68, 68, 0.4);
+                    }
+
+                    .excel-button {
+                        padding: 8px 16px;
+                        background: linear-gradient(135deg, #16a085, #0f7864);
+                        color: white;
+                        border: none;
+                        border-radius: 8px;
+                        font-weight: 600;
+                        cursor: pointer;
+                        transition: all 0.3s ease;
+                        box-shadow: 0 4px 15px rgba(22, 160, 133, 0.3);
+                        font-size: 0.9rem;
+                    }
+                    .excel-button:hover {
+                        transform: translateY(-2px);
+                        box-shadow: 0 6px 20px rgba(22, 160, 133, 0.4);
                     }
 
                     .mark-paid-button {
@@ -869,8 +928,6 @@ const PaymentsPage = () => {
                                 >
                                     {editingStatement ? '✏️ Ενημέρωση Ταμειακής' : '📄 Δημιουργία Ταμειακής'}
                                 </button>
-                                {paymentError && <div className="error-message">❌ {paymentError}</div>}
-                                {successMessage && <div className="success-message">✅ {successMessage}</div>}
                             </div>
                         </>
                     )}
@@ -920,6 +977,12 @@ const PaymentsPage = () => {
                                                 >
                                                     📄 PDF
                                                 </button>
+                                                <button
+                                                    onClick={() => handleDownloadExcel(st.id)}
+                                                    className="excel-button"
+                                                >
+                                                    📊 Excel
+                                                </button>
                                                 {st.payment_status === 'draft' && (
                                                     <>
                                                         <button
@@ -959,6 +1022,31 @@ const PaymentsPage = () => {
                     )}
                 </div>
             </div>
+
+            {/* Toast Notification */}
+            {toast && (
+                <ToastNotification
+                    type={toast.type}
+                    title={toast.title}
+                    message={toast.message}
+                    duration={toast.duration}
+                    onClose={hideToast}
+                />
+            )}
+
+            {/* Confirmation Modal */}
+            {confirmModal && (
+                <ConfirmationModal
+                    isOpen={true}
+                    title={confirmModal.title}
+                    message={confirmModal.message}
+                    type={confirmModal.type}
+                    confirmText="Επιβεβαίωση"
+                    cancelText="Ακύρωση"
+                    onConfirm={confirmModal.onConfirm}
+                    onCancel={hideConfirmModal}
+                />
+            )}
         </div>
     );
 };
