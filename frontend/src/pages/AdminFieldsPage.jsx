@@ -15,6 +15,7 @@ const AdminFieldsPage = () => {
     const [label, setLabel] = useState('');
     const [type, setType] = useState('text');
     const [isCommissionable, setIsCommissionable] = useState(false);
+    const [showInTable, setShowInTable] = useState(false);
 
     const fetchData = async () => {
         if (!token) return;
@@ -37,6 +38,7 @@ const AdminFieldsPage = () => {
         setLabel('');
         setType('text');
         setIsCommissionable(false);
+        setShowInTable(false);
     };
 
     const handleEditClick = (field) => {
@@ -45,6 +47,7 @@ const AdminFieldsPage = () => {
         setLabel(field.label);
         setType(field.type);
         setIsCommissionable(field.is_commissionable);
+        setShowInTable(field.show_in_applications_table || false);
     };
 
     const handleDeleteClick = async (fieldId) => {
@@ -64,7 +67,12 @@ const AdminFieldsPage = () => {
         e.preventDefault();
         setError('');
         const config = { headers: { Authorization: `Bearer ${token}` } };
-        const fieldData = { label, type, is_commissionable: isCommissionable };
+        const fieldData = { 
+            label, 
+            type, 
+            is_commissionable: isCommissionable,
+            show_in_applications_table: showInTable 
+        };
 
         try {
             if (isEditing) {
@@ -105,7 +113,7 @@ const AdminFieldsPage = () => {
                 }
 
                 .modern-header {
-                    background: rgba(255, 255, 255, 0.1);
+                    background: rgba(255, 255, 255, 0.15);
                     backdrop-filter: blur(20px);
                     border-bottom: 1px solid rgba(255, 255, 255, 0.2);
                     padding: 2rem 0;
@@ -166,13 +174,14 @@ const AdminFieldsPage = () => {
                 }
 
                 .form-card {
-                    background: rgba(255, 255, 255, 0.1);
+                    background: rgba(255, 255, 255, 0.15);
                     backdrop-filter: blur(20px);
                     border: 1px solid rgba(255, 255, 255, 0.2);
                     border-radius: 20px;
                     padding: 2rem;
                     position: relative;
                     overflow: hidden;
+                    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
                 }
 
                 .form-card::before {
@@ -548,6 +557,15 @@ const AdminFieldsPage = () => {
                                     onChange={e => setIsCommissionable(e.target.checked)} 
                                 />
                                 <label htmlFor="is_commissionable">💰 Δέχεται Αμοιβή;</label>
+                            </div>
+                            <div className="checkbox-group-modern">
+                                <input 
+                                    type="checkbox" 
+                                    id="show_in_applications_table" 
+                                    checked={showInTable} 
+                                    onChange={e => setShowInTable(e.target.checked)} 
+                                />
+                                <label htmlFor="show_in_applications_table">📋 Εμφάνιση στον Πίνακα Αιτήσεων;</label>
                             </div>
                             <div className="form-actions-modern">
                                 <button type="submit" className="save-button">

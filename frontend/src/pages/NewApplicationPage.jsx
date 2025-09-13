@@ -909,7 +909,7 @@ const NewApplicationPage = () => {
                 }
 
                 .wizard-container {
-                    background: #ffffff;
+                    background: rgba(255, 255, 255, 0.1);
                     border-radius: 16px;
                     box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
                     overflow: hidden;
@@ -1077,7 +1077,7 @@ const NewApplicationPage = () => {
                 }
 
                 .personal-toggle {
-                    background: #ffffff;
+                    background: rgba(255, 255, 255, 0.1);
                     border-radius: 12px;
                     padding: 20px;
                     margin-bottom: 25px;
@@ -1174,7 +1174,7 @@ const NewApplicationPage = () => {
                     border-radius: 8px;
                     font-size: 1rem;
                     transition: all 0.3s ease;
-                    background: white;
+                    background: rgba(255, 255, 255, 0.1);
                     box-sizing: border-box;
                 }
 
@@ -1277,7 +1277,7 @@ const NewApplicationPage = () => {
                     justify-content: space-between;
                     align-items: center;
                     padding: 8px 12px;
-                    background: white;
+                    background: rgba(255, 255, 255, 0.1);
                     border-radius: 6px;
                     margin-bottom: 8px;
                     border: 1px solid #e5e7eb;
@@ -1299,7 +1299,7 @@ const NewApplicationPage = () => {
                 }
 
                 .preview-card {
-                    background: #ffffff;
+                    background: rgba(255, 255, 255, 0.1);
                     border-radius: 12px;
                     padding: 25px;
                     border: 1px solid #e5e7eb;
@@ -1483,7 +1483,7 @@ const NewApplicationPage = () => {
                     top: 20px;
                     right: 20px;
                     min-width: 300px;
-                    background: white;
+                    background: rgba(255, 255, 255, 0.1);
                     border-radius: 8px;
                     box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
                     z-index: 1000;
@@ -1597,7 +1597,7 @@ const NewApplicationPage = () => {
                     font-weight: 500;
                     color: #1f2937;
                     transition: all 0.3s ease;
-                    background: white;
+                    background: rgba(255, 255, 255, 0.1);
                     box-sizing: border-box;
                 }
 
@@ -1646,7 +1646,7 @@ const NewApplicationPage = () => {
                 }
 
                 .application-card {
-                    background: white;
+                    background: rgba(255, 255, 255, 0.1);
                     border-radius: 8px;
                     padding: 16px;
                     cursor: pointer;
@@ -1733,7 +1733,7 @@ const NewApplicationPage = () => {
                 }
 
                 .modal-content {
-                    background: white;
+                    background: rgba(255, 255, 255, 0.1);
                     border-radius: 16px;
                     box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
                     max-width: 500px;
@@ -1827,7 +1827,7 @@ const NewApplicationPage = () => {
                     border: 1px solid #d1d5db;
                     border-radius: 6px;
                     font-size: 0.9rem;
-                    background: white;
+                    background: rgba(255, 255, 255, 0.1);
                     color: #374151;
                 }
 

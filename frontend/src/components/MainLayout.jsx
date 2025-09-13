@@ -1,56 +1,14 @@
-import React, { useContext, useEffect, useState } from 'react';
-import { Outlet, NavLink, useNavigate, Link } from 'react-router-dom';
-import axios from 'axios';
+import React, { useContext, useState } from 'react';
+import { Outlet, NavLink, Link } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
+import Header from './Header';
+import ToastNotification from './ToastNotification';
 import '../App.css';
 
 const MainLayout = () => {
-    const { user, logout, token } = useContext(AuthContext);
-    const navigate = useNavigate();
-    const [notifications, setNotifications] = useState([]);
-    const [isNotificationPanelOpen, setIsNotificationPanelOpen] = useState(false);
+    const { user, sessionTimeout } = useContext(AuthContext);
+    const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
-    const fetchNotifications = async () => {
-        if (!token) return;
-        try {
-            const config = { headers: { Authorization: `Bearer ${token}` } };
-            const res = await axios.get('http://localhost:3000/api/notifications', config);
-            setNotifications(res.data);
-        } catch (err) {
-            console.error("Failed to fetch notifications", err);
-        }
-    };
-   
-    useEffect(() => {
-        fetchNotifications();
-        const interval = setInterval(fetchNotifications, 60000);
-        return () => clearInterval(interval);
-    }, [token]);
-   
-    const handleMarkAsRead = async (notificationId) => {
-        try {
-            const config = { headers: { Authorization: `Bearer ${token}` } };
-            await axios.patch(`http://localhost:3000/api/notifications/${notificationId}/read`, {}, config);
-            fetchNotifications();
-        } catch (err) {
-            console.error("Failed to mark as read", err);
-        }
-    };
-
-    const handleNotificationClick = (notification) => {
-        handleMarkAsRead(notification.id);
-        setIsNotificationPanelOpen(false);
-        if (notification.link_url) {
-            navigate(notification.link_url);
-        }
-    };
-
-    const handleLogout = () => { 
-        logout(); 
-        navigate('/login'); 
-    };
-
-    const unreadCount = notifications.filter(n => n.status === 'unread').length;
 
     return (
         <div className="modern-app-layout">
@@ -89,11 +47,12 @@ const MainLayout = () => {
                     }
                     
                     .modern-sidebar-header {
-                        padding: 30px 25px;
+                        padding: 25px 20px;
                         text-align: center;
                         border-bottom: 1px solid rgba(255, 255, 255, 0.15);
                         position: relative;
                         overflow: hidden;
+                        flex-shrink: 0;
                     }
                     
                     .modern-sidebar-header::before {
@@ -123,6 +82,8 @@ const MainLayout = () => {
                         z-index: 2;
                         text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
                         transition: all 0.3s ease;
+                        line-height: 1.2;
+                        word-break: break-word;
                     }
                     
                     .app-logo:hover {
@@ -132,11 +93,12 @@ const MainLayout = () => {
                     }
                     
                     .modern-sidebar-nav {
-                        flex-grow: 1;
-                        padding: 20px 0;
+                        flex: 1;
+                        padding: 15px 0;
                         display: flex;
                         flex-direction: column;
-                        gap: 8px;
+                        gap: 6px;
+                        min-height: 0;
                     }
                     
                     .nav-link {
@@ -145,10 +107,10 @@ const MainLayout = () => {
                         gap: 12px;
                         color: rgba(255, 255, 255, 0.8);
                         text-decoration: none;
-                        padding: 12px 25px;
+                        padding: 10px 20px;
                         margin: 0 15px;
-                        border-radius: 12px;
-                        font-size: 0.95rem;
+                        border-radius: 10px;
+                        font-size: 0.9rem;
                         font-weight: 500;
                         transition: all 0.3s ease;
                         position: relative;
@@ -205,167 +167,241 @@ const MainLayout = () => {
                         text-align: center;
                     }
                     
-                    .modern-sidebar-footer {
-                        padding: 25px;
-                        border-top: 1px solid rgba(255, 255, 255, 0.15);
-                        background: rgba(255, 255, 255, 0.08);
-                    }
                     
-                    .notification-bell {
-                        position: relative;
-                        display: inline-flex;
-                        align-items: center;
-                        gap: 8px;
-                        background: rgba(255, 255, 255, 0.15);
-                        padding: 10px 15px;
-                        border-radius: 10px;
-                        cursor: pointer;
-                        transition: all 0.3s ease;
-                        color: white;
-                        font-size: 0.9rem;
-                        margin-bottom: 15px;
-                        border: 1px solid rgba(255, 255, 255, 0.1);
-                    }
                     
-                    .notification-bell:hover {
-                        background: rgba(255, 255, 255, 0.2);
-                        transform: translateY(-2px);
-                        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-                    }
                     
-                    .notification-count {
-                        background: linear-gradient(135deg, #ef4444, #dc2626);
-                        color: white;
-                        border-radius: 50%;
-                        width: 20px;
-                        height: 20px;
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        font-size: 0.75rem;
-                        font-weight: bold;
-                        position: absolute;
-                        top: -5px;
-                        right: -5px;
-                        box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);
-                        animation: pulse 2s infinite;
-                    }
                     
-                    @keyframes pulse {
-                        0%, 100% { transform: scale(1); }
-                        50% { transform: scale(1.1); }
-                    }
                     
-                    .notification-panel {
-                        position: absolute;
-                        bottom: 100%;
-                        left: 0;
-                        right: 0;
-                        background: rgba(255, 255, 255, 0.95);
-                        backdrop-filter: blur(20px);
-                        border: 1px solid rgba(255, 255, 255, 0.2);
-                        border-radius: 12px;
-                        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-                        max-height: 300px;
-                        overflow-y: auto;
-                        margin-bottom: 10px;
-                        z-index: 1000;
-                    }
                     
-                    .notification-item {
-                        padding: 15px;
-                        border-bottom: 1px solid rgba(0, 0, 0, 0.05);
-                        transition: all 0.2s ease;
-                    }
                     
-                    .notification-item:hover {
-                        background: rgba(102, 126, 234, 0.05);
-                    }
                     
-                    .notification-item:last-child {
-                        border-bottom: none;
-                    }
                     
-                    .notification-item p {
-                        margin: 0;
-                        color: #374151;
-                        font-size: 0.9rem;
-                        cursor: pointer;
-                    }
                     
-                    .notification-item.unread {
-                        background: rgba(102, 126, 234, 0.1);
-                        border-left: 3px solid #667eea;
-                    }
                     
-                    .button-mark-read {
-                        background: linear-gradient(135deg, #10b981, #059669);
-                        color: white;
-                        border: none;
-                        padding: 4px 8px;
-                        border-radius: 6px;
-                        font-size: 0.75rem;
-                        cursor: pointer;
-                        margin-left: 10px;
-                        transition: all 0.2s ease;
-                    }
                     
-                    .button-mark-read:hover {
-                        transform: scale(1.05);
-                        box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
-                    }
                     
-                    .user-info {
-                        color: rgba(255, 255, 255, 0.9);
-                        font-size: 0.9rem;
-                        margin-bottom: 15px;
-                        padding: 15px;
-                        background: rgba(255, 255, 255, 0.1);
-                        border-radius: 10px;
-                        border: 1px solid rgba(255, 255, 255, 0.1);
-                        text-align: center;
-                    }
                     
-                    .user-info strong {
-                        color: white;
-                        font-weight: 600;
-                    }
                     
-                    .logout-button-sidebar {
-                        background: linear-gradient(135deg, rgba(239, 68, 68, 0.8), rgba(220, 38, 38, 0.8));
-                        color: white;
-                        border: none;
-                        padding: 12px 20px;
-                        border-radius: 10px;
-                        font-size: 0.9rem;
-                        font-weight: 600;
-                        cursor: pointer;
-                        transition: all 0.3s ease;
-                        width: 100%;
-                        box-shadow: 0 4px 15px rgba(239, 68, 68, 0.3);
-                        border: 1px solid rgba(255, 255, 255, 0.2);
-                    }
                     
-                    .logout-button-sidebar:hover {
-                        background: linear-gradient(135deg, rgba(239, 68, 68, 0.9), rgba(220, 38, 38, 0.9));
-                        transform: translateY(-2px);
-                        box-shadow: 0 6px 20px rgba(239, 68, 68, 0.4);
-                    }
                     
                     .modern-main-content {
                         margin-left: 280px;
+                        margin-top: 60px;
                         flex-grow: 1;
-                        min-height: 100vh;
+                        min-height: calc(100vh - 60px);
                         position: relative;
+                    }
+                    
+                    @media (max-width: 1200px) {
+                        .modern-sidebar {
+                            width: 240px;
+                        }
+
+                        .modern-main-content {
+                            margin-left: 240px;
+                            margin-top: 60px;
+                        }
+
+                        .app-logo {
+                            font-size: 1.5rem;
+                        }
+
+                        .nav-link {
+                            font-size: 0.85rem;
+                            padding: 8px 18px;
+                            gap: 10px;
+                        }
+
+                        .modern-sidebar-header {
+                            padding: 20px 18px;
+                        }
+
+                        .modern-sidebar-footer {
+                            padding: 18px;
+                        }
+
+                        .modern-sidebar-nav {
+                            padding: 12px 0;
+                            gap: 4px;
+                        }
+
+                        .user-info {
+                            font-size: 0.85rem;
+                            padding: 12px;
+                            margin-bottom: 12px;
+                        }
+
+                        .notification-bell {
+                            font-size: 0.85rem;
+                            padding: 8px 12px;
+                            margin-bottom: 12px;
+                        }
+
+                        .logout-button-sidebar {
+                            padding: 10px 16px;
+                            font-size: 0.85rem;
+                        }
                     }
                     
                     @media (max-width: 1024px) {
                         .modern-sidebar {
-                            width: 250px;
+                            width: 200px;
+                        }
+
+                        .modern-main-content {
+                            margin-left: 200px;
+                            margin-top: 60px;
+                        }
+
+                        .app-logo {
+                            font-size: 1.3rem;
+                        }
+
+                        .nav-link {
+                            font-size: 0.8rem;
+                            padding: 6px 12px;
+                            margin: 0 10px;
+                            gap: 8px;
+                        }
+
+                        .modern-sidebar-header {
+                            padding: 15px 12px;
+                        }
+
+                        .modern-sidebar-footer {
+                            padding: 12px;
+                        }
+
+                        .modern-sidebar-nav {
+                            padding: 10px 0;
+                            gap: 2px;
+                        }
+
+                        .user-info {
+                            font-size: 0.75rem;
+                            padding: 10px;
+                            margin-bottom: 10px;
+                        }
+
+                        .notification-bell {
+                            font-size: 0.75rem;
+                            padding: 6px 10px;
+                            margin-bottom: 10px;
+                        }
+
+                        .logout-button-sidebar {
+                            padding: 8px 12px;
+                            font-size: 0.75rem;
+                        }
+
+                        .nav-icon {
+                            font-size: 1rem;
+                            width: 18px;
+                        }
+                    }
+                    
+                    @media (max-width: 900px) {
+                        .modern-sidebar {
+                            width: 70px;
+                            overflow-x: visible;
                         }
                         
                         .modern-main-content {
-                            margin-left: 250px;
+                            margin-left: 70px;
+                            margin-top: 60px;
+                        }
+                        
+                        .app-logo {
+                            font-size: 1.1rem;
+                            text-align: center;
+                            line-height: 1.1;
+                        }
+
+                        .modern-sidebar-header {
+                            padding: 12px 8px;
+                        }
+
+                        .modern-sidebar-footer {
+                            padding: 8px;
+                        }
+                        
+                        .nav-link {
+                            justify-content: center;
+                            padding: 12px 8px;
+                            margin: 0 5px;
+                            position: relative;
+                            overflow: visible;
+                        }
+                        
+                        .nav-link span:not(.nav-icon) {
+                            position: absolute;
+                            left: 100%;
+                            top: 50%;
+                            transform: translateY(-50%);
+                            background: rgba(0, 0, 0, 0.9);
+                            color: white;
+                            padding: 8px 12px;
+                            border-radius: 8px;
+                            font-size: 0.85rem;
+                            white-space: nowrap;
+                            margin-left: 10px;
+                            opacity: 0;
+                            pointer-events: none;
+                            transition: all 0.3s ease;
+                            z-index: 1001;
+                            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+                        }
+                        
+                        .nav-link:hover span:not(.nav-icon) {
+                            opacity: 1;
+                        }
+                        
+                        .modern-sidebar-header {
+                            padding: 15px 5px;
+                        }
+                        
+                        .modern-sidebar-footer {
+                            padding: 6px 2px;
+                        }
+
+                        .modern-sidebar-nav {
+                            padding: 8px 0;
+                            gap: 1px;
+                        }
+                        
+                        .user-info {
+                            display: none;
+                        }
+                        
+                        .notification-bell {
+                            justify-content: center;
+                            font-size: 0;
+                            padding: 10px;
+                            position: relative;
+                        }
+                        
+                        .notification-bell::before {
+                            content: '🔔';
+                            font-size: 1.1rem;
+                        }
+                        
+                        .logout-button-sidebar {
+                            padding: 10px;
+                            font-size: 0;
+                            position: relative;
+                        }
+                        
+                        .logout-button-sidebar::before {
+                            content: '🚺';
+                            font-size: 1.1rem;
+                        }
+                        
+                        .notification-panel {
+                            left: 100%;
+                            bottom: 0;
+                            margin-left: 10px;
+                            margin-bottom: 0;
+                            width: 300px;
                         }
                     }
                     
@@ -373,6 +409,8 @@ const MainLayout = () => {
                         .modern-sidebar {
                             transform: translateX(-100%);
                             transition: transform 0.3s ease;
+                            width: 280px;
+                            z-index: 2000;
                         }
                         
                         .modern-sidebar.mobile-open {
@@ -381,18 +419,174 @@ const MainLayout = () => {
                         
                         .modern-main-content {
                             margin-left: 0;
+                            margin-top: 60px;
+                        }
+                        
+                        .app-logo {
+                            font-size: 1.6rem;
                         }
                         
                         .nav-link {
                             font-size: 0.9rem;
-                            padding: 10px 20px;
+                            padding: 12px 20px;
+                            margin: 0 15px;
+                            justify-content: flex-start;
+                        }
+                        
+                        .nav-link span:not(.nav-icon) {
+                            position: static;
+                            transform: none;
+                            background: transparent;
+                            color: inherit;
+                            padding: 0;
+                            margin-left: 0;
+                            opacity: 1;
+                            pointer-events: auto;
+                            box-shadow: none;
+                        }
+                        
+                        .modern-sidebar-header {
+                            padding: 25px 20px;
+                        }
+                        
+                        .modern-sidebar-footer {
+                            padding: 20px;
+                        }
+                        
+                        .user-info {
+                            display: block;
+                            font-size: 0.9rem;
+                            padding: 15px;
+                        }
+                        
+                        .notification-bell {
+                            font-size: 0.9rem;
+                            padding: 10px 15px;
+                            justify-content: flex-start;
+                        }
+                        
+                        .notification-bell::before {
+                            display: none;
+                        }
+                        
+                        .logout-button-sidebar {
+                            font-size: 0.9rem;
+                            padding: 12px 20px;
+                        }
+                        
+                        .logout-button-sidebar::before {
+                            display: none;
+                        }
+                        
+                        .notification-panel {
+                            left: 0;
+                            margin-left: 0;
+                            width: auto;
+                        }
+                    }
+                    
+                    .mobile-sidebar-toggle {
+                        display: none;
+                        position: fixed;
+                        top: 20px;
+                        left: 20px;
+                        z-index: 2001;
+                        background: rgba(255, 255, 255, 0.9);
+                        backdrop-filter: blur(10px);
+                        border: 1px solid rgba(102, 126, 234, 0.2);
+                        border-radius: 12px;
+                        padding: 12px;
+                        font-size: 1.2rem;
+                        cursor: pointer;
+                        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+                        transition: all 0.3s ease;
+                    }
+                    
+                    .mobile-sidebar-toggle:hover {
+                        background: rgba(255, 255, 255, 1);
+                        transform: scale(1.1);
+                        box-shadow: 0 6px 20px rgba(102, 126, 234, 0.2);
+                    }
+                    
+                    @media (max-width: 768px) {
+                        .mobile-sidebar-toggle {
+                            display: block;
+                        }
+                    }
+                    
+                    .sidebar-close-button {
+                        display: none;
+                        position: absolute;
+                        top: 15px;
+                        right: 15px;
+                        background: rgba(255, 255, 255, 0.2);
+                        border: none;
+                        border-radius: 8px;
+                        padding: 8px;
+                        color: white;
+                        font-size: 1.2rem;
+                        cursor: pointer;
+                        transition: all 0.3s ease;
+                        z-index: 2;
+                    }
+                    
+                    .sidebar-close-button:hover {
+                        background: rgba(255, 255, 255, 0.3);
+                        transform: scale(1.1);
+                    }
+                    
+                    @media (max-width: 768px) {
+                        .sidebar-close-button {
+                            display: block;
+                        }
+                    }
+                    
+                    .mobile-overlay {
+                        display: none;
+                        position: fixed;
+                        top: 0;
+                        left: 0;
+                        width: 100%;
+                        height: 100%;
+                        background: rgba(0, 0, 0, 0.5);
+                        z-index: 1999;
+                        opacity: 0;
+                        transition: opacity 0.3s ease;
+                    }
+                    
+                    .mobile-overlay.active {
+                        opacity: 1;
+                    }
+                    
+                    @media (max-width: 768px) {
+                        .mobile-overlay {
+                            display: block;
                         }
                     }
                 `}
             </style>
             
-            <aside className="modern-sidebar">
+            <button 
+                className="mobile-sidebar-toggle"
+                onClick={() => setIsMobileSidebarOpen(true)}
+            >
+                ☰
+            </button>
+            
+            <div 
+                className={`mobile-overlay ${isMobileSidebarOpen ? 'active' : ''}`}
+                onClick={() => setIsMobileSidebarOpen(false)}
+            ></div>
+            
+            <aside className={`modern-sidebar ${isMobileSidebarOpen ? 'mobile-open' : ''}`}>
                 <div className="modern-sidebar-header">
+                    <button 
+                        className="sidebar-close-button"
+                        onClick={() => setIsMobileSidebarOpen(false)}
+                    >
+                        ×
+                    </button>
+                    
                     <Link to="/dashboard" className="app-logo">
                         ✨ Erasmos App
                     </Link>
@@ -458,43 +652,30 @@ const MainLayout = () => {
                     )}
                 </nav>
                 
-                <div className="modern-sidebar-footer">
-                    <div className="notification-bell" onClick={() => setIsNotificationPanelOpen(prev => !prev)}>
-                        🔔 Ειδοποιήσεις
-                        {unreadCount > 0 && <span className="notification-count">{unreadCount}</span>}
-                        
-                        {isNotificationPanelOpen && (
-                            <div className="notification-panel">
-                                {notifications.length > 0 ? notifications.map(notif => (
-                                    <div key={notif.id} className={`notification-item ${notif.status}`}>
-                                        <p onClick={() => handleNotificationClick(notif)}>{notif.message}</p>
-                                        {notif.status === 'unread' &&
-                                            <button onClick={() => handleMarkAsRead(notif.id)} className='button-mark-read' title="Mark as read">✓</button>
-                                        }
-                                    </div>
-                                )) : (
-                                    <div className="notification-item">
-                                        <p>Δεν υπάρχουν νέες ειδοποιήσεις.</p>
-                                    </div>
-                                )}
-                            </div>
-                        )}
-                    </div>
-                    
-                    <div className="user-info">
-                        Συνδεδεμένος ως:<br />
-                        <strong>{user?.email}</strong>
-                    </div>
-                    
-                    <button onClick={handleLogout} className="logout-button-sidebar">
-                        🚪 Αποσύνδεση
-                    </button>
-                </div>
             </aside>
             
+            <Header />
+
             <main className="modern-main-content">
                 <Outlet />
             </main>
+
+            {/* Session Timeout Toast Notification */}
+            {sessionTimeout?.sessionWarning && (
+                <ToastNotification
+                    type="warning"
+                    title="Προειδοποίηση Συνεδρίας"
+                    message="Η συνεδρία σας πρόκειται να λήξει. Κάντε κλικ στο 'Συνέχεια' για να παραμείνετε συνδεδεμένοι."
+                    duration={0} // Don't auto-close
+                    showCountdown={true}
+                    countdownTime={sessionTimeout.sessionWarning.remainingTime}
+                    onAction={sessionTimeout.sessionWarning.onRefresh}
+                    actionLabel="🔄 Συνέχεια"
+                    autoRefresh={sessionTimeout.autoRefresh}
+                    onAutoRefreshToggle={sessionTimeout.sessionWarning.onAutoRefreshToggle}
+                    onClose={sessionTimeout.sessionWarning.onDismiss}
+                />
+            )}
         </div>
     );
 };

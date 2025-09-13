@@ -4,12 +4,14 @@ const authMiddleware = require('../middleware/authMiddleware');
 const adminMiddleware = require('../middleware/adminMiddleware');
 const termsCheckMiddleware = require('../middleware/termsCheckMiddleware');
 
-const { 
-    loginUser, 
-    createUser, 
-    getAllUsers, 
-    getUserById, 
-    updateUser, 
+const {
+    loginUser,
+    registerUserRequest,
+    refreshToken,
+    createUser,
+    getAllUsers,
+    getUserById,
+    updateUser,
     deleteUser,
     getMyTeam,
     acceptTerms,
@@ -17,11 +19,15 @@ const {
     generateAgreementPdf
 } = require('../controllers/userController');
 
-// Public Route for Login
+// Public Routes
 router.post('/login', loginUser);
+router.post('/register', registerUserRequest);
 
 // --- All subsequent routes are protected ---
 router.use(authMiddleware);
+
+// Token Refresh Route (requires valid token but not terms acceptance)
+router.post('/refresh-token', refreshToken);
 
 // Accept Terms Route
 router.post('/accept-terms', acceptTerms);

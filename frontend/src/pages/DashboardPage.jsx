@@ -107,12 +107,12 @@ const DashboardPage = () => {
                     }
                     
                     .dashboard-header {
-                        background: rgba(255, 255, 255, 0.95);
-                        backdrop-filter: blur(10px);
+                        background: rgba(255, 255, 255, 0.15);
+                        backdrop-filter: blur(20px);
                         border-radius: 20px;
                         padding: 30px;
                         margin-bottom: 30px;
-                        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+                        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
                         border: 1px solid rgba(255, 255, 255, 0.2);
                         position: relative;
                         overflow: hidden;
@@ -138,10 +138,8 @@ const DashboardPage = () => {
                     .welcome-title {
                         font-size: 2.5rem;
                         font-weight: 700;
-                        background: linear-gradient(135deg, #667eea, #764ba2);
-                        -webkit-background-clip: text;
-                        -webkit-text-fill-color: transparent;
-                        background-clip: text;
+                        color: white;
+                        text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
                         margin-bottom: 10px;
                         position: relative;
                         z-index: 2;
@@ -149,7 +147,7 @@ const DashboardPage = () => {
                     
                     .welcome-subtitle {
                         font-size: 1.1rem;
-                        color: #6b7280;
+                        color: rgba(255, 255, 255, 0.8);
                         margin-bottom: 20px;
                         position: relative;
                         z-index: 2;
@@ -180,13 +178,14 @@ const DashboardPage = () => {
                     .user-details h3 {
                         margin: 0;
                         font-size: 1.2rem;
-                        color: #1f2937;
+                        color: white;
                         font-weight: 600;
+                        text-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
                     }
-                    
+
                     .user-details p {
                         margin: 5px 0 0 0;
-                        color: #6b7280;
+                        color: rgba(255, 255, 255, 0.7);
                         font-size: 0.95rem;
                     }
                     
@@ -205,11 +204,11 @@ const DashboardPage = () => {
                     }
                     
                     .modern-stat-card {
-                        background: rgba(255, 255, 255, 0.95);
-                        backdrop-filter: blur(10px);
+                        background: rgba(255, 255, 255, 0.15);
+                        backdrop-filter: blur(20px);
                         border-radius: 20px;
                         padding: 25px;
-                        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+                        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
                         border: 1px solid rgba(255, 255, 255, 0.2);
                         transition: all 0.3s ease;
                         position: relative;
@@ -228,7 +227,8 @@ const DashboardPage = () => {
                     
                     .modern-stat-card:hover {
                         transform: translateY(-5px);
-                        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+                        background: rgba(255, 255, 255, 0.2);
+                        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
                     }
                     
                     .stat-icon {
@@ -246,7 +246,7 @@ const DashboardPage = () => {
                     
                     .stat-title {
                         font-size: 0.9rem;
-                        color: #6b7280;
+                        color: rgba(255, 255, 255, 0.7);
                         margin-bottom: 10px;
                         font-weight: 500;
                         text-transform: uppercase;
@@ -256,22 +256,24 @@ const DashboardPage = () => {
                     .stat-value {
                         font-size: 2rem;
                         font-weight: 700;
-                        color: #1f2937;
+                        color: white;
+                        text-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
                         margin-bottom: 5px;
                     }
                     
                     .stat-change {
                         font-size: 0.85rem;
-                        color: #10b981;
+                        color: #4ade80;
                         font-weight: 500;
+                        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
                     }
                     
                     .applications-section {
-                        background: rgba(255, 255, 255, 0.95);
-                        backdrop-filter: blur(10px);
+                        background: rgba(255, 255, 255, 0.15);
+                        backdrop-filter: blur(20px);
                         border-radius: 20px;
                         padding: 30px;
-                        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+                        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
                         border: 1px solid rgba(255, 255, 255, 0.2);
                     }
                     
@@ -285,7 +287,8 @@ const DashboardPage = () => {
                     .section-title {
                         font-size: 1.5rem;
                         font-weight: 600;
-                        color: #1f2937;
+                        color: white;
+                        text-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
                         margin: 0;
                     }
                     
@@ -313,29 +316,29 @@ const DashboardPage = () => {
                     
                     .modern-table td {
                         padding: 15px 20px;
-                        border-bottom: 1px solid #f3f4f6;
-                        color: #374151;
+                        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+                        color: rgba(255, 255, 255, 0.9);
                         font-size: 0.95rem;
                     }
                     
                     .modern-table tbody tr {
-                        background: white;
+                        background: rgba(255, 255, 255, 0.1);
                         transition: all 0.2s ease;
                         cursor: pointer;
                     }
                     
                     .modern-table tbody tr:hover {
-                        background: #f8fafc;
+                        background: rgba(255, 255, 255, 0.2);
                         transform: scale(1.01);
-                        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
+                        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
                     }
                     
                     .app-id-badge {
-                        color: #667eea;
+                        color: white;
                         font-weight: 600;
                         padding: 5px 10px;
                         border-radius: 8px;
-                        background: rgba(102, 126, 234, 0.1);
+                        background: rgba(255, 255, 255, 0.2);
                         display: inline-block;
                     }
                     

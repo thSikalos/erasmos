@@ -71,11 +71,11 @@ const RemindersWidget = () => {
             <style>
                 {`
                     .modern-reminders-widget {
-                        background: rgba(255, 255, 255, 0.95);
-                        backdrop-filter: blur(10px);
+                        background: rgba(255, 255, 255, 0.15);
+                        backdrop-filter: blur(20px);
                         border-radius: 20px;
                         padding: 30px;
-                        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+                        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
                         border: 1px solid rgba(255, 255, 255, 0.2);
                         margin-top: 30px;
                     }
@@ -103,7 +103,8 @@ const RemindersWidget = () => {
                     .reminders-title {
                         font-size: 1.5rem;
                         font-weight: 600;
-                        color: #1f2937;
+                        color: white;
+                        text-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
                         margin: 0;
                     }
                     
@@ -113,26 +114,32 @@ const RemindersWidget = () => {
                         gap: 15px;
                         margin-bottom: 30px;
                         padding: 20px;
-                        background: rgba(243, 244, 246, 0.5);
+                        background: rgba(255, 255, 255, 0.1);
                         border-radius: 12px;
-                        border: 1px solid rgba(229, 231, 235, 0.5);
+                        border: 1px solid rgba(255, 255, 255, 0.2);
                     }
                     
                     .modern-reminder-form input,
                     .modern-reminder-form select {
                         padding: 10px 15px;
-                        border: 1px solid #d1d5db;
+                        border: 1px solid rgba(255, 255, 255, 0.3);
                         border-radius: 8px;
                         font-size: 0.95rem;
-                        background: white;
+                        background: rgba(255, 255, 255, 0.2);
+                        color: white;
                         transition: all 0.2s ease;
+                    }
+
+                    .modern-reminder-form input::placeholder {
+                        color: rgba(255, 255, 255, 0.7);
                     }
                     
                     .modern-reminder-form input:focus,
                     .modern-reminder-form select:focus {
                         outline: none;
-                        border-color: #8b5cf6;
-                        box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1);
+                        border-color: rgba(255, 255, 255, 0.5);
+                        background: rgba(255, 255, 255, 0.25);
+                        box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.1);
                     }
                     
                     .add-reminder-btn {
@@ -159,7 +166,7 @@ const RemindersWidget = () => {
                     .section-subtitle {
                         font-size: 1.1rem;
                         font-weight: 600;
-                        color: #374151;
+                        color: rgba(255, 255, 255, 0.9);
                         margin-bottom: 15px;
                         display: flex;
                         align-items: center;
@@ -175,21 +182,22 @@ const RemindersWidget = () => {
                     }
                     
                     .reminder-item {
-                        background: white;
+                        background: rgba(255, 255, 255, 0.1);
                         padding: 15px 20px;
                         border-radius: 12px;
-                        border: 1px solid #e5e7eb;
+                        border: 1px solid rgba(255, 255, 255, 0.2);
                         display: flex;
                         justify-content: space-between;
                         align-items: center;
                         transition: all 0.2s ease;
-                        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+                        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
                     }
                     
                     .reminder-item:hover {
                         transform: translateY(-2px);
-                        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-                        border-color: #8b5cf6;
+                        background: rgba(255, 255, 255, 0.2);
+                        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+                        border-color: rgba(255, 255, 255, 0.4);
                     }
                     
                     .reminder-content {
@@ -198,18 +206,18 @@ const RemindersWidget = () => {
                     
                     .reminder-title {
                         font-weight: 600;
-                        color: #1f2937;
+                        color: white;
                         margin-bottom: 5px;
                         font-size: 1rem;
                     }
                     
                     .reminder-date {
-                        color: #6b7280;
+                        color: rgba(255, 255, 255, 0.8);
                         font-size: 0.9rem;
                     }
                     
                     .reminder-meta {
-                        color: #9ca3af;
+                        color: rgba(255, 255, 255, 0.7);
                         font-size: 0.85rem;
                         margin-top: 3px;
                     }
@@ -234,17 +242,17 @@ const RemindersWidget = () => {
                     
                     .no-reminders {
                         text-align: center;
-                        color: #9ca3af;
+                        color: rgba(255, 255, 255, 0.7);
                         font-style: italic;
                         padding: 20px;
-                        background: rgba(249, 250, 251, 0.5);
+                        background: rgba(255, 255, 255, 0.05);
                         border-radius: 8px;
-                        border: 1px dashed #d1d5db;
+                        border: 1px dashed rgba(255, 255, 255, 0.3);
                     }
                     
                     .completed-reminder-item {
                         opacity: 0.7;
-                        background: rgba(249, 250, 251, 0.8);
+                        background: rgba(255, 255, 255, 0.05);
                     }
                     
                     @media (max-width: 768px) {

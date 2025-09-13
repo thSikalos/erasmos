@@ -130,7 +130,7 @@ const RenewalsPage = () => {
                     }
                     
                     .renewals-header {
-                        background: rgba(255, 255, 255, 0.95);
+                        background: rgba(255, 255, 255, 0.15);
                         backdrop-filter: blur(10px);
                         border-radius: 20px;
                         padding: 30px;
@@ -243,7 +243,7 @@ const RenewalsPage = () => {
                     }
                     
                     .filters-section {
-                        background: rgba(255, 255, 255, 0.95);
+                        background: rgba(255, 255, 255, 0.15);
                         backdrop-filter: blur(10px);
                         border-radius: 20px;
                         padding: 25px;
@@ -310,7 +310,7 @@ const RenewalsPage = () => {
                         border: 2px solid #e5e7eb;
                         border-radius: 12px;
                         font-size: 1rem;
-                        background: rgba(255, 255, 255, 0.9);
+                        background: rgba(255, 255, 255, 0.15);
                         backdrop-filter: blur(10px);
                         transition: all 0.3s ease;
                         box-sizing: border-box;
@@ -325,7 +325,7 @@ const RenewalsPage = () => {
                     }
                     
                     .renewals-content {
-                        background: rgba(255, 255, 255, 0.95);
+                        background: rgba(255, 255, 255, 0.15);
                         backdrop-filter: blur(10px);
                         border-radius: 20px;
                         padding: 30px;
@@ -432,7 +432,7 @@ const RenewalsPage = () => {
                     }
                     
                     .modern-renewals-table tbody tr {
-                        background: white;
+                        background: rgba(255, 255, 255, 0.1);
                         transition: all 0.2s ease;
                     }
                     

@@ -3,6 +3,7 @@ import axios from 'axios';
 import { jwtDecode } from 'jwt-decode';
 import { useNavigate } from 'react-router-dom';
 import setAuthToken from '../utils/setAuthToken';
+import useSessionTimeout from '../hooks/useSessionTimeout';
 
 export const AuthContext = createContext(null);
 
@@ -16,6 +17,29 @@ export const AuthProvider = ({ children }) => {
     lastTokenCheck: null
   });
   const navigate = useNavigate();
+
+  const refreshTokenFromServer = async () => {
+    try {
+      const config = { headers: { Authorization: `Bearer ${token}` } };
+      const response = await axios.post('http://localhost:3000/api/users/refresh-token', {}, config);
+      const newToken = response.data.token;
+
+      // Update localStorage and state
+      localStorage.setItem('token', newToken);
+      setAuthToken(newToken);
+      setToken(newToken);
+
+      // Update user data from new token
+      const decoded = jwtDecode(newToken);
+      setUser(decoded.user);
+
+      console.log('[AUTH] Token refreshed successfully');
+      return true;
+    } catch (error) {
+      console.error('[AUTH] Token refresh failed:', error);
+      return false;
+    }
+  };
 
   const logout = () => {
     console.log('[AUTH] User logout initiated');
@@ -98,7 +122,19 @@ export const AuthProvider = ({ children }) => {
       login(newToken); // Απλά κάνουμε login με το νέο, ενημερωμένο token
   };
 
-  const value = { token, user, loading, login, logout, userAcceptedTerms, sessionState };
+  // Session timeout hook
+  const sessionTimeout = useSessionTimeout(token, refreshTokenFromServer, logout);
+
+  const value = {
+    token,
+    user,
+    loading,
+    login,
+    logout,
+    userAcceptedTerms,
+    sessionState,
+    sessionTimeout
+  };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

@@ -92,6 +92,116 @@ const loginUser = async (req, res) => {
     }
 };
 
+// --- REGISTER NEW USER REQUEST ---
+const registerUserRequest = async (req, res) => {
+    try {
+        const { fullName, email, phone, message } = req.body;
+
+        // Validate required fields
+        if (!fullName || !email || !phone) {
+            return res.status(400).json({ message: 'Όλα τα υποχρεωτικά πεδία πρέπει να συμπληρωθούν' });
+        }
+
+        // Check if email already exists in users table
+        const existingUser = await pool.query('SELECT email FROM users WHERE email = $1', [email]);
+        if (existingUser.rows.length > 0) {
+            return res.status(400).json({ message: 'Αυτό το email χρησιμοποιείται ήδη από έναν υπάρχοντα χρήστη' });
+        }
+
+        // Store registration request in database (you may want to create a registration_requests table)
+        const registrationData = {
+            fullName,
+            email,
+            phone,
+            message: message || '',
+            createdAt: new Date().toISOString(),
+            status: 'pending'
+        };
+
+        console.log('[REGISTRATION] New registration request:', registrationData);
+
+        // TODO: Send email notification to admin when email service is configured
+        // This is a placeholder for the email service integration
+        console.log('[EMAIL PLACEHOLDER] Would send notification email to admin with:', {
+            subject: 'Νέα αίτηση εγγραφής χρήστη',
+            content: `
+                Νέα αίτηση εγγραφής χρήστη:
+
+                Όνομα: ${fullName}
+                Email: ${email}
+                Τηλέφωνο: ${phone}
+                Μήνυμα: ${message || 'Δεν παρέχεται'}
+                Ημερομηνία: ${new Date().toLocaleString('el-GR')}
+            `
+        });
+
+        // For now, just log the registration
+        // In the future, you might want to store in a registration_requests table
+        // await pool.query(
+        //     'INSERT INTO registration_requests (full_name, email, phone, message, created_at) VALUES ($1, $2, $3, $4, $5)',
+        //     [fullName, email, phone, message || '', new Date()]
+        // );
+
+        res.status(200).json({
+            success: true,
+            message: 'Η αίτηση εγγραφής σας έχει υποβληθεί επιτυχώς! Θα επικοινωνήσουμε μαζί σας σύντομα.',
+            data: {
+                fullName,
+                email,
+                phone
+            }
+        });
+
+    } catch (err) {
+        console.error('[REGISTRATION ERROR]:', err.message);
+        res.status(500).json({ message: 'Παρουσιάστηκε σφάλμα κατά την υποβολή της αίτησης' });
+    }
+};
+
+// --- REFRESH TOKEN ---
+const refreshToken = async (req, res) => {
+    try {
+        // The token is already verified by authMiddleware
+        const userId = req.user.id;
+
+        // Get fresh user data from database
+        const userResult = await pool.query(
+            'SELECT id, name, email, role, parent_user_id, has_accepted_terms FROM users WHERE id = $1 AND deleted_at IS NULL',
+            [userId]
+        );
+
+        if (userResult.rows.length === 0) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        const user = userResult.rows[0];
+
+        // Create new token with updated user data and fresh expiration
+        const payload = {
+            user: {
+                id: user.id,
+                role: user.role,
+                email: user.email,
+                parent_user_id: user.parent_user_id,
+                has_accepted_terms: user.has_accepted_terms
+            }
+        };
+
+        jwt.sign(payload, 'mySuperSecretKey123', { expiresIn: '1h' }, (err, newToken) => {
+            if (err) {
+                console.error('JWT REFRESH ERROR:', err);
+                return res.status(500).json({ message: 'Error generating new token' });
+            }
+
+            console.log(`[AUTH] Token refreshed for user: ${user.email}`);
+            res.json({ token: newToken, message: 'Token refreshed successfully' });
+        });
+    } catch (err) {
+        console.error('TOKEN REFRESH ERROR:', err.message);
+        res.status(500).json({ message: 'Server error during token refresh' });
+    }
+};
+
 // --- ACCEPT TERMS ---
 const acceptTerms = async (req, res) => {
     const userId = req.user.id;
@@ -236,6 +346,8 @@ const generateAgreementPdf = async (req, res) => {
 
 module.exports = {
     loginUser,
+    registerUserRequest,
+    refreshToken,
     createUser,
     getAllUsers,
     getUserById,

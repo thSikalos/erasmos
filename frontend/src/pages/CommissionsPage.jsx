@@ -119,7 +119,7 @@ const CommissionsPage = () => {
                     }
 
                     .modern-header {
-                        background: rgba(255, 255, 255, 0.95);
+                        background: rgba(255, 255, 255, 0.15);
                         backdrop-filter: blur(20px);
                         border-radius: 20px;
                         padding: 30px;
@@ -230,7 +230,7 @@ const CommissionsPage = () => {
                     }
 
                     .associate-card {
-                        background: rgba(255, 255, 255, 0.95);
+                        background: rgba(255, 255, 255, 0.15);
                         backdrop-filter: blur(20px);
                         border-radius: 20px;
                         padding: 30px;
@@ -340,7 +340,7 @@ const CommissionsPage = () => {
                         border: 2px solid rgba(102, 126, 234, 0.1);
                         border-radius: 8px;
                         font-size: 1.1rem;
-                        background: rgba(255, 255, 255, 0.9);
+                        background: rgba(255, 255, 255, 0.15);
                         backdrop-filter: blur(10px);
                         transition: all 0.3s ease;
                         text-align: right;
@@ -355,18 +355,19 @@ const CommissionsPage = () => {
                     }
 
                     .save-button {
-                        padding: 8px 16px;
+                        padding: 6px 10px;
                         background: linear-gradient(135deg, #667eea, #764ba2);
                         color: white;
                         border: none;
-                        border-radius: 8px;
+                        border-radius: 6px;
                         font-weight: 600;
                         cursor: pointer;
                         transition: all 0.3s ease;
                         box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
                         flex: 0 0 auto;
-                        font-size: 0.9rem;
+                        font-size: 0.8rem;
                         white-space: nowrap;
+                        max-width: 110px;
                     }
 
                     .save-button:hover {
@@ -421,7 +422,7 @@ const CommissionsPage = () => {
                     }
 
                     .stat-card {
-                        background: rgba(255, 255, 255, 0.9);
+                        background: rgba(255, 255, 255, 0.15);
                         backdrop-filter: blur(15px);
                         border-radius: 15px;
                         padding: 25px;

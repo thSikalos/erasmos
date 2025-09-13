@@ -140,7 +140,7 @@ const PaymentsPage = () => {
                     }
 
                     .modern-header {
-                        background: rgba(255, 255, 255, 0.95);
+                        background: rgba(255, 255, 255, 0.15);
                         backdrop-filter: blur(20px);
                         border-radius: 20px;
                         padding: 30px;
@@ -229,7 +229,7 @@ const PaymentsPage = () => {
                     }
 
                     .modern-card {
-                        background: rgba(255, 255, 255, 0.95);
+                        background: rgba(255, 255, 255, 0.15);
                         backdrop-filter: blur(20px);
                         border-radius: 20px;
                         padding: 30px;
@@ -295,7 +295,7 @@ const PaymentsPage = () => {
                         border: 2px solid rgba(102, 126, 234, 0.1);
                         border-radius: 12px;
                         font-size: 1rem;
-                        background: rgba(255, 255, 255, 0.9);
+                        background: rgba(255, 255, 255, 0.15);
                         backdrop-filter: blur(10px);
                         transition: all 0.3s ease;
                         box-sizing: border-box;
@@ -521,7 +521,7 @@ const PaymentsPage = () => {
                     }
 
                     .stat-card {
-                        background: rgba(255, 255, 255, 0.9);
+                        background: rgba(255, 255, 255, 0.15);
                         backdrop-filter: blur(15px);
                         border-radius: 15px;
                         padding: 25px;

@@ -79,7 +79,7 @@ const NotificationsPage = () => {
                     }
 
                     .modern-header {
-                        background: rgba(255, 255, 255, 0.95);
+                        background: rgba(255, 255, 255, 0.15);
                         backdrop-filter: blur(20px);
                         border-radius: 20px;
                         padding: 30px;
@@ -168,7 +168,7 @@ const NotificationsPage = () => {
                     }
 
                     .modern-card {
-                        background: rgba(255, 255, 255, 0.95);
+                        background: rgba(255, 255, 255, 0.15);
                         backdrop-filter: blur(20px);
                         border-radius: 20px;
                         padding: 30px;
@@ -399,7 +399,7 @@ const NotificationsPage = () => {
                     }
 
                     .stat-card {
-                        background: rgba(255, 255, 255, 0.9);
+                        background: rgba(255, 255, 255, 0.15);
                         backdrop-filter: blur(15px);
                         border-radius: 15px;
                         padding: 25px;

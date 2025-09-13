@@ -73,6 +73,58 @@ const ApplicationDetailPage = () => {
         }
     };
 
+    // Payment control handlers
+    const handlePaymentToggle = async () => {
+        try {
+            const config = { headers: { Authorization: `Bearer ${token}` } };
+            const endpoint = application.is_paid_by_company ? 'unpaid' : 'paid';
+            await axios.patch(`http://localhost:3000/api/applications/${id}/${endpoint}`, {}, config);
+            fetchData(); // Refresh data
+        } catch (error) {
+            console.error("Failed to update payment status", error);
+            setError('Σφάλμα κατά την ενημέρωση της πληρωμής');
+        }
+    };
+
+    const handleFieldPaymentUpdate = async (fieldId, isPaid) => {
+        try {
+            const config = { headers: { Authorization: `Bearer ${token}` } };
+            await axios.patch(
+                `http://localhost:3000/api/applications/${id}/fields/${fieldId}/payment`,
+                { isPaid },
+                config
+            );
+            fetchData(); // Refresh data
+        } catch (error) {
+            console.error("Failed to update field payment", error);
+            setError('Σφάλμα κατά την ενημέρωση της πληρωμής');
+        }
+    };
+
+    const handleFieldClawback = async (fieldId) => {
+        const percentage = prompt('Εισάγετε το ποσοστό clawback σε δωδεκατημόρια (1-12):', '12');
+        if (!percentage || isNaN(percentage) || percentage < 1 || percentage > 12) {
+            if (percentage !== null) alert('Παρακαλώ εισάγετε έναν αριθμό από 1 έως 12.');
+            return;
+        }
+        
+        const reason = prompt('Εισάγετε τον λόγο για το clawback:');
+        if (!reason) return;
+
+        try {
+            const config = { headers: { Authorization: `Bearer ${token}` } };
+            await axios.post(
+                `http://localhost:3000/api/applications/${id}/fields/${fieldId}/clawback`,
+                { percentage: parseFloat(percentage), reason },
+                config
+            );
+            fetchData(); // Refresh data
+        } catch (error) {
+            console.error("Failed to create field clawback", error);
+            setError(error.response?.data?.message || 'Σφάλμα κατά τη δημιουργία του clawback');
+        }
+    };
+
     const handleAddComment = async (e) => {
         e.preventDefault();
         if (!newComment.trim()) return;
@@ -202,7 +254,7 @@ const ApplicationDetailPage = () => {
                     }
 
                     .modern-header {
-                        background: rgba(255, 255, 255, 0.95);
+                        background: rgba(255, 255, 255, 0.15);
                         backdrop-filter: blur(20px);
                         border-radius: 20px;
                         padding: 30px;
@@ -286,7 +338,7 @@ const ApplicationDetailPage = () => {
                     }
 
                     .modern-card {
-                        background: rgba(255, 255, 255, 0.95);
+                        background: rgba(255, 255, 255, 0.15);
                         backdrop-filter: blur(20px);
                         border-radius: 20px;
                         padding: 30px;
@@ -390,6 +442,136 @@ const ApplicationDetailPage = () => {
                         color: #374151;
                         font-size: 1.1rem;
                         font-weight: 700;
+                    }
+
+                    /* Field Payment Styles */
+                    .field-payments-grid {
+                        display: grid;
+                        gap: 20px;
+                        margin-top: 20px;
+                    }
+
+                    .field-payment-item {
+                        background: rgba(255, 255, 255, 0.1);
+                        backdrop-filter: blur(10px);
+                        border: 1px solid rgba(255, 255, 255, 0.15);
+                        border-radius: 15px;
+                        padding: 20px;
+                        transition: all 0.3s ease;
+                        position: relative;
+                        overflow: hidden;
+                    }
+
+                    .field-payment-item::before {
+                        content: '';
+                        position: absolute;
+                        top: 0;
+                        left: 0;
+                        right: 0;
+                        height: 3px;
+                        background: linear-gradient(135deg, #667eea, #764ba2);
+                    }
+
+                    .field-payment-item:hover {
+                        transform: translateY(-2px);
+                        box-shadow: 0 8px 25px rgba(102, 126, 234, 0.15);
+                        border-color: rgba(102, 126, 234, 0.3);
+                    }
+
+                    .field-payment-info {
+                        display: grid;
+                        grid-template-columns: 1fr auto auto;
+                        gap: 15px;
+                        align-items: center;
+                        margin-bottom: 15px;
+                        padding-bottom: 15px;
+                        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+                    }
+
+                    .field-label {
+                        color: #667eea;
+                        font-weight: 600;
+                        font-size: 1rem;
+                    }
+
+                    .field-value {
+                        color: #374151;
+                        font-weight: 500;
+                        text-align: center;
+                        padding: 4px 8px;
+                        background: rgba(255, 255, 255, 0.1);
+                        border-radius: 8px;
+                        font-size: 0.9rem;
+                    }
+
+                    .field-commission {
+                        color: #059669;
+                        font-weight: 700;
+                        font-size: 1.1rem;
+                        text-align: right;
+                    }
+
+                    .field-payment-controls {
+                        display: flex;
+                        align-items: center;
+                        justify-content: space-between;
+                        gap: 15px;
+                    }
+
+                    .payment-checkbox-container {
+                        display: flex;
+                        align-items: center;
+                        gap: 8px;
+                    }
+
+                    .payment-checkbox {
+                        width: 18px;
+                        height: 18px;
+                        border-radius: 4px;
+                        border: 2px solid #667eea;
+                        background: transparent;
+                        cursor: pointer;
+                        transition: all 0.2s ease;
+                    }
+
+                    .payment-checkbox:checked {
+                        background: linear-gradient(135deg, #667eea, #764ba2);
+                        border-color: #667eea;
+                    }
+
+                    .payment-checkbox-label {
+                        color: #374151;
+                        font-size: 0.9rem;
+                        font-weight: 500;
+                        cursor: pointer;
+                        user-select: none;
+                    }
+
+                    .clawback-button {
+                        padding: 6px 12px;
+                        background: linear-gradient(135deg, #f59e0b, #d97706);
+                        color: white;
+                        border: none;
+                        border-radius: 8px;
+                        font-size: 0.8rem;
+                        font-weight: 600;
+                        cursor: pointer;
+                        transition: all 0.2s ease;
+                    }
+
+                    .clawback-button:hover {
+                        background: linear-gradient(135deg, #d97706, #b45309);
+                        transform: translateY(-1px);
+                        box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+                    }
+
+                    .clawback-indicator {
+                        color: #f59e0b;
+                        font-size: 0.9rem;
+                        font-weight: 600;
+                        display: flex;
+                        align-items: center;
+                        gap: 5px;
                     }
 
                     .modern-actions {
@@ -619,7 +801,7 @@ const ApplicationDetailPage = () => {
                         height: 44px;
                         border: 1px solid rgba(102, 126, 234, 0.2);
                         border-radius: 12px;
-                        background: rgba(255, 255, 255, 0.9);
+                        background: rgba(255, 255, 255, 0.15);
                         backdrop-filter: blur(10px);
                         cursor: pointer;
                         display: flex;
@@ -691,7 +873,7 @@ const ApplicationDetailPage = () => {
                         border: 2px solid rgba(102, 126, 234, 0.1);
                         border-radius: 12px;
                         font-size: 1rem;
-                        background: rgba(255, 255, 255, 0.9);
+                        background: rgba(255, 255, 255, 0.15);
                         backdrop-filter: blur(10px);
                         transition: all 0.3s ease;
                         box-sizing: border-box;
@@ -740,7 +922,7 @@ const ApplicationDetailPage = () => {
                     }
 
                     .modal {
-                        background: rgba(255, 255, 255, 0.95);
+                        background: rgba(255, 255, 255, 0.15);
                         backdrop-filter: blur(20px);
                         border-radius: 20px;
                         padding: 40px;
@@ -767,7 +949,7 @@ const ApplicationDetailPage = () => {
                         border: 2px solid rgba(102, 126, 234, 0.1);
                         border-radius: 12px;
                         font-size: 1rem;
-                        background: rgba(255, 255, 255, 0.9);
+                        background: rgba(255, 255, 255, 0.15);
                         backdrop-filter: blur(10px);
                         transition: all 0.3s ease;
                         box-sizing: border-box;
@@ -954,6 +1136,27 @@ const ApplicationDetailPage = () => {
                                 {application.contract_end_date ? new Date(application.contract_end_date).toLocaleDateString('el-GR') : '-'}
                             </div>
                         </div>
+
+                        {/* Payment Controls - Only for TeamLeaders/Admins */}
+                        {(user.role === 'TeamLeader' || user.role === 'Admin') && (
+                            <div className="detail-item payment-control">
+                                <div className="detail-label">💳 Πληρωμή</div>
+                                <div className="detail-value">
+                                    <div className="payment-checkbox-container">
+                                        <input
+                                            type="checkbox"
+                                            id="payment-toggle"
+                                            checked={application.is_paid_by_company}
+                                            onChange={handlePaymentToggle}
+                                            className="payment-checkbox"
+                                        />
+                                        <label htmlFor="payment-toggle" className="payment-checkbox-label">
+                                            Πληρώθηκα από την εταιρία
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     {renderActionButtons() && (
@@ -988,6 +1191,58 @@ const ApplicationDetailPage = () => {
                     )}
                 </div>
             </div>
+
+            {/* Field Payment Controls - Only for applications with commissionable fields */}
+            {(user.role === 'TeamLeader' || user.role === 'Admin') && application.fields?.some(f => f.is_commissionable) && (
+                <div className="modern-card">
+                    <div className="card-content">
+                        <div className="card-header">
+                            <h3 className="card-title">💰 Διαχείριση Πληρωμών Πεδίων</h3>
+                        </div>
+                        <div className="field-payments-grid">
+                            {application.fields?.filter(f => f.is_commissionable).map((field) => (
+                                <div key={field.id} className="field-payment-item">
+                                    <div className="field-payment-info">
+                                        <span className="field-label">{field.label}</span>
+                                        <span className="field-value">{field.value}</span>
+                                        <span className="field-commission">
+                                            {field.commission_amount ? `€${parseFloat(field.commission_amount).toFixed(2)}` : '€0.00'}
+                                        </span>
+                                    </div>
+                                    <div className="field-payment-controls">
+                                        <div className="payment-checkbox-container">
+                                            <input
+                                                type="checkbox"
+                                                id={`field-paid-${field.id}`}
+                                                checked={field.is_paid || false}
+                                                onChange={(e) => handleFieldPaymentUpdate(field.id, e.target.checked)}
+                                                className="payment-checkbox"
+                                                disabled={field.is_in_statement}
+                                            />
+                                            <label htmlFor={`field-paid-${field.id}`} className="payment-checkbox-label">
+                                                Πληρώθηκα από την εταιρία
+                                            </label>
+                                        </div>
+                                        {field.is_paid && field.is_in_statement && !field.has_clawback && (
+                                            <button
+                                                onClick={() => handleFieldClawback(field.id)}
+                                                className="clawback-button"
+                                            >
+                                                + Clawback
+                                            </button>
+                                        )}
+                                        {field.has_clawback && (
+                                            <span className="clawback-indicator">
+                                                ⚠️ Έχει Clawback
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            )}
 
             <div className="modern-card">
                 <div className="card-content">
@@ -1094,16 +1349,19 @@ const ApplicationDetailPage = () => {
                             </div>
                         ))}
                     </div>
-                    <form onSubmit={handleAddComment} className="comment-form">
-                        <textarea 
-                            rows="3" 
-                            placeholder="Γράψε ένα σχόλιο..." 
-                            value={newComment} 
-                            onChange={(e) => setNewComment(e.target.value)} 
-                            required
-                        />
-                        <button type="submit">💬 Αποστολή</button>
-                    </form>
+                    {/* Comments form - Only authenticated users can comment */}
+                    {user && (
+                        <form onSubmit={handleAddComment} className="comment-form">
+                            <textarea
+                                rows="3"
+                                placeholder="Γράψε ένα σχόλιο..."
+                                value={newComment}
+                                onChange={(e) => setNewComment(e.target.value)}
+                                required
+                            />
+                            <button type="submit">💬 Αποστολή</button>
+                        </form>
+                    )}
                 </div>
             </div>
 

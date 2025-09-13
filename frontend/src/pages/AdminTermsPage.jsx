@@ -143,7 +143,7 @@ const AdminTermsPage = () => {
                 }
 
                 .admin-header {
-                    background: rgba(255, 255, 255, 0.95);
+                    background: rgba(255, 255, 255, 0.15);
                     backdrop-filter: blur(20px);
                     border-radius: 20px;
                     padding: 30px;
@@ -215,7 +215,7 @@ const AdminTermsPage = () => {
                 }
 
                 .tabs-container {
-                    background: rgba(255, 255, 255, 0.95);
+                    background: rgba(255, 255, 255, 0.15);
                     backdrop-filter: blur(20px);
                     border-radius: 20px;
                     margin-bottom: 30px;
@@ -370,7 +370,7 @@ const AdminTermsPage = () => {
                 .acceptance-table {
                     width: 100%;
                     border-collapse: collapse;
-                    background: rgba(255, 255, 255, 0.9);
+                    background: rgba(255, 255, 255, 0.15);
                     border-radius: 12px;
                     overflow: hidden;
                     box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
@@ -428,7 +428,7 @@ const AdminTermsPage = () => {
                 }
 
                 .modal {
-                    background: white;
+                    background: rgba(255, 255, 255, 0.1);
                     border-radius: 20px;
                     width: 100%;
                     max-width: 800px;

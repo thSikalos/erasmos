@@ -1,5 +1,80 @@
 /* --- ΓΕΝΙΚΑ ΣΤΥΛ --- */
-body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; background-color: #f0f2f5;}
+body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+
+/* --- GLASSMORPHISM UTILITIES --- */
+.glass-card {
+    background: rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 20px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+}
+
+.glass-card-hover {
+    transition: all 0.3s ease;
+}
+
+.glass-card-hover:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: translateY(-2px);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+}
+
+.glass-text-white {
+    color: white;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.glass-text-white-muted {
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.glass-text-white-light {
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.glass-table {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.glass-table tbody tr {
+    background: rgba(255, 255, 255, 0.1);
+    transition: all 0.2s ease;
+}
+
+.glass-table tbody tr:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.glass-table td {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.glass-table th {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: white;
+    border: none;
+}
+
+.glass-button {
+    background: rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 10px;
+    color: rgba(255, 255, 255, 0.9);
+    transition: all 0.3s ease;
+}
+
+.glass-button:hover {
+    background: rgba(255, 255, 255, 0.25);
+    color: white;
+    transform: translateY(-1px);
+}
 .App { text-align: left; }
 .error-message { color: red; text-align: center; margin-top: 1rem; }
 .success-message { color: green; text-align: center; margin-top: 1rem; }
@@ -606,4 +681,368 @@ h3 { margin-top: 0; border-bottom: 1px solid #eee; padding-bottom: 0.5rem; }
 .payment-checkbox:checked + .payment-checkbox-label {
     color: #1cc88a;
     font-weight: 500;
+}
+
+/* Advanced Applications Table Styles */
+.application-row {
+    transition: all 0.3s ease;
+}
+
+.application-row:hover {
+    background-color: #f8f9fc;
+}
+
+.expand-button {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 12px;
+    color: #5a5c69;
+    padding: 4px;
+    border-radius: 3px;
+    transition: all 0.3s ease;
+}
+
+.expand-button:hover {
+    background-color: #e3e6f0;
+    color: #3a3b45;
+}
+
+.expand-button.expanded {
+    transform: rotate(180deg);
+}
+
+.expanded-row {
+    background-color: #f8f9fc;
+    border-top: 1px solid #e3e6f0;
+}
+
+.expanded-row td {
+    padding: 0;
+}
+
+.field-payments-container {
+    padding: 1.5rem;
+    border-left: 3px solid #4e73df;
+}
+
+.field-payments-container h4 {
+    margin: 0 0 1rem 0;
+    color: #5a5c69;
+    font-size: 1.1rem;
+}
+
+.field-payments-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.field-payment-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    background-color: white;
+    border: 1px solid #e3e6f0;
+    border-radius: 0.35rem;
+    box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.15);
+}
+
+.field-payment-info {
+    flex: 1;
+}
+
+.field-label {
+    font-weight: 600;
+    color: #5a5c69;
+    font-size: 1rem;
+}
+
+.field-payment-controls {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+}
+
+.clawback-checkbox-container {
+    margin-left: 1rem;
+}
+
+.clawback-button {
+    background-color: #f6c23e;
+    border: none;
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 0.35rem;
+    cursor: pointer;
+    font-size: 0.875rem;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+.clawback-button:hover {
+    background-color: #dda20a;
+    transform: translateY(-1px);
+    box-shadow: 0 0.25rem 0.5rem rgba(0, 0, 0, 0.1);
+}
+
+.clawback-indicator {
+    color: #e74a3b;
+    font-size: 0.875rem;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+/* Status Badge Improvements */
+.status-partial {
+    background-color: #f6c23e;
+    color: white;
+}
+
+/* Advanced Table Responsive Design */
+@media (max-width: 1200px) {
+    .applications-table th,
+    .applications-table td {
+        min-width: 100px;
+        font-size: 0.875rem;
+    }
+}
+
+@media (max-width: 768px) {
+    .field-payment-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1rem;
+    }
+    
+    .field-payment-controls {
+        width: 100%;
+        justify-content: flex-start;
+    }
+    
+    .applications-table {
+        font-size: 0.8rem;
+    }
+    
+    .field-payments-container {
+        padding: 1rem;
+    }
+}
+
+/* Loading and Animation Improvements */
+.applications-table tbody tr {
+    animation: fadeInUp 0.5s ease forwards;
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Expandable Row Animation */
+.expanded-row td {
+    animation: expandRow 0.3s ease forwards;
+}
+
+@keyframes expandRow {
+    from {
+        opacity: 0;
+        max-height: 0;
+        padding: 0;
+    }
+    to {
+        opacity: 1;
+        max-height: 500px;
+        padding: inherit;
+    }
+}
+
+/* Enhanced Search and Filter Styling */
+.applications-filters {
+    margin-bottom: 1.5rem;
+}
+
+.search-container {
+    position: relative;
+    margin-bottom: 2rem;
+}
+
+/* Better Button Styling */
+.filter-button.active {
+    background: linear-gradient(180deg, #4e73df 10%, #224abe 100%);
+    box-shadow: 0 0.25rem 0.5rem rgba(78, 115, 223, 0.3);
+}
+
+/* Enterprise-level Table Header */
+.applications-table thead th {
+    background: linear-gradient(180deg, #f8f9fc 0%, #eaecf4 100%);
+    border-bottom: 2px solid #4e73df;
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.8rem;
+    letter-spacing: 0.5px;
+}
+
+/* Enhanced Responsive Design */
+@media (max-width: 1400px) {
+    .applications-container {
+        padding: 1.5rem;
+    }
+    
+    .applications-table {
+        font-size: 0.85rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .applications-container {
+        padding: 1rem;
+        margin: 0.5rem;
+    }
+    
+    .applications-header h1 {
+        font-size: 1.5rem;
+    }
+    
+    .applications-table th,
+    .applications-table td {
+        padding: 0.5rem;
+        font-size: 0.75rem;
+        min-width: 80px;
+    }
+    
+    .payment-checkbox-container {
+        font-size: 0.75rem;
+    }
+    
+    .search-input {
+        font-size: 0.875rem;
+        padding: 0.75rem;
+    }
+    
+    .filter-button {
+        font-size: 0.8rem;
+        padding: 0.5rem 1rem;
+    }
+}
+
+/* Better Table Overflow Handling */
+.applications-table-container {
+    position: relative;
+    margin: 0 -1rem;
+    padding: 0 1rem;
+}
+
+@media (max-width: 768px) {
+    .applications-table-container {
+        margin: 0 -0.5rem;
+        padding: 0 0.5rem;
+    }
+}
+
+/* Field Commission Styling */
+.field-commission {
+    font-weight: 600;
+    color: #10b981;
+    font-size: 0.9rem;
+    margin-left: 0.5rem;
+}
+
+.field-payment-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.field-payment-info .field-label {
+    font-weight: 600;
+}
+
+.field-payment-info .field-value {
+    color: #666;
+    font-size: 0.9rem;
+}
+
+.field-payment-info .field-commission {
+    color: #10b981;
+    font-weight: 600;
+    margin-left: 0;
+}
+
+/* Pagination Styles */
+.pagination-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 20px 0;
+    padding: 20px;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.pagination-info {
+    color: #666;
+    font-size: 0.9rem;
+}
+
+.pagination {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.pagination-button {
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    background: white;
+    color: #333;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 0.9rem;
+}
+
+.pagination-button:hover:not(:disabled) {
+    background: #f5f5f5;
+    border-color: #007bff;
+}
+
+.pagination-button:disabled {
+    color: #ccc;
+    cursor: not-allowed;
+    background: #f8f9fa;
+}
+
+.pagination-button.active {
+    background: #007bff;
+    color: white;
+    border-color: #007bff;
+}
+
+/* Mobile responsiveness for pagination */
+@media (max-width: 768px) {
+    .pagination-container {
+        flex-direction: column;
+        gap: 15px;
+        text-align: center;
+    }
+    
+    .pagination {
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+    
+    .pagination-button {
+        min-width: 40px;
+    }
 }

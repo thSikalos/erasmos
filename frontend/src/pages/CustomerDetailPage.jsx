@@ -17,7 +17,7 @@ const CustomerDetailPage = () => {
     const [error, setError] = useState('');
     
     const [isEditing, setIsEditing] = useState(false);
-    const [formData, setFormData] = useState({ full_name: '', phone: '', address: '', notes: '' });
+    const [formData, setFormData] = useState({ full_name: '', phone: '', address: '', notes: '', phones: [], emails: [] });
 
     const [newNote, setNewNote] = useState('');
     const [method, setMethod] = useState('phone');
@@ -33,7 +33,11 @@ const CustomerDetailPage = () => {
                 axios.get(`http://localhost:3000/api/customers/${id}/applications`, config)
             ]);
             setCustomer(customerRes.data);
-            setFormData(customerRes.data);
+            setFormData({
+                ...customerRes.data,
+                phones: customerRes.data.phone ? [customerRes.data.phone] : [''],
+                emails: customerRes.data.email ? [customerRes.data.email] : ['']
+            });
             setLog(logRes.data);
             setApplications(applicationsRes.data);
         } catch (err) {
@@ -49,11 +53,46 @@ const CustomerDetailPage = () => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
     };
 
+    const handlePhoneChange = (index, value) => {
+        const newPhones = [...formData.phones];
+        newPhones[index] = value;
+        setFormData({ ...formData, phones: newPhones });
+    };
+
+    const handleEmailChange = (index, value) => {
+        const newEmails = [...formData.emails];
+        newEmails[index] = value;
+        setFormData({ ...formData, emails: newEmails });
+    };
+
+    const addPhone = () => {
+        setFormData({ ...formData, phones: [...formData.phones, ''] });
+    };
+
+    const removePhone = (index) => {
+        const newPhones = formData.phones.filter((_, i) => i !== index);
+        setFormData({ ...formData, phones: newPhones.length > 0 ? newPhones : [''] });
+    };
+
+    const addEmail = () => {
+        setFormData({ ...formData, emails: [...formData.emails, ''] });
+    };
+
+    const removeEmail = (index) => {
+        const newEmails = formData.emails.filter((_, i) => i !== index);
+        setFormData({ ...formData, emails: newEmails.length > 0 ? newEmails : [''] });
+    };
+
     const handleUpdateSubmit = async (e) => {
         e.preventDefault();
         try {
             const config = { headers: { Authorization: `Bearer ${token}` } };
-            const res = await axios.put(`http://localhost:3000/api/customers/${id}`, formData, config);
+            const submitData = {
+                ...formData,
+                phone: formData.phones.filter(p => p.trim()).join(', '),
+                email: formData.emails.filter(e => e.trim()).join(', ')
+            };
+            const res = await axios.put(`http://localhost:3000/api/customers/${id}`, submitData, config);
             setCustomer(res.data);
             setIsEditing(false);
         } catch (err) {
@@ -186,7 +225,7 @@ const CustomerDetailPage = () => {
                     }
                     
                     .customer-header {
-                        background: rgba(255, 255, 255, 0.95);
+                        background: rgba(255, 255, 255, 0.15);
                         backdrop-filter: blur(10px);
                         border-radius: 20px;
                         padding: 30px;
@@ -340,7 +379,7 @@ const CustomerDetailPage = () => {
                     }
                     
                     .customer-info-section, .notes-section, .communication-section {
-                        background: rgba(255, 255, 255, 0.95);
+                        background: rgba(255, 255, 255, 0.15);
                         backdrop-filter: blur(10px);
                         border-radius: 20px;
                         padding: 30px;
@@ -395,7 +434,7 @@ const CustomerDetailPage = () => {
                     }
                     
                     .edit-form {
-                        background: rgba(255, 255, 255, 0.95);
+                        background: rgba(255, 255, 255, 0.15);
                         backdrop-filter: blur(10px);
                         border-radius: 20px;
                         padding: 30px;
@@ -428,7 +467,7 @@ const CustomerDetailPage = () => {
                         border: 2px solid #e5e7eb;
                         border-radius: 12px;
                         font-size: 1rem;
-                        background: rgba(255, 255, 255, 0.9);
+                        background: rgba(255, 255, 255, 0.15);
                         backdrop-filter: blur(10px);
                         transition: all 0.3s ease;
                         box-sizing: border-box;
@@ -447,6 +486,63 @@ const CustomerDetailPage = () => {
                         background: rgba(243, 244, 246, 0.5);
                         color: #6b7280;
                         cursor: not-allowed;
+                    }
+
+                    .dynamic-field-container {
+                        display: flex;
+                        align-items: center;
+                        gap: 10px;
+                        margin-bottom: 10px;
+                    }
+
+                    .dynamic-field-container:last-child {
+                        margin-bottom: 0;
+                    }
+
+                    .dynamic-field-container .modern-input {
+                        flex: 1;
+                        margin: 0;
+                    }
+
+                    .field-actions {
+                        display: flex;
+                        gap: 5px;
+                        flex-shrink: 0;
+                    }
+
+                    .add-field-button, .remove-field-button {
+                        width: 32px;
+                        height: 32px;
+                        border: none;
+                        border-radius: 8px;
+                        cursor: pointer;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        font-size: 14px;
+                        transition: all 0.2s ease;
+                    }
+
+                    .add-field-button {
+                        background: linear-gradient(135deg, #10b981, #059669);
+                        color: white;
+                    }
+
+                    .add-field-button:hover {
+                        background: linear-gradient(135deg, #059669, #047857);
+                        transform: translateY(-1px);
+                        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+                    }
+
+                    .remove-field-button {
+                        background: linear-gradient(135deg, #ef4444, #dc2626);
+                        color: white;
+                    }
+
+                    .remove-field-button:hover {
+                        background: linear-gradient(135deg, #dc2626, #b91c1c);
+                        transform: translateY(-1px);
+                        box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
                     }
                     
                     .form-actions {
@@ -524,7 +620,7 @@ const CustomerDetailPage = () => {
                         border: 2px solid #e5e7eb;
                         border-radius: 12px;
                         font-size: 1rem;
-                        background: rgba(255, 255, 255, 0.9);
+                        background: rgba(255, 255, 255, 0.15);
                         backdrop-filter: blur(10px);
                         transition: all 0.3s ease;
                         cursor: pointer;
@@ -561,7 +657,7 @@ const CustomerDetailPage = () => {
                     }
                     
                     .log-entry {
-                        background: white;
+                        background: rgba(255, 255, 255, 0.1);
                         padding: 20px;
                         border-radius: 12px;
                         border: 1px solid #e5e7eb;
@@ -618,7 +714,7 @@ const CustomerDetailPage = () => {
                     }
                     
                     .danger-zone {
-                        background: rgba(255, 255, 255, 0.95);
+                        background: rgba(255, 255, 255, 0.15);
                         backdrop-filter: blur(10px);
                         border-radius: 20px;
                         padding: 30px;
@@ -653,7 +749,7 @@ const CustomerDetailPage = () => {
                     }
                     
                     .error-message {
-                        background: rgba(255, 255, 255, 0.95);
+                        background: rgba(255, 255, 255, 0.15);
                         backdrop-filter: blur(10px);
                         color: #dc2626;
                         padding: 20px 30px;
@@ -702,7 +798,7 @@ const CustomerDetailPage = () => {
                     }
                     
                     .applications-section {
-                        background: rgba(255, 255, 255, 0.95);
+                        background: rgba(255, 255, 255, 0.15);
                         backdrop-filter: blur(10px);
                         border-radius: 20px;
                         padding: 30px;
@@ -718,15 +814,15 @@ const CustomerDetailPage = () => {
                     }
                     
                     .application-card {
-                        background: white;
+                        background: rgba(255, 255, 255, 0.15);
+                        backdrop-filter: blur(20px);
+                        border: 1px solid rgba(255, 255, 255, 0.2);
                         border-radius: 15px;
                         padding: 25px;
                         box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
-                        border: 1px solid #e5e7eb;
                         transition: all 0.3s ease;
                         cursor: pointer;
                         position: relative;
-                        overflow: hidden;
                     }
                     
                     .application-card::before {
@@ -747,20 +843,13 @@ const CustomerDetailPage = () => {
                     
                     .app-header {
                         display: flex;
-                        justify-content: space-between;
+                        justify-content: flex-end;
                         align-items: center;
                         margin-bottom: 20px;
                         padding-bottom: 15px;
-                        border-bottom: 1px solid #f3f4f6;
+                        border-bottom: 1px solid rgba(255, 255, 255, 0.2);
                     }
                     
-                    .company-name {
-                        font-size: 1.1rem;
-                        font-weight: 700;
-                        color: #1f2937;
-                        flex: 1;
-                        margin-right: 10px;
-                    }
                     
                     .status-badge {
                         padding: 4px 12px;
@@ -918,16 +1007,40 @@ const CustomerDetailPage = () => {
                                     />
                                 </div>
                                 <div className="form-group">
-                                    <label htmlFor="phone">📞 Τηλέφωνο</label>
-                                    <input
-                                        id="phone"
-                                        type="text"
-                                        name="phone"
-                                        value={formData.phone || ''}
-                                        onChange={handleFormChange}
-                                        className="modern-input"
-                                        placeholder="Εισάγετε τηλέφωνο"
-                                    />
+                                    <label>📞 Τηλέφωνα</label>
+                                    {formData.phones.map((phone, index) => (
+                                        <div key={index} className="dynamic-field-container">
+                                            <input
+                                                type="text"
+                                                value={phone}
+                                                onChange={(e) => handlePhoneChange(index, e.target.value)}
+                                                className="modern-input"
+                                                placeholder={`Τηλέφωνο ${index + 1}`}
+                                            />
+                                            <div className="field-actions">
+                                                {formData.phones.length > 1 && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => removePhone(index)}
+                                                        className="remove-field-button"
+                                                        title="Αφαίρεση τηλεφώνου"
+                                                    >
+                                                        ❌
+                                                    </button>
+                                                )}
+                                                {index === formData.phones.length - 1 && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={addPhone}
+                                                        className="add-field-button"
+                                                        title="Προσθήκη τηλεφώνου"
+                                                    >
+                                                        ➕
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
                                 </div>
                                 <div className="form-group">
                                     <label htmlFor="address">🏠 Διεύθυνση</label>
@@ -943,6 +1056,43 @@ const CustomerDetailPage = () => {
                                 </div>
                             </div>
                             
+                            <div className="form-group">
+                                <label>📧 Emails</label>
+                                {formData.emails.map((email, index) => (
+                                    <div key={index} className="dynamic-field-container">
+                                        <input
+                                            type="email"
+                                            value={email}
+                                            onChange={(e) => handleEmailChange(index, e.target.value)}
+                                            className="modern-input"
+                                            placeholder={`Email ${index + 1}`}
+                                        />
+                                        <div className="field-actions">
+                                            {formData.emails.length > 1 && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => removeEmail(index)}
+                                                    className="remove-field-button"
+                                                    title="Αφαίρεση email"
+                                                >
+                                                    ❌
+                                                </button>
+                                            )}
+                                            {index === formData.emails.length - 1 && (
+                                                <button
+                                                    type="button"
+                                                    onClick={addEmail}
+                                                    className="add-field-button"
+                                                    title="Προσθήκη email"
+                                                >
+                                                    ➕
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+
                             <div className="form-group">
                                 <label htmlFor="notes">📝 Γενικές Σημειώσεις</label>
                                 <textarea
@@ -1007,19 +1157,24 @@ const CustomerDetailPage = () => {
                             {applications.length > 0 ? (
                                 <>
                                     <div className="applications-grid">
-                                        {(showAllApplications ? applications : applications.slice(0, 4)).map(app => (
-                                            <div 
-                                                key={app.application_id} 
-                                                className="application-card"
-                                                onClick={() => navigate(`/application/${app.application_id}`)}
-                                            >
-                                                <div className="app-header">
-                                                    <span className="company-name">{app.company_name}</span>
+                                        {(showAllApplications ? applications : applications.slice(0, 4)).map(app => {
+                                            console.log('Application data:', app);
+                                            return (
+                                                <div
+                                                    key={app.application_id}
+                                                    className="application-card"
+                                                    onClick={() => navigate(`/application/${app.application_id}`)}
+                                                >
+                                                    <div className="app-header">
                                                     <span className={`status-badge status-${app.status.toLowerCase().replace(' ', '-')}`}>
                                                         {app.status}
                                                     </span>
                                                 </div>
                                                 <div className="app-details">
+                                                    <div className="app-detail">
+                                                        <span className="detail-label">🏢 Εταιρεία:</span>
+                                                        <span className="detail-value">{app.company_name || 'ΧΩΡΙΣ ΕΤΑΙΡΕΙΑ'}</span>
+                                                    </div>
                                                     <div className="app-detail">
                                                         <span className="detail-label">💰 Αμοιβή:</span>
                                                         <span className="detail-value">€{app.total_commission}</span>
@@ -1044,7 +1199,8 @@ const CustomerDetailPage = () => {
                                                     </div>
                                                 </div>
                                             </div>
-                                        ))}
+                                            );
+                                        })}
                                     </div>
                                     {applications.length > 4 && (
                                         <div className="show-more-container">

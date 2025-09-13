@@ -100,7 +100,7 @@ const LoginPage = () => {
           }
           
           .modern-login-form {
-            background: rgba(255, 255, 255, 0.95);
+            background: rgba(255, 255, 255, 0.15);
             backdrop-filter: blur(20px);
             border-radius: 25px;
             padding: 50px 40px;
@@ -189,7 +189,7 @@ const LoginPage = () => {
             border: 2px solid #e5e7eb;
             border-radius: 12px;
             font-size: 1rem;
-            background: rgba(255, 255, 255, 0.9);
+            background: rgba(255, 255, 255, 0.15);
             backdrop-filter: blur(10px);
             transition: all 0.3s ease;
             box-sizing: border-box;
@@ -288,6 +288,50 @@ const LoginPage = () => {
             backdrop-filter: blur(10px);
           }
           
+          .login-links {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-top: 25px;
+            text-align: center;
+            position: relative;
+            z-index: 2;
+          }
+
+          .forgot-password-link,
+          .new-user-link {
+            color: rgba(255, 255, 255, 0.8);
+            text-decoration: none;
+            font-size: 0.9rem;
+            padding: 12px 20px;
+            border-radius: 10px;
+            transition: all 0.3s ease;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(10px);
+          }
+
+          .forgot-password-link:hover,
+          .new-user-link:hover {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(255, 255, 255, 0.1);
+          }
+
+          .new-user-link {
+            background: rgba(102, 126, 234, 0.2);
+            border: 1px solid rgba(102, 126, 234, 0.3);
+            color: rgba(255, 255, 255, 0.9);
+            font-weight: 600;
+          }
+
+          .new-user-link:hover {
+            background: rgba(102, 126, 234, 0.3);
+            border-color: rgba(102, 126, 234, 0.5);
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.2);
+          }
+
           .welcome-message {
             text-align: center;
             margin-top: 30px;
@@ -399,12 +443,20 @@ const LoginPage = () => {
             )}
           </button>
         </form>
-        
+
         {error && <div className="modern-error-message">❌ {error}</div>}
-        
+
+        <div className="login-links">
+          <a href="#" className="forgot-password-link" onClick={(e) => { e.preventDefault(); alert('Η λειτουργία "Ξέχασα τον κωδικό μου" θα διατεθεί σύντομα!'); }}>
+            🔑 Ξέχασα τον κωδικό μου
+          </a>
+          <a href="/register" className="new-user-link">
+            👤 Νέος χρήστης; πάτα εδώ!
+          </a>
+        </div>
+
         <div className="welcome-message">
-          💼 Καλώς ήρθατε στο <span className="feature-highlight">Erasmos Business Management Platform</span><br />
-          🎯 Διαχειριστείτε εύκολα τις αιτήσεις, τους πελάτες και τις αμοιβές σας
+          💼 Καλώς ήρθατε στον <span className="feature-highlight">Έρασμο</span>
         </div>
       </div>
     </div>

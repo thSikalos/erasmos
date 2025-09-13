@@ -2,6 +2,7 @@ import React, { useContext } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthContext } from './context/AuthContext';
 import LoginPage from './pages/LoginPage';
+import RegisterPage from './pages/RegisterPage';
 import DashboardPage from './pages/DashboardPage';
 import ApplicationDetailPage from './pages/ApplicationDetailPage';
 import NewApplicationPage from './pages/NewApplicationPage';
@@ -21,7 +22,8 @@ import CustomersPage from './pages/CustomersPage';
 import CustomerDetailPage from './pages/CustomerDetailPage';
 import ReportingPage from './pages/ReportingPage';
 import NotificationsPage from './pages/NotificationsPage';
-import ApplicationsPage from './pages/ApplicationsPage';
+import AdvancedApplicationsPage from './pages/AdvancedApplicationsPage';
+import ProfilePage from './pages/ProfilePage';
 import MainLayout from './components/MainLayout';
 import ProtectedRoute from './components/ProtectedRoute';
 import FinanceProtectedRoute from './components/FinanceProtectedRoute';
@@ -39,6 +41,7 @@ function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/register" element={<RegisterPage />} />
       <Route element={<ProtectedRoute />}>
         <Route path="/terms" element={<TermsPage />} />
         <Route element={<MainLayout />}>
@@ -49,8 +52,9 @@ function App() {
           <Route path="/application/edit/:id" element={<EditApplicationPage />} />
           <Route path="/application/:id" element={<ApplicationDetailPage />} />
           <Route path="/renewals" element={<RenewalsPage />} />
-          <Route path="/applications" element={<ApplicationsPage />} />
+          <Route path="/applications" element={<AdvancedApplicationsPage />} />
           <Route path="/notifications" element={<NotificationsPage />} />
+          <Route path="/profile" element={<ProfilePage />} />
           <Route element={<FinanceProtectedRoute />}>
             <Route path="/payments" element={<PaymentsPage />} />
             <Route path="/commissions" element={<CommissionsPage />} />
