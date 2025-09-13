@@ -14,17 +14,19 @@ const ApplicationsPage = () => {
     const [showCommissionDialog, setShowCommissionDialog] = useState(false);
     const [selectedApplication, setSelectedApplication] = useState(null);
     const [commissionableFields, setCommissionableFields] = useState([]);
+    const [displayFields, setDisplayFields] = useState([]);
 
     const fetchApplications = async () => {
         if (!token) return;
         setLoading(true);
         try {
             const config = { headers: { Authorization: `Bearer ${token}` } };
-            const response = await axios.get(
-                `http://localhost:3000/api/applications/team-applications?paid_status=${filter}`, 
-                config
-            );
-            setApplications(response.data);
+            const [appsRes, fieldsRes] = await Promise.all([
+                axios.get(`http://localhost:3000/api/applications/team-applications?paid_status=${filter}`, config),
+                axios.get('http://localhost:3000/api/fields', config)
+            ]);
+            setApplications(appsRes.data);
+            setDisplayFields(fieldsRes.data.filter(f => f.show_in_applications_table));
         } catch (error) {
             console.error("Failed to fetch applications", error);
             setError('Σφάλμα κατά τη φόρτωση των αιτήσεων');
@@ -209,6 +211,9 @@ const ApplicationsPage = () => {
                             <thead>
                                 <tr>
                                     <th>ID</th>
+                                    {displayFields.length > 0 && (
+                                        <th>{displayFields[0].label}</th>
+                                    )}
                                     <th>Πελάτης</th>
                                     <th>Συνεργάτης</th>
                                     <th>Εταιρία</th>
@@ -222,6 +227,14 @@ const ApplicationsPage = () => {
                                 {filteredApplications.map((app) => (
                                     <tr key={app.id}>
                                         <td>#{app.id}</td>
+                                        {displayFields.length > 0 && (
+                                            <td>
+                                                {app.display_fields && app.display_fields[displayFields[0].label] ?
+                                                    app.display_fields[displayFields[0].label] :
+                                                    '-'
+                                                }
+                                            </td>
+                                        )}
                                         <td>
                                             <div>
                                                 <strong>{app.customer_name}</strong>

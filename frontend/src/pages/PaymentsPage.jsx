@@ -13,20 +13,24 @@ const PaymentsPage = () => {
     const [loading, setLoading] = useState(true);
     const [paymentError, setPaymentError] = useState('');
     const [successMessage, setSuccessMessage] = useState('');
+    const [editingStatement, setEditingStatement] = useState(null);
+    const [displayFields, setDisplayFields] = useState([]);
 
     const fetchData = async () => {
         if (!token) return;
         setLoading(true);
         try {
             const config = { headers: { Authorization: `Bearer ${token}` } };
-            const [teamRes, appsRes, statementsRes] = await Promise.all([
+            const [teamRes, appsRes, statementsRes, fieldsRes] = await Promise.all([
                 axios.get(user.role === 'Admin' ? 'http://localhost:3000/api/users' : 'http://localhost:3000/api/users/my-team', config),
                 axios.get('http://localhost:3000/api/applications', config),
                 axios.get('http://localhost:3000/api/payments/statements', config),
+                axios.get('http://localhost:3000/api/fields', config),
             ]);
             setTeam(teamRes.data.filter(u => u.role === 'Associate'));
             setApplications(appsRes.data);
             setStatements(statementsRes.data);
+            setDisplayFields(fieldsRes.data.filter(f => f.show_in_applications_table));
         } catch (error) {
             console.error("Failed to fetch payment data", error);
         } finally {
@@ -75,15 +79,23 @@ const PaymentsPage = () => {
         setSuccessMessage('');
         try {
             const config = { headers: { Authorization: `Bearer ${token}` } };
-            const response = await axios.post('http://localhost:3000/api/payments/statements', {
-                recipient_id: parseInt(selectedAssociateId),
-                application_ids: Array.from(selectedAppIds)
-            }, config);
-            setSuccessMessage(`Statement #${response.data.statementId} created successfully!`);
+            if (editingStatement) {
+                await axios.put(`http://localhost:3000/api/payments/statements/${editingStatement}`, {
+                    application_ids: Array.from(selectedAppIds)
+                }, config);
+                setSuccessMessage(`Statement #${editingStatement} updated successfully!`);
+                setEditingStatement(null);
+            } else {
+                const response = await axios.post('http://localhost:3000/api/payments/statements', {
+                    recipient_id: parseInt(selectedAssociateId),
+                    application_ids: Array.from(selectedAppIds)
+                }, config);
+                setSuccessMessage(`Statement #${response.data.statementId} created successfully!`);
+            }
             setSelectedAppIds(new Set());
             fetchData();
         } catch (error) {
-            console.error("Failed to create statement", error);
+            console.error("Failed to create/update statement", error);
             setPaymentError(error.response?.data?.message || 'An unknown error occurred.');
         }
     };
@@ -145,6 +157,31 @@ const PaymentsPage = () => {
             console.error("Failed to mark as paid", error);
             setPaymentError('Σφάλμα κατά το μαρκάρισμα ως πληρωμένη');
         }
+    };
+
+    const handleEditStatement = async (statementId) => {
+        try {
+            const config = { headers: { Authorization: `Bearer ${token}` } };
+            const response = await axios.get(`http://localhost:3000/api/payments/statements/${statementId}`, config);
+            const statement = response.data;
+
+            // Set the editing state
+            setEditingStatement(statementId);
+            setSelectedAssociateId(statement.recipient_id.toString());
+            setSelectedAppIds(new Set(statement.application_ids));
+
+            // Scroll to the form
+            document.getElementById('payment-form').scrollIntoView({ behavior: 'smooth' });
+        } catch (error) {
+            console.error("Failed to load statement for editing", error);
+            setPaymentError('Σφάλμα κατά τη φόρτωση της ταμειακής για επεξεργασία');
+        }
+    };
+
+    const cancelEdit = () => {
+        setEditingStatement(null);
+        setSelectedAppIds(new Set());
+        setSelectedAssociateId('');
     };
 
     return (
@@ -506,6 +543,42 @@ const PaymentsPage = () => {
                         box-shadow: 0 6px 20px rgba(245, 158, 11, 0.4);
                     }
 
+                    .edit-button {
+                        padding: 8px 16px;
+                        background: linear-gradient(135deg, #3b82f6, #2563eb);
+                        color: white;
+                        border: none;
+                        border-radius: 8px;
+                        font-weight: 600;
+                        cursor: pointer;
+                        transition: all 0.3s ease;
+                        box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
+                        font-size: 0.9rem;
+                    }
+
+                    .edit-button:hover {
+                        transform: translateY(-2px);
+                        box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
+                    }
+
+                    .cancel-edit-button {
+                        padding: 8px 16px;
+                        background: linear-gradient(135deg, #6b7280, #4b5563);
+                        color: white;
+                        border: none;
+                        border-radius: 8px;
+                        font-weight: 600;
+                        cursor: pointer;
+                        transition: all 0.3s ease;
+                        box-shadow: 0 4px 15px rgba(107, 114, 128, 0.3);
+                        font-size: 0.9rem;
+                    }
+
+                    .cancel-edit-button:hover {
+                        transform: translateY(-2px);
+                        box-shadow: 0 6px 20px rgba(107, 114, 128, 0.4);
+                    }
+
                     .status-badge {
                         padding: 6px 12px;
                         border-radius: 20px;
@@ -706,10 +779,17 @@ const PaymentsPage = () => {
                 </div>
             </div>
 
-            <div className="modern-card">
+            <div className="modern-card" id="payment-form">
                 <div className="card-content">
                     <div className="card-header">
-                        <h3 className="card-title">💰 Δημιουργία Νέας Ταμειακής</h3>
+                        <h3 className="card-title">
+                            {editingStatement ? '✏️ Επεξεργασία Ταμειακής' : '💰 Δημιουργία Νέας Ταμειακής'}
+                        </h3>
+                        {editingStatement && (
+                            <button onClick={cancelEdit} className="cancel-edit-button">
+                                ❌ Ακύρωση
+                            </button>
+                        )}
                     </div>
                     
                     <div className="modern-form-group">
@@ -737,7 +817,7 @@ const PaymentsPage = () => {
                                     <thead>
                                         <tr>
                                             <th>Επιλογή</th>
-                                            <th>Αίτηση</th>
+                                            <th>{displayFields.length > 0 ? displayFields[0].label : 'Αίτηση'}</th>
                                             <th>Πελάτης</th>
                                             <th>Αμοιβή</th>
                                         </tr>
@@ -753,7 +833,14 @@ const PaymentsPage = () => {
                                                         checked={selectedAppIds.has(app.application_id)} 
                                                     />
                                                 </td>
-                                                <td>#{app.application_id}</td>
+                                                <td>
+                                                    {app.fields && displayFields.length > 0 ? (
+                                                        (() => {
+                                                            const field = app.fields.find(f => f.label === displayFields[0].label);
+                                                            return field ? field.value : `#${app.application_id}`;
+                                                        })()
+                                                    ) : `#${app.application_id}`}
+                                                </td>
                                                 <td>{app.customer_name}</td>
                                                 <td>
                                                     <strong>
@@ -775,12 +862,12 @@ const PaymentsPage = () => {
                                 <div className="total-amount">
                                     💰 Σύνολο Επιλεγμένων: {selectedTotal.toFixed(2)} €
                                 </div>
-                                <button 
-                                    onClick={handleCreateStatement} 
+                                <button
+                                    onClick={handleCreateStatement}
                                     disabled={selectedAppIds.size === 0}
                                     className="create-statement-button"
                                 >
-                                    📄 Δημιουργία Ταμειακής
+                                    {editingStatement ? '✏️ Ενημέρωση Ταμειακής' : '📄 Δημιουργία Ταμειακής'}
                                 </button>
                                 {paymentError && <div className="error-message">❌ {paymentError}</div>}
                                 {successMessage && <div className="success-message">✅ {successMessage}</div>}
@@ -835,6 +922,12 @@ const PaymentsPage = () => {
                                                 </button>
                                                 {st.payment_status === 'draft' && (
                                                     <>
+                                                        <button
+                                                            onClick={() => handleEditStatement(st.id)}
+                                                            className="edit-button"
+                                                        >
+                                                            ✏️ Επεξεργασία
+                                                        </button>
                                                         <button
                                                             onClick={() => handleMarkAsPaid(st.id)}
                                                             className="mark-paid-button"
