@@ -14,7 +14,11 @@ const {
     addApplicationComment,
     exportRenewals, // <-- ΝΕΟ
     getTeamApplications,
-    getApplicationCommissionableFields
+    getApplicationCommissionableFields,
+    updateFieldPaymentStatus,
+    createFieldClawback,
+    getApplicationFieldPayments,
+    getDisplayableFields
 } = require('../controllers/applicationController');
 
 router.use(authMiddleware);
@@ -29,6 +33,14 @@ router.get('/', getApplications);
 router.get('/:id/comments', getApplicationComments);
 router.post('/:id/comments', addApplicationComment);
 router.get('/:id/commissionable-fields', getApplicationCommissionableFields);
+router.get('/:id/field-payments', getApplicationFieldPayments);
+
+// Field-level payment management routes
+router.patch('/:applicationId/fields/:fieldId/payment', updateFieldPaymentStatus);
+router.post('/:applicationId/fields/:fieldId/clawback', createFieldClawback);
+
+// Displayable fields for table configuration
+router.get('/displayable-fields', getDisplayableFields);
 
 router.get('/:id', getApplicationById);
 router.put('/:id', updateApplication);

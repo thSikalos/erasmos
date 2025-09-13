@@ -86,8 +86,8 @@ class PaymentStatementTemplate {
         let currentY = startY;
 
         // Table headers
-        const headers = ['#', 'Αίτηση ID', 'Πελάτης', 'Αμοιβή'];
-        const columnWidths = [30, 80, 250, 100];
+        const headers = ['#', 'Είδος', 'Εταιρία', 'Πελάτης', 'Αμοιβή'];
+        const columnWidths = [30, 80, 120, 180, 80];
         const tableWidth = columnWidths.reduce((sum, width) => sum + width, 0);
         const startX = 50;
 
@@ -123,9 +123,10 @@ class PaymentStatementTemplate {
             // Row data
             const rowData = [
                 (index + 1).toString(),
-                `#${item.id}`,
+                item.item_type || 'Αίτηση',
+                item.company_name || 'N/A',
                 item.customer_name || 'N/A',
-                `${parseFloat(item.total_commission || 0).toFixed(2)} ${this.brandConfig.locale.currencySymbol}`
+                `${parseFloat(item.commission_amount || 0).toFixed(2)} ${this.brandConfig.locale.currencySymbol}`
             ];
 
             rowData.forEach((data, colIndex) => {
@@ -133,7 +134,7 @@ class PaymentStatementTemplate {
                    .fillColor(colors.dark)
                    .text(data, x + 5, currentY + 3, {
                        width: columnWidths[colIndex] - 10,
-                       align: colIndex === 3 ? 'right' : 'left'
+                       align: colIndex === 4 ? 'right' : 'left'
                    });
                 x += columnWidths[colIndex];
             });

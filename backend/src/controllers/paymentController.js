@@ -21,13 +21,28 @@ const generateStatementPdf = async (req, res) => {
         }
         const statement = statementRes.rows[0];
 
-        // Fetch statement items
+        // Fetch statement items with field-level details
         const itemsQuery = `
-            SELECT a.id, c.full_name as customer_name, a.total_commission
+            SELECT DISTINCT
+                a.id as application_id,
+                c.full_name as customer_name,
+                comp.name as company_name,
+                CASE 
+                    WHEN si.field_id IS NOT NULL THEN f.label
+                    ELSE 'Αίτηση'
+                END as item_type,
+                CASE 
+                    WHEN si.field_id IS NOT NULL THEN COALESCE(cf.commission_amount, 0)
+                    ELSE COALESCE(a.total_commission, 0)
+                END as commission_amount
             FROM statement_items si
             JOIN applications a ON si.application_id = a.id
             JOIN customers c ON a.customer_id = c.id
+            JOIN companies comp ON a.company_id = comp.id
+            LEFT JOIN fields f ON si.field_id = f.id
+            LEFT JOIN company_fields cf ON si.field_id = cf.field_id AND a.company_id = cf.company_id
             WHERE si.statement_id = $1
+            ORDER BY a.id, f.label
         `;
         const itemsRes = await pool.query(itemsQuery, [id]);
         const items = itemsRes.rows;
@@ -67,7 +82,27 @@ const createPaymentStatement = async (req, res) => {
         const appsCheckResult = await client.query(appsCheckQuery, [application_ids]);
         if (appsCheckResult.rows.length !== application_ids.length) { throw new Error('One or more application IDs are invalid.'); }
         for (const app of appsCheckResult.rows) { const itemCheckQuery = "SELECT id FROM statement_items WHERE application_id = $1"; const itemCheckResult = await client.query(itemCheckQuery, [app.id]); if (itemCheckResult.rows.length > 0) { throw new Error(`Application #${app.id} is already in another statement.`); } if (!app.is_paid_by_company || app.status !== 'Καταχωρήθηκε') { throw new Error(`Application #${app.id} is not ready to be paid.`); } }
-        const commissionsTotal = appsCheckResult.rows.reduce((sum, app) => sum + (app.total_commission ? parseFloat(app.total_commission) : 0), 0);
+        // Calculate total commissions including field-level payments
+        let commissionsTotal = 0;
+        for (const app of appsCheckResult.rows) {
+            // Check for field-level payments first
+            const fieldPaymentsQuery = `
+                SELECT SUM(cf.commission_amount) as field_commission_total
+                FROM field_payments fp
+                JOIN company_fields cf ON fp.field_id = cf.field_id 
+                JOIN applications a ON fp.application_id = a.id AND a.company_id = cf.company_id
+                WHERE fp.application_id = $1 AND fp.is_paid_by_company = TRUE
+            `;
+            const fieldPaymentsResult = await client.query(fieldPaymentsQuery, [app.id]);
+            const fieldCommissionTotal = parseFloat(fieldPaymentsResult.rows[0].field_commission_total || 0);
+            
+            if (fieldCommissionTotal > 0) {
+                commissionsTotal += fieldCommissionTotal;
+            } else {
+                // Use application-level commission (legacy behavior)
+                commissionsTotal += parseFloat(app.total_commission || 0);
+            }
+        }
         let bonusTotal = 0;
         const activeBonusesQuery = "SELECT * FROM bonuses WHERE target_user_id = $1 AND is_active = TRUE AND start_date <= CURRENT_DATE AND end_date >= CURRENT_DATE";
         const activeBonusesRes = await client.query(activeBonusesQuery, [recipient_id]);
@@ -85,7 +120,31 @@ const createPaymentStatement = async (req, res) => {
         const statementQuery = "INSERT INTO payment_statements (creator_id, recipient_id, total_amount, subtotal, vat_amount) VALUES ($1, $2, $3, $4, $5) RETURNING id";
         const statementResult = await client.query(statementQuery, [creator_id, recipient_id, finalTotalAmount.toFixed(2), subtotal.toFixed(2), vatAmount.toFixed(2)]);
         const newStatementId = statementResult.rows[0].id;
-        for (const appId of application_ids) { const itemQuery = "INSERT INTO statement_items (statement_id, application_id) VALUES ($1, $2)"; await client.query(itemQuery, [newStatementId, appId]); }
+        // Check for field-level payments
+        for (const appId of application_ids) {
+            // First check if application has field-level payments
+            const fieldPaymentsQuery = `
+                SELECT fp.field_id, cf.commission_amount
+                FROM field_payments fp
+                JOIN company_fields cf ON fp.field_id = cf.field_id AND fp.application_id IN (
+                    SELECT id FROM applications WHERE id = $1 AND company_id = cf.company_id
+                )
+                WHERE fp.application_id = $1 AND fp.is_paid_by_company = TRUE
+            `;
+            const fieldPaymentsResult = await client.query(fieldPaymentsQuery, [appId]);
+            
+            if (fieldPaymentsResult.rows.length > 0) {
+                // Add field-level items
+                for (const fieldPayment of fieldPaymentsResult.rows) {
+                    const itemQuery = "INSERT INTO statement_items (statement_id, application_id, field_id) VALUES ($1, $2, $3)";
+                    await client.query(itemQuery, [newStatementId, appId, fieldPayment.field_id]);
+                }
+            } else {
+                // Add application-level item (legacy behavior)
+                const itemQuery = "INSERT INTO statement_items (statement_id, application_id) VALUES ($1, $2)";
+                await client.query(itemQuery, [newStatementId, appId]);
+            }
+        }
         if (clawbacksResult.rows.length > 0) { const clawbackIds = clawbacksResult.rows.map(cb => cb.id); const settleClawbacksQuery = "UPDATE clawbacks SET is_settled = TRUE WHERE id = ANY($1::int[])"; await client.query(settleClawbacksQuery, [clawbackIds]); }
         await client.query('COMMIT');
         res.status(201).json({ message: 'Payment statement created successfully', statementId: newStatementId, subtotal, vatAmount, bonusTotal, finalTotalAmount });

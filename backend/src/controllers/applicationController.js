@@ -219,13 +219,30 @@ const getApplicationById = async (req, res) => {
                 cust.full_name as customer_name, 
                 co.id as company_id, co.name as company_name, 
                 u.id as associate_id, u.name as associate_name, u.parent_user_id as associate_parent_id,
-                COALESCE(json_agg(DISTINCT jsonb_build_object('field_id', f.id, 'label', f.label, 'value', av.value)) FILTER (WHERE f.id IS NOT NULL), '[]') as fields
+                COALESCE(
+                    json_agg(DISTINCT 
+                        jsonb_build_object(
+                            'id', f.id, 
+                            'label', f.label, 
+                            'value', av.value, 
+                            'is_commissionable', f.is_commissionable,
+                            'commission_amount', f.commission_amount,
+                            'is_paid', COALESCE(fp.is_paid_by_company, false),
+                            'has_clawback', CASE WHEN cb.id IS NOT NULL THEN true ELSE false END,
+                            'is_in_statement', CASE WHEN si.id IS NOT NULL THEN true ELSE false END
+                        )
+                    ) FILTER (WHERE f.id IS NOT NULL), 
+                    '[]'
+                ) as fields
             FROM applications app
             JOIN customers cust ON app.customer_id = cust.id
             JOIN companies co ON app.company_id = co.id
             JOIN users u ON app.user_id = u.id
             LEFT JOIN application_values av ON app.id = av.application_id
             LEFT JOIN fields f ON av.field_id = f.id
+            LEFT JOIN field_payments fp ON f.id = fp.field_id AND fp.application_id = app.id
+            LEFT JOIN clawbacks cb ON fp.id = cb.field_payment_id AND cb.is_settled = false
+            LEFT JOIN statement_items si ON si.application_id = app.id AND si.field_id = f.id
             WHERE app.id = $1
             GROUP BY app.id, cust.full_name, co.id, co.name, u.id, u.name, u.parent_user_id;
         `;
@@ -553,14 +570,50 @@ const getTeamApplications = async (req, res) => {
                 c.full_name as customer_name,
                 c.phone as customer_phone,
                 comp.name as company_name,
-                u.name as associate_name
+                u.name as associate_name,
+                -- Calculate field payment status
+                CASE 
+                    WHEN COUNT(cf.id) = 0 THEN 'simple'
+                    WHEN COUNT(cf.id) = COUNT(CASE WHEN fp.is_paid_by_company = true THEN 1 END) THEN 'fully_paid'
+                    WHEN COUNT(CASE WHEN fp.is_paid_by_company = true THEN 1 END) > 0 THEN 'partially_paid'
+                    ELSE 'unpaid'
+                END as payment_status,
+                -- Get displayable field values
+                COALESCE(
+                    json_object_agg(
+                        df.label, av.value
+                    ) FILTER (WHERE df.show_in_applications_table = true), 
+                    '{}'::json
+                ) as display_fields,
+                -- Get commissionable field payment info
+                COALESCE(
+                    json_agg(
+                        json_build_object(
+                            'field_id', cf.id,
+                            'field_label', cf.label,
+                            'commission_amount', cf.commission_amount,
+                            'is_paid', COALESCE(fp.is_paid_by_company, false),
+                            'has_clawback', CASE WHEN cb.id IS NOT NULL THEN true ELSE false END,
+                            'is_in_statement', CASE WHEN si.id IS NOT NULL THEN true ELSE false END
+                        )
+                    ) FILTER (WHERE cf.id IS NOT NULL),
+                    '[]'::json
+                ) as commissionable_fields
             FROM applications a
             JOIN customers c ON a.customer_id = c.id
             JOIN companies comp ON a.company_id = comp.id
             JOIN users u ON a.user_id = u.id
+            LEFT JOIN application_values av ON a.id = av.application_id
+            LEFT JOIN fields df ON av.field_id = df.id
+            LEFT JOIN fields cf ON av.field_id = cf.id AND cf.is_commissionable = true
+            LEFT JOIN field_payments fp ON cf.id = fp.field_id AND fp.application_id = a.id
+            LEFT JOIN clawbacks cb ON fp.id = cb.field_payment_id AND cb.is_settled = false
+            LEFT JOIN statement_items si ON si.application_id = a.id AND si.field_id = cf.id
             WHERE ${userFilter} 
                 AND a.status = 'Καταχωρήθηκε' 
                 ${paymentFilter}
+            GROUP BY a.id, a.total_commission, a.is_paid_by_company, a.created_at,
+                     c.full_name, c.phone, comp.name, u.name
             ORDER BY a.created_at DESC
         `;
 
@@ -568,7 +621,8 @@ const getTeamApplications = async (req, res) => {
         res.json(result.rows);
 
     } catch (err) {
-        console.error(err.message);
+        console.error("Error in getTeamApplications:", err.message);
+        console.error("Full error:", err);
         res.status(500).send('Server Error');
     }
 };
@@ -641,6 +695,211 @@ const getApplicationCommissionableFields = async (req, res) => {
     }
 };
 
+// --- FIELD PAYMENT MANAGEMENT ---
+
+// Update field payment status
+const updateFieldPaymentStatus = async (req, res) => {
+    const { applicationId, fieldId } = req.params;
+    const { isPaid } = req.body;
+    
+    try {
+        const client = await pool.connect();
+        
+        try {
+            await client.query('BEGIN');
+            
+            // Check if field payment record exists
+            const existingQuery = `
+                SELECT id FROM field_payments 
+                WHERE application_id = $1 AND field_id = $2
+            `;
+            const existingResult = await client.query(existingQuery, [applicationId, fieldId]);
+            
+            let fieldPaymentId;
+            
+            if (existingResult.rows.length > 0) {
+                // Update existing record
+                const updateQuery = `
+                    UPDATE field_payments 
+                    SET is_paid_by_company = $1, paid_at = $2, updated_at = CURRENT_TIMESTAMP
+                    WHERE application_id = $3 AND field_id = $4
+                    RETURNING id
+                `;
+                const updateResult = await client.query(updateQuery, [
+                    isPaid, 
+                    isPaid ? new Date() : null, 
+                    applicationId, 
+                    fieldId
+                ]);
+                fieldPaymentId = updateResult.rows[0].id;
+            } else {
+                // Create new record
+                const insertQuery = `
+                    INSERT INTO field_payments (application_id, field_id, is_paid_by_company, paid_at)
+                    VALUES ($1, $2, $3, $4)
+                    RETURNING id
+                `;
+                const insertResult = await client.query(insertQuery, [
+                    applicationId, 
+                    fieldId, 
+                    isPaid, 
+                    isPaid ? new Date() : null
+                ]);
+                fieldPaymentId = insertResult.rows[0].id;
+            }
+            
+            await client.query('COMMIT');
+            
+            res.json({ 
+                success: true, 
+                fieldPaymentId,
+                message: `Field payment status updated successfully` 
+            });
+            
+        } catch (error) {
+            await client.query('ROLLBACK');
+            throw error;
+        } finally {
+            client.release();
+        }
+        
+    } catch (err) {
+        console.error('Error updating field payment status:', err.message);
+        res.status(500).send('Server Error');
+    }
+};
+
+// Create field-level clawback
+const createFieldClawback = async (req, res) => {
+    const { applicationId, fieldId } = req.params;
+    const { percentage, reason } = req.body;
+    const userId = req.user.id;
+    
+    try {
+        const client = await pool.connect();
+        
+        try {
+            await client.query('BEGIN');
+            
+            // Get the field payment record and field commission
+            const fieldPaymentQuery = `
+                SELECT fp.id, f.commission_amount
+                FROM field_payments fp
+                JOIN fields f ON f.id = fp.field_id  
+                WHERE fp.application_id = $1 AND fp.field_id = $2 AND fp.is_paid_by_company = true
+            `;
+            const fieldPaymentResult = await client.query(fieldPaymentQuery, [applicationId, fieldId]);
+            
+            if (fieldPaymentResult.rows.length === 0) {
+                return res.status(400).json({ 
+                    message: 'Field must be paid before creating a clawback' 
+                });
+            }
+            
+            const fieldPaymentId = fieldPaymentResult.rows[0].id;
+            const commissionAmount = fieldPaymentResult.rows[0].commission_amount || 0;
+            
+            // Calculate clawback amount: (commission * percentage / 12)
+            const clawbackAmount = (commissionAmount * percentage / 12).toFixed(2);
+            
+            // Create the clawback
+            const clawbackQuery = `
+                INSERT INTO clawbacks (user_id, application_id, field_id, field_payment_id, amount, reason)
+                VALUES ($1, $2, $3, $4, $5, $6)
+                RETURNING *
+            `;
+            const clawbackResult = await client.query(clawbackQuery, [
+                userId, 
+                applicationId, 
+                fieldId, 
+                fieldPaymentId, 
+                clawbackAmount, 
+                reason
+            ]);
+            
+            await client.query('COMMIT');
+            
+            res.status(201).json({
+                success: true,
+                clawback: clawbackResult.rows[0],
+                message: 'Field clawback created successfully'
+            });
+            
+        } catch (error) {
+            await client.query('ROLLBACK');
+            throw error;
+        } finally {
+            client.release();
+        }
+        
+    } catch (err) {
+        console.error('Error creating field clawback:', err.message);
+        res.status(500).send('Server Error');
+    }
+};
+
+// Get field payments for an application with clawback info
+const getApplicationFieldPayments = async (req, res) => {
+    const { applicationId } = req.params;
+    
+    try {
+        const query = `
+            SELECT 
+                f.id as field_id,
+                f.label as field_label,
+                f.type as field_type,
+                fp.id as payment_id,
+                fp.is_paid_by_company,
+                fp.paid_at,
+                COALESCE(
+                    json_agg(
+                        json_build_object(
+                            'id', c.id,
+                            'amount', c.amount,
+                            'reason', c.reason,
+                            'is_settled', c.is_settled,
+                            'created_at', c.created_at
+                        )
+                    ) FILTER (WHERE c.id IS NOT NULL), 
+                    '[]'
+                ) as clawbacks
+            FROM fields f
+            JOIN application_values av ON f.id = av.field_id
+            LEFT JOIN field_payments fp ON f.id = fp.field_id AND fp.application_id = $1
+            LEFT JOIN clawbacks c ON fp.id = c.field_payment_id AND c.is_settled = false
+            WHERE av.application_id = $1 AND f.is_commissionable = true
+            GROUP BY f.id, f.label, f.type, fp.id, fp.is_paid_by_company, fp.paid_at
+            ORDER BY f.label
+        `;
+        
+        const result = await pool.query(query, [applicationId]);
+        res.json(result.rows);
+        
+    } catch (err) {
+        console.error('Error fetching field payments:', err.message);
+        res.status(500).send('Server Error');
+    }
+};
+
+// Get fields that should be displayed in applications table
+const getDisplayableFields = async (req, res) => {
+    try {
+        const query = `
+            SELECT id, label, type
+            FROM fields 
+            WHERE show_in_applications_table = true
+            ORDER BY label
+        `;
+        
+        const result = await pool.query(query);
+        res.json(result.rows);
+        
+    } catch (err) {
+        console.error('Error fetching displayable fields:', err.message);
+        res.status(500).send('Server Error');
+    }
+};
+
 module.exports = {
     createApplication,
     getApplications,
@@ -654,5 +913,9 @@ module.exports = {
     addApplicationComment,
     exportRenewals,
     getTeamApplications,
-    getApplicationCommissionableFields
+    getApplicationCommissionableFields,
+    updateFieldPaymentStatus,
+    createFieldClawback,
+    getApplicationFieldPayments,
+    getDisplayableFields
 };

@@ -2,11 +2,11 @@ const pool = require('../config/db');
 
 // --- CREATE A NEW FIELD IN THE LIBRARY --- (Admin only)
 const createField = async (req, res) => {
-    const { label, type, is_commissionable } = req.body;
+    const { label, type, is_commissionable, show_in_applications_table } = req.body;
     try {
         const newField = await pool.query(
-            "INSERT INTO fields (label, type, is_commissionable) VALUES ($1, $2, $3) RETURNING *",
-            [label, type, is_commissionable]
+            "INSERT INTO fields (label, type, is_commissionable, show_in_applications_table) VALUES ($1, $2, $3, $4) RETURNING *",
+            [label, type, is_commissionable, show_in_applications_table]
         );
         res.status(201).json(newField.rows[0]);
     } catch (err) {
@@ -32,11 +32,11 @@ const getAllFields = async (req, res) => {
 // --- UPDATE A FIELD --- (Admin only)
 const updateField = async (req, res) => {
     const { id } = req.params;
-    const { label, type, is_commissionable } = req.body;
+    const { label, type, is_commissionable, show_in_applications_table } = req.body;
     try {
         const result = await pool.query(
-            "UPDATE fields SET label = $1, type = $2, is_commissionable = $3 WHERE id = $4 RETURNING *",
-            [label, type, is_commissionable, id]
+            "UPDATE fields SET label = $1, type = $2, is_commissionable = $3, show_in_applications_table = $4 WHERE id = $5 RETURNING *",
+            [label, type, is_commissionable, show_in_applications_table, id]
         );
         if (result.rows.length === 0) {
             return res.status(404).json({ message: 'Field not found' });
