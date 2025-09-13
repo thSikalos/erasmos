@@ -7,7 +7,7 @@ const ApplicationsPage = () => {
     const { token, user } = useContext(AuthContext);
     const [applications, setApplications] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [filter, setFilter] = useState('unpaid'); // 'all', 'paid', 'unpaid'
+    const [filter, setFilter] = useState('all'); // 'all', 'paid', 'unpaid'
     const [searchTerm, setSearchTerm] = useState('');
     const [successMessage, setSuccessMessage] = useState('');
     const [error, setError] = useState('');
@@ -52,18 +52,24 @@ const ApplicationsPage = () => {
     };
 
     const handleMarkAsPaid = async (applicationId) => {
-        // First check if this application has commissionable fields
-        const fields = await fetchCommissionableFields(applicationId);
         const app = applications.find(a => a.id === applicationId);
         
-        if (fields.length > 0) {
-            // Show dialog for field-by-field payment selection
-            setSelectedApplication(app);
-            setCommissionableFields(fields);
-            setShowCommissionDialog(true);
+        if (app.is_paid_by_company) {
+            // If already paid, unmark it as paid
+            await markApplicationAsUnpaid(applicationId);
         } else {
-            // No commissionable fields, proceed with simple payment
-            await markApplicationAsPaid(applicationId);
+            // First check if this application has commissionable fields
+            const fields = await fetchCommissionableFields(applicationId);
+            
+            if (fields.length > 0) {
+                // Show dialog for field-by-field payment selection
+                setSelectedApplication(app);
+                setCommissionableFields(fields);
+                setShowCommissionDialog(true);
+            } else {
+                // No commissionable fields, proceed with simple payment
+                await markApplicationAsPaid(applicationId);
+            }
         }
     };
 
@@ -76,6 +82,20 @@ const ApplicationsPage = () => {
             fetchApplications(); // Refresh the list
         } catch (error) {
             console.error("Failed to mark application as paid", error);
+            setError('Σφάλμα κατά τη μαρκάρισμα της αίτησης');
+            setTimeout(() => setError(''), 3000);
+        }
+    };
+
+    const markApplicationAsUnpaid = async (applicationId) => {
+        try {
+            const config = { headers: { Authorization: `Bearer ${token}` } };
+            await axios.patch(`http://localhost:3000/api/applications/${applicationId}/unpaid`, {}, config);
+            setSuccessMessage('Η αίτηση μαρκάρισε ως απλήρωτη επιτυχώς!');
+            setTimeout(() => setSuccessMessage(''), 3000);
+            fetchApplications(); // Refresh the list
+        } catch (error) {
+            console.error("Failed to mark application as unpaid", error);
             setError('Σφάλμα κατά τη μαρκάρισμα της αίτησης');
             setTimeout(() => setError(''), 3000);
         }
@@ -135,22 +155,22 @@ const ApplicationsPage = () => {
             {/* Filter Tabs */}
             <div className="applications-filters">
                 <button
+                    onClick={() => setFilter('all')}
+                    className={`filter-button ${filter === 'all' ? 'active' : ''}`}
+                >
+                    Όλες
+                </button>
+                <button
                     onClick={() => setFilter('unpaid')}
                     className={`filter-button ${filter === 'unpaid' ? 'active' : ''}`}
                 >
-                    Μη Πληρωμένες
+                    Απλήρωτες
                 </button>
                 <button
                     onClick={() => setFilter('paid')}
                     className={`filter-button ${filter === 'paid' ? 'active' : ''}`}
                 >
                     Πληρωμένες
-                </button>
-                <button
-                    onClick={() => setFilter('all')}
-                    className={`filter-button ${filter === 'all' ? 'active' : ''}`}
-                >
-                    Όλες
                 </button>
             </div>
 
@@ -225,14 +245,19 @@ const ApplicationsPage = () => {
                                             >
                                                 Προβολή
                                             </Link>
-                                            {!app.is_paid_by_company && canMarkAsPaid && (
-                                                <button
-                                                    onClick={() => handleMarkAsPaid(app.id)}
-                                                    className="action-link mark-paid"
-                                                    style={{ background: 'none', border: 'none', padding: 0 }}
-                                                >
-                                                    Μάρκανση ως Πληρωμένη
-                                                </button>
+                                            {canMarkAsPaid && (
+                                                <div className="payment-checkbox-container">
+                                                    <input
+                                                        type="checkbox"
+                                                        id={`paid-${app.id}`}
+                                                        checked={app.is_paid_by_company}
+                                                        onChange={() => handleMarkAsPaid(app.id)}
+                                                        className="payment-checkbox"
+                                                    />
+                                                    <label htmlFor={`paid-${app.id}`} className="payment-checkbox-label">
+                                                        Πληρώθηκα από την εταιρία
+                                                    </label>
+                                                </div>
                                             )}
                                         </td>
                                     </tr>

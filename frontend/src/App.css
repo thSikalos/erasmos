@@ -579,3 +579,31 @@ h3 { margin-top: 0; border-bottom: 1px solid #eee; padding-bottom: 0.5rem; }
 .button-confirm:hover {
     background-color: #218838;
 }
+
+/* Payment Checkbox Styles */
+.payment-checkbox-container {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+.payment-checkbox {
+    width: 16px;
+    height: 16px;
+    accent-color: #1cc88a;
+    cursor: pointer;
+}
+
+.payment-checkbox-label {
+    font-size: 0.875rem;
+    color: #5a5c69;
+    cursor: pointer;
+    margin-bottom: 0;
+    user-select: none;
+}
+
+.payment-checkbox:checked + .payment-checkbox-label {
+    color: #1cc88a;
+    font-weight: 500;
+}

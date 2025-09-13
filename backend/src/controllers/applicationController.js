@@ -305,6 +305,24 @@ const markAsPaid = async (req, res) => {
     }
 };
 
+// --- MARK AS UNPAID ---
+const markAsUnpaid = async (req, res) => {
+    const { id } = req.params;
+    try {
+        const result = await pool.query(
+            "UPDATE applications SET is_paid_by_company = FALSE WHERE id = $1 RETURNING *",
+            [id]
+        );
+        if (result.rows.length === 0) {
+            return res.status(404).json({ message: 'Application not found' });
+        }
+        res.json(result.rows[0]);
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).send('Server Error');
+    }
+};
+
 // --- GET RENEWALS (CORRECTED FOR EMPTY TEAMS) ---
 const getRenewals = async (req, res) => {
     console.log('=== getRenewals function called ===');
@@ -630,6 +648,7 @@ module.exports = {
     updateApplicationStatus,
     updateApplication,
     markAsPaid,
+    markAsUnpaid,
     getRenewals,
     getApplicationComments,
     addApplicationComment,

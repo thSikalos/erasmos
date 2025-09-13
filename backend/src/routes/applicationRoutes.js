@@ -8,6 +8,7 @@ const {
     updateApplicationStatus,
     updateApplication,
     markAsPaid,
+    markAsUnpaid,
     getRenewals,
     getApplicationComments,
     addApplicationComment,
@@ -33,5 +34,6 @@ router.get('/:id', getApplicationById);
 router.put('/:id', updateApplication);
 router.patch('/:id/status', updateApplicationStatus);
 router.patch('/:id/paid', markAsPaid);
+router.patch('/:id/unpaid', markAsUnpaid);
 
 module.exports = router;
