@@ -1,6 +1,7 @@
 const pool = require('../config/db');
 const PDFDocument = require('pdfkit');
 const path = require('path');
+const documentGenerator = require('../utils/documentGenerator');
 
 const getBillingSettings = async (req, res) => {
     try {
@@ -215,7 +216,9 @@ const getInvoices = async (req, res) => {
 const generateInvoicePdf = async (req, res) => {
     const { id } = req.params;
     const adminUserId = req.user.id;
+    
     try {
+        // Fetch invoice data with team leader details
         const invoiceQuery = `
             SELECT i.*, u.name as team_leader_name, u.email as team_leader_email, u.afm as team_leader_afm
             FROM team_leader_invoices i
@@ -223,50 +226,32 @@ const generateInvoicePdf = async (req, res) => {
             WHERE i.id = $1
         `;
         const invoiceRes = await pool.query(invoiceQuery, [id]);
-        if (invoiceRes.rows.length === 0) return res.status(404).send('Invoice not found');
+        
+        if (invoiceRes.rows.length === 0) {
+            return res.status(404).send('Invoice not found');
+        }
+        
         const invoice = invoiceRes.rows[0];
-        const adminRes = await pool.query("SELECT name, profession, address, afm FROM users WHERE id = $1", [adminUserId]);
-        const adminDetails = adminRes.rows[0];
-        const doc = new PDFDocument({ margin: 50 });
+
+        // Prepare data for the new document generator
+        const documentData = {
+            invoice: invoice,
+            issuerId: adminUserId
+        };
+
+        // Generate PDF using the new enterprise system
+        const doc = await documentGenerator.generatePDF('invoice', documentData);
+
+        // Set response headers
         res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', `attachment; filename="invoice-${id}.pdf"`);
+        res.setHeader('Content-Disposition', `attachment; filename="τιμολογιο_${id}.pdf"`);
+        
+        // Pipe the document to response
         doc.pipe(res);
-        const fontPath = path.join(__dirname, '../assets/Roboto-Regular.ttf');
-        doc.registerFont('Roboto', fontPath);
-        doc.font('Roboto');
-        doc.fontSize(20).text(`ΤΙΜΟΛΟΓΙΟ ΠΑΡΟΧΗΣ ΥΠΗΡΕΣΙΩΝ #${invoice.id}`, { align: 'center' });
-        doc.moveDown();
-        doc.fontSize(12).text(`Ημερομηνία Έκδοσης: ${new Date(invoice.created_at).toLocaleDateString('el-GR')}`);
-        doc.text(`Περίοδος Χρέωσης: ${new Date(invoice.start_date).toLocaleDateString('el-GR')} - ${new Date(invoice.end_date).toLocaleDateString('el-GR')}`);
-        doc.moveDown(2);
-        doc.text('ΑΠΟ (Πάροχος):', { underline: true });
-        doc.text(adminDetails.name || '');
-        if(adminDetails.profession) doc.text(adminDetails.profession);
-        if(adminDetails.address) doc.text(adminDetails.address);
-        if(adminDetails.afm) doc.text(`ΑΦΜ: ${adminDetails.afm}`);
-        doc.moveDown();
-        doc.text('ΠΡΟΣ (Πελάτης):', { underline: true });
-        doc.text(invoice.team_leader_name || '');
-        if(invoice.team_leader_email) doc.text(invoice.team_leader_email);
-        if(invoice.team_leader_afm) doc.text(`ΑΦΜ: ${invoice.team_leader_afm}`);
-        doc.moveDown(2);
-        doc.fontSize(14).text('Ανάλυση Χρέωσης:', { underline: true });
-        doc.moveDown();
-        doc.fontSize(10).text(`- Αιτήσεις Συνεργατών (${invoice.application_count} τεμ.): ${parseFloat(invoice.base_charge).toFixed(2)} €`);
-        if(parseFloat(invoice.discount_applied) > 0) {
-            doc.fontSize(10).text(`- Έκπτωση όγκου (${invoice.discount_applied}%): -${(parseFloat(invoice.base_charge) * parseFloat(invoice.discount_applied) / 100).toFixed(2)} €`);
-        }
-        doc.moveDown(2);
-        doc.fontSize(12).font('Roboto');
-        doc.text(`Καθαρό Ποσό: ${parseFloat(invoice.subtotal).toFixed(2)} €`, { align: 'right' });
-        if(parseFloat(invoice.vat_amount) > 0) {
-            doc.text(`ΦΠΑ (24%): ${parseFloat(invoice.vat_amount).toFixed(2)} €`, { align: 'right' });
-        }
-        doc.moveDown();
-        doc.fontSize(14).text(`ΣΥΝΟΛΙΚΗ ΧΡΕΩΣΗ: ${parseFloat(invoice.total_charge).toFixed(2)} €`, { align: 'right' });
         doc.end();
+
     } catch (err) {
-        console.error("PDF Generation Error:", err.message);
+        console.error('Enterprise PDF Generation Error:', err.message);
         res.status(500).send('Could not generate PDF');
     }
 };

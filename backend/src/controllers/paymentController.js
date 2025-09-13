@@ -1,19 +1,17 @@
 const pool = require('../config/db');
-const PDFDocument = require('pdfkit');
+const documentGenerator = require('../utils/documentGenerator');
 const fs = require('fs');
 const path = require('path');
 
-// --- GENERATE PDF FOR A STATEMENT (SMART VERSION) ---
+// --- GENERATE PDF FOR A STATEMENT (ENTERPRISE VERSION) ---
 const generateStatementPdf = async (req, res) => {
     const { id } = req.params;
     try {
-        // Παίρνουμε όλα τα δεδομένα
+        // Fetch statement data
         const statementQuery = `
             SELECT ps.*,
-                   c.name as creator_name, c.afm as creator_afm, c.address as creator_address, c.profession as creator_profession,
                    r.name as recipient_name, r.email as recipient_email, r.phone as recipient_phone
             FROM payment_statements ps
-            JOIN users c ON ps.creator_id = c.id
             JOIN users r ON ps.recipient_id = r.id
             WHERE ps.id = $1
         `;
@@ -22,6 +20,8 @@ const generateStatementPdf = async (req, res) => {
             return res.status(404).send('Statement not found');
         }
         const statement = statementRes.rows[0];
+
+        // Fetch statement items
         const itemsQuery = `
             SELECT a.id, c.full_name as customer_name, a.total_commission
             FROM statement_items si
@@ -31,47 +31,27 @@ const generateStatementPdf = async (req, res) => {
         `;
         const itemsRes = await pool.query(itemsQuery, [id]);
         const items = itemsRes.rows;
-        const doc = new PDFDocument({ margin: 50 });
+
+        // Prepare data for the new document generator
+        const documentData = {
+            statement: statement,
+            items: items,
+            issuerId: statement.creator_id
+        };
+
+        // Generate PDF using the new enterprise system
+        const doc = await documentGenerator.generatePDF('payment_statement', documentData);
+
+        // Set response headers
         res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', `attachment; filename="statement-${id}.pdf"`);
+        res.setHeader('Content-Disposition', `attachment; filename="tameiaki_katastasi_${id}.pdf"`);
+        
+        // Pipe the document to response
         doc.pipe(res);
-        const fontPath = path.join(__dirname, '../assets/Roboto-Regular.ttf');
-        doc.registerFont('Roboto', fontPath);
-        doc.font('Roboto');
-        doc.fontSize(20).text(`ΤΑΜΕΙΑΚΗ ΚΑΤΑΣΤΑΣΗ #${statement.id}`, { align: 'center' });
-        doc.moveDown();
-        doc.fontSize(12).text(`Ημερομηνία Έκδοσης: ${new Date(statement.created_at).toLocaleDateString('el-GR')}`);
-        doc.moveDown(2);
-        doc.text('ΑΠΟ (Ομαδάρχης):', { underline: true });
-        doc.text(statement.creator_name || '');
-        if(statement.creator_profession) doc.text(statement.creator_profession);
-        if(statement.creator_address) doc.text(statement.creator_address);
-        if(statement.creator_afm) doc.text(`ΑΦΜ: ${statement.creator_afm}`);
-        doc.moveDown();
-       
-        doc.text('ΠΡΟΣ (Συνεργάτης):', { underline: true });
-        doc.text(statement.recipient_name || '');
-        if(statement.recipient_email) doc.text(statement.recipient_email);
-        // --- ΕΞΥΠΝΟΣ ΕΛΕΓΧΟΣ ---
-        // Τυπώνει το τηλέφωνο μόνο αν υπάρχει
-        if(statement.recipient_phone) doc.text(`Τηλέφωνο: ${statement.recipient_phone}`);
-        doc.moveDown(2);
-        doc.fontSize(14).text('Ανάλυση Αμοιβών:', { underline: true });
-        doc.moveDown();
-        items.forEach(item => {
-            doc.fontSize(10).text(`- Αίτηση #${item.id} (${item.customer_name}): ${parseFloat(item.total_commission).toFixed(2)} €`);
-        });
-        doc.moveDown(2);
-        doc.fontSize(12).font('Roboto');
-        doc.text(`Καθαρό Ποσό: ${parseFloat(statement.subtotal).toFixed(2)} €`, { align: 'right' });
-        if(parseFloat(statement.vat_amount) > 0) {
-            doc.text(`ΦΠΑ (24%): ${parseFloat(statement.vat_amount).toFixed(2)} €`, { align: 'right' });
-        }
-        doc.moveDown();
-        doc.fontSize(14).text(`ΣΥΝΟΛΙΚΟ ΠΟΣΟ: ${parseFloat(statement.total_amount).toFixed(2)} €`, { align: 'right' });
         doc.end();
+
     } catch (err) {
-        console.error("PDF Generation Error:", err.message);
+        console.error("Enterprise PDF Generation Error:", err.message);
         res.status(500).send('Could not generate PDF');
     }
 };

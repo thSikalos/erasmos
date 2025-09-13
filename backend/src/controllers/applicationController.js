@@ -1,6 +1,7 @@
 const pool = require('../config/db');
 const ExcelJS = require('exceljs');
 const { getEffectiveUserId } = require('../utils/userUtils');
+const documentGenerator = require('../utils/documentGenerator');
 
 const createApplication = async (req, res) => {
   const { company_id, field_values, contract_end_date, customerDetails, is_personal } = req.body;
@@ -369,44 +370,67 @@ const getRenewals = async (req, res) => {
 const exportRenewals = async (req, res) => {
     const { id: userId, role: userRole } = req.user;
     const { startDate, endDate } = req.query;
+    
     try {
-        // Step 1: Fetch the basic renewal data (same as getRenewals)
+        // Step 1: Fetch the basic renewal data with user access control
         let userFilter;
         let queryParams = [];
         let paramIndex = 1;
-        if (userRole === 'TeamLeader' || userRole === 'Admin') {
+        
+        if (userRole === 'Secretary') {
+            // Secretary inherits TeamLeader's data access
+            const effectiveUserId = await getEffectiveUserId(req.user);
+            const teamMembersResult = await pool.query(`SELECT id FROM users WHERE parent_user_id = $${paramIndex++}`, [effectiveUserId]);
+            const teamMemberIds = teamMembersResult.rows.map(user => user.id);
+            const allUserIds = [effectiveUserId, ...teamMemberIds];
+            
+            if (allUserIds.length === 0) {
+                return res.status(404).send('No renewals found for the selected criteria.');
+            }
+            userFilter = `app.user_id = ANY($${paramIndex++}::int[])`;
+            queryParams.push(allUserIds);
+        } else if (userRole === 'TeamLeader' || userRole === 'Admin') {
             const teamMembersResult = await pool.query(`SELECT id FROM users WHERE parent_user_id = $${paramIndex++}`, [userId]);
             const teamMemberIds = teamMembersResult.rows.map(user => user.id);
             const allUserIds = [userId, ...teamMemberIds];
+            
             if (allUserIds.length === 0) {
-                let workbook = new ExcelJS.Workbook();
-                let worksheet = workbook.addWorksheet('Renewals');
-                worksheet.columns = [{ header: 'Status', key: 'status', width: 30 }];
-                worksheet.addRow({ status: 'No renewals found for the selected criteria.' });
-                res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-                res.setHeader('Content-Disposition', 'attachment; filename=' + 'renewals.xlsx');
-                await workbook.xlsx.write(res);
-                return res.end();
+                return res.status(404).send('No renewals found for the selected criteria.');
             }
             userFilter = `app.user_id = ANY($${paramIndex++}::int[])`;
             queryParams.push(allUserIds);
         } else {
+            // Associate role
             userFilter = `app.user_id = $${paramIndex++}`;
             queryParams.push(userId);
         }
+
+        // Set up date filter
         let dateFilter = `app.contract_end_date BETWEEN CURRENT_DATE - INTERVAL '7 days' AND CURRENT_DATE + INTERVAL '30 days'`;
         if (startDate && endDate) {
             dateFilter = `app.contract_end_date BETWEEN $${paramIndex++} AND $${paramIndex++}`;
             queryParams.push(startDate, endDate);
         }
-        const renewalsQuery = ` SELECT app.id as application_id, cust.full_name as customer_name, cust.phone as customer_phone, co.name as company_name, app.contract_end_date, u.name as associate_name FROM applications app JOIN customers cust ON app.customer_id = cust.id JOIN companies co ON app.company_id = co.id JOIN users u ON app.user_id = u.id WHERE ${userFilter} AND ${dateFilter} ORDER BY app.contract_end_date ASC;`;
+
+        // Fetch renewal data
+        const renewalsQuery = `
+            SELECT app.id as application_id, cust.full_name as customer_name, cust.phone as customer_phone, 
+                   co.name as company_name, app.contract_end_date, u.name as associate_name
+            FROM applications app
+            JOIN customers cust ON app.customer_id = cust.id
+            JOIN companies co ON app.company_id = co.id
+            JOIN users u ON app.user_id = u.id
+            WHERE ${userFilter} AND ${dateFilter}
+            ORDER BY app.contract_end_date ASC
+        `;
         const renewalsResult = await pool.query(renewalsQuery, queryParams);
         const renewals = renewalsResult.rows;
+
         if (renewals.length === 0) {
-            // Handle case with no renewals
             return res.status(404).send('No renewals found for the selected criteria.');
         }
-        // Step 2: Fetch all dynamic field values for these specific applications
+
+        // Step 2: Fetch dynamic field values
         const applicationIds = renewals.map(r => r.application_id);
         const valuesQuery = `
             SELECT av.application_id, f.label, av.value
@@ -415,11 +439,9 @@ const exportRenewals = async (req, res) => {
             WHERE av.application_id = ANY($1::int[])
         `;
         const valuesResult = await pool.query(valuesQuery, [applicationIds]);
-        // Step 3: Process data to be Excel-friendly
-        const dataForExcel = [];
+
+        // Step 3: Process data for Excel template
         const dynamicHeaders = new Set();
-       
-        // Group values by application_id
         const valuesByAppId = valuesResult.rows.reduce((acc, row) => {
             if (!acc[row.application_id]) {
                 acc[row.application_id] = {};
@@ -428,39 +450,31 @@ const exportRenewals = async (req, res) => {
             dynamicHeaders.add(row.label);
             return acc;
         }, {});
-        renewals.forEach(renewal => {
-            const row = { ...renewal };
+
+        // Combine renewal data with dynamic fields
+        const processedRenewals = renewals.map(renewal => {
             const dynamicValues = valuesByAppId[renewal.application_id] || {};
-            for (const header of dynamicHeaders) {
-                row[header] = dynamicValues[header] || '';
-            }
-            dataForExcel.push(row);
+            return { ...renewal, ...dynamicValues };
         });
-        // Step 4: Create the Excel file
-        const workbook = new ExcelJS.Workbook();
-        const worksheet = workbook.addWorksheet('Renewals');
-       
-        const headers = [
-            { header: 'Customer Name', key: 'customer_name', width: 30 },
-            { header: 'Phone', key: 'customer_phone', width: 20 },
-            { header: 'Company', key: 'company_name', width: 20 },
-            { header: 'Associate', key: 'associate_name', width: 30 },
-            { header: 'End Date', key: 'contract_end_date', width: 15, style: { numFmt: 'dd/mm/yyyy' } },
-        ];
-       
-        // Add dynamic headers
-        dynamicHeaders.forEach(header => {
-            headers.push({ header: header, key: header, width: 25 });
-        });
-        worksheet.columns = headers;
-        worksheet.addRows(dataForExcel);
+
+        // Prepare data for the enterprise document generator
+        const documentData = {
+            renewals: processedRenewals,
+            dynamicHeaders: Array.from(dynamicHeaders),
+            filters: { startDate, endDate }
+        };
+
+        // Generate Excel using the new enterprise system
+        const workbook = await documentGenerator.generateExcel('renewals', documentData);
+
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-        res.setHeader('Content-Disposition', 'attachment; filename=' + 'renewals_export.xlsx');
-       
+        res.setHeader('Content-Disposition', 'attachment; filename=ανανεωσεις_συμβολαιων.xlsx');
+
         await workbook.xlsx.write(res);
         res.end();
+
     } catch (err) {
-        console.error("Export Error:", err.message);
+        console.error("Enterprise Export Error:", err.message);
         res.status(500).send('Server Error during export');
     }
 };

@@ -3,6 +3,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const PDFDocument = require('pdfkit');
 const path = require('path');
+const documentGenerator = require('../utils/documentGenerator');
 
 // --- GET ALL USERS (FOR ADMIN) ---
 const getAllUsers = async (req, res) => {
@@ -210,83 +211,25 @@ const generateAgreementPdf = async (req, res) => {
         
         const agreement = result.rows[0];
         
-        // Create PDF
-        const doc = new PDFDocument({ margin: 50 });
-        
+        // Prepare data for the new document generator
+        const documentData = {
+            agreement: agreement,
+            userId: id
+        };
+
+        // Generate PDF using the new enterprise system
+        const doc = await documentGenerator.generatePDF('terms_acceptance', documentData);
+
         // Set response headers
         res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', `attachment; filename="agreement-${agreement.user_name.replace(/\s+/g, '_')}-v${agreement.terms_version}.pdf"`);
+        res.setHeader('Content-Disposition', `attachment; filename="αποδοχη_ορων_${agreement.user_name.replace(/\s+/g, '_')}_v${agreement.terms_version}.pdf"`);
         
+        // Pipe the document to response
         doc.pipe(res);
-        
-        // Use Greek-compatible font
-        const fontPath = path.join(__dirname, '../assets/Roboto-Regular.ttf');
-        doc.registerFont('Roboto', fontPath);
-        doc.font('Roboto');
-        
-        // Header
-        doc.fontSize(18).text('ΑΠΟΔΟΧΗ ΟΡΩΝ ΧΡΗΣΗΣ & ΠΡΟΣΤΑΣΙΑΣ ΔΕΔΟΜΕΝΩΝ', { align: 'center' });
-        doc.moveDown();
-        doc.fontSize(14).text('Πλατφόρμα Έρασμος', { align: 'center' });
-        doc.moveDown(2);
-        
-        // Agreement Details
-        doc.fontSize(12);
-        doc.text('ΣΤΟΙΧΕΙΑ ΑΠΟΔΟΧΗΣ', { underline: true });
-        doc.moveDown(0.5);
-        doc.text(`Χρήστης: ${agreement.user_name}`);
-        doc.text(`Email: ${agreement.user_email}`);
-        doc.text(`Ημερομηνία Αποδοχής: ${new Date(agreement.accepted_at).toLocaleString('el-GR')}`);
-        doc.text(`Έκδοση Όρων: ${agreement.terms_version}`);
-        doc.text(`IP Address: ${agreement.ip_address || 'N/A'}`);
-        if (agreement.user_agent) {
-            doc.text(`Browser: ${agreement.user_agent.substring(0, 100)}...`);
-        }
-        doc.moveDown(2);
-        
-        // Terms Content
-        doc.text('ΠΕΡΙΕΧΟΜΕΝΟ ΟΡΩΝ ΠΟΥ ΑΠΟΔΕΧΤΗΚΕ Ο ΧΡΗΣΤΗΣ', { underline: true });
-        doc.moveDown(0.5);
-        doc.text(`Τίτλος: ${agreement.terms_title}`);
-        doc.moveDown(1);
-        
-        // Split content into paragraphs and format
-        const content = agreement.terms_content;
-        const lines = content.split('\n');
-        
-        lines.forEach(line => {
-            line = line.trim();
-            if (line.length === 0) {
-                doc.moveDown(0.5);
-            } else if (line.match(/^\d+\./)) {
-                // Section headers
-                doc.moveDown(0.5);
-                doc.fontSize(11).text(line, { underline: true });
-                doc.moveDown(0.3);
-            } else if (line.includes(':')) {
-                // Sub-headers
-                doc.fontSize(10).text(line, { continued: false });
-                doc.moveDown(0.2);
-            } else if (line.startsWith('- ')) {
-                // Bullet points
-                doc.fontSize(9).text(`  ${line}`, { indent: 20 });
-            } else {
-                // Regular paragraphs
-                doc.fontSize(9).text(line, { align: 'justify' });
-                doc.moveDown(0.3);
-            }
-        });
-        
-        // Footer
-        doc.moveDown(2);
-        doc.fontSize(8).text('---', { align: 'center' });
-        doc.text('Το παρόν έγγραφο αποτελεί αποδεικτικό αποδοχής των όρων χρήσης της πλατφόρμας Έρασμος.', { align: 'center' });
-        doc.text(`Δημιουργήθηκε στις: ${new Date().toLocaleString('el-GR')}`, { align: 'center' });
-        
         doc.end();
         
     } catch (err) {
-        console.error(err.message);
+        console.error('Enterprise PDF Generation Error:', err.message);
         res.status(500).send('Server Error');
     }
 };

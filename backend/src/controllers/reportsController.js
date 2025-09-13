@@ -1,6 +1,7 @@
 const pool = require('../config/db');
 const ExcelJS = require('exceljs');
 const { getEffectiveUserId } = require('../utils/userUtils');
+const documentGenerator = require('../utils/documentGenerator');
 
 // --- GET CHART DATA (CORRECTED FOR EMPTY TEAMS) ---
 const getChartData = async (req, res) => {
@@ -219,22 +220,34 @@ const exportDetailedReport = async (req, res) => {
         `;
         const detailsResult = await pool.query(detailsQuery, queryParams);
 
-        // Create Excel workbook
-        const workbook = new ExcelJS.Workbook();
-        const worksheet = workbook.addWorksheet('Report');
-        worksheet.columns = [
-            { header: 'ID Αίτησης', key: 'id', width: 10 },
-            { header: 'Ημερομηνία', key: 'created_at', width: 20, style: { numFmt: 'dd/mm/yyyy hh:mm' } },
-            { header: 'Συνεργάτης', key: 'associate_name', width: 30 },
-            { header: 'Πελάτης', key: 'customer_name', width: 30 },
-            { header: 'Εταιρεία', key: 'company_name', width: 20 },
-            { header: 'Status', key: 'status', width: 20 },
-            { header: 'Αμοιβή', key: 'total_commission', width: 15, style: { numFmt: '"€"#,##0.00' } }
-        ];
-        worksheet.addRows(detailsResult.rows);
+        // Fetch summary data
+        const summaryQuery = `
+            SELECT COUNT(*) as total_applications, COALESCE(SUM(app.total_commission), 0) as total_commission
+            ${baseQuery}
+            ${whereString}
+        `;
+        const summaryResult = await pool.query(summaryQuery, queryParams);
+
+        // Prepare data for the new document generator
+        const documentData = {
+            details: detailsResult.rows,
+            summary: {
+                total_applications: parseInt(summaryResult.rows[0].total_applications),
+                total_commission: parseFloat(summaryResult.rows[0].total_commission)
+            },
+            filters: {
+                startDate,
+                endDate,
+                associateId,
+                companyId
+            }
+        };
+
+        // Generate Excel using the new enterprise system
+        const workbook = await documentGenerator.generateExcel('reports', documentData);
 
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-        res.setHeader('Content-Disposition', 'attachment; filename=report.xlsx');
+        res.setHeader('Content-Disposition', 'attachment; filename=αναλυτικη_αναφορα.xlsx');
 
         await workbook.xlsx.write(res);
         res.end();

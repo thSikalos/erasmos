@@ -1,0 +1,218 @@
+const BRAND_CONFIG = require('../brandConfig');
+
+class PaymentStatementTemplate {
+    constructor(documentGenerator) {
+        this.generator = documentGenerator;
+        this.brandConfig = BRAND_CONFIG;
+    }
+
+    async generate(data, issuerData, options = {}) {
+        const doc = this.generator.createPDFDocument();
+        const { colors, locale } = this.brandConfig;
+
+        try {
+            // Add header
+            let currentY = this.generator.addEnterpriseHeader(
+                doc, 
+                'ΤΑΜΕΙΑΚΗ ΚΑΤΑΣΤΑΣΗ', 
+                data.statement.id
+            );
+
+            // Add date information
+            const createdAt = new Date(data.statement.created_at);
+            doc.fontSize(12)
+               .fillColor(colors.dark)
+               .text(`Ημερομηνία Έκδοσης: ${createdAt.toLocaleDateString(locale.language)}`, 50, currentY);
+            
+            currentY += 30;
+
+            // Add issuer details
+            currentY = this.generator.addIssuerDetails(doc, issuerData, currentY);
+
+            // Add recipient details
+            doc.fontSize(12)
+               .fillColor(colors.dark)
+               .text('ΠΡΟΣ (Συνεργάτης):', 50, currentY, { underline: true });
+            
+            currentY += 20;
+
+            if (data.statement.recipient_name) {
+                doc.fontSize(11).text(data.statement.recipient_name, 50, currentY);
+                currentY += 15;
+            }
+
+            if (data.statement.recipient_email) {
+                doc.fontSize(10).text(`Email: ${data.statement.recipient_email}`, 50, currentY);
+                currentY += 15;
+            }
+
+            if (data.statement.recipient_phone) {
+                doc.fontSize(10).text(`Τηλέφωνο: ${data.statement.recipient_phone}`, 50, currentY);
+                currentY += 15;
+            }
+
+            currentY += 20;
+
+            // Commission Analysis Header
+            doc.fontSize(14)
+               .fillColor(colors.primary)
+               .text('Ανάλυση Αμοιβών:', 50, currentY, { underline: true });
+            
+            currentY += 25;
+
+            // Commission Items Table
+            this.addCommissionTable(doc, data.items, currentY);
+            
+            // Calculate table height (rough estimation)
+            const tableHeight = (data.items.length + 1) * 20 + 40;
+            currentY += tableHeight;
+
+            // Financial Summary
+            currentY = this.addFinancialSummary(doc, data.statement, currentY);
+
+            // Add footer
+            this.generator.addEnterpriseFooter(doc);
+
+            return doc;
+
+        } catch (error) {
+            console.error('Error generating payment statement PDF:', error);
+            throw error;
+        }
+    }
+
+    addCommissionTable(doc, items, startY) {
+        const { colors } = this.brandConfig;
+        let currentY = startY;
+
+        // Table headers
+        const headers = ['#', 'Αίτηση ID', 'Πελάτης', 'Αμοιβή'];
+        const columnWidths = [30, 80, 250, 100];
+        const tableWidth = columnWidths.reduce((sum, width) => sum + width, 0);
+        const startX = 50;
+
+        // Header background
+        doc.rect(startX, currentY - 5, tableWidth, 25)
+           .fill(colors.primary)
+           .fillColor(colors.white);
+
+        // Header text
+        let x = startX;
+        headers.forEach((header, index) => {
+            doc.fontSize(10)
+               .text(header, x + 5, currentY + 5, {
+                   width: columnWidths[index] - 10,
+                   align: 'center'
+               });
+            x += columnWidths[index];
+        });
+
+        currentY += 25;
+
+        // Table rows
+        doc.fillColor(colors.dark);
+        items.forEach((item, index) => {
+            x = startX;
+            
+            // Row background (alternating)
+            if (index % 2 === 0) {
+                doc.rect(startX, currentY - 2, tableWidth, 20)
+                   .fill(colors.light);
+            }
+
+            // Row data
+            const rowData = [
+                (index + 1).toString(),
+                `#${item.id}`,
+                item.customer_name || 'N/A',
+                `${parseFloat(item.total_commission || 0).toFixed(2)} ${this.brandConfig.locale.currencySymbol}`
+            ];
+
+            rowData.forEach((data, colIndex) => {
+                doc.fontSize(9)
+                   .fillColor(colors.dark)
+                   .text(data, x + 5, currentY + 3, {
+                       width: columnWidths[colIndex] - 10,
+                       align: colIndex === 3 ? 'right' : 'left'
+                   });
+                x += columnWidths[colIndex];
+            });
+
+            currentY += 20;
+        });
+
+        // Table border
+        doc.rect(startX, startY - 5, tableWidth, (items.length + 1) * 20 + 15)
+           .stroke(colors.primary);
+    }
+
+    addFinancialSummary(doc, statement, startY) {
+        const { colors, locale } = this.brandConfig;
+        let currentY = startY + 20;
+
+        // Summary box
+        const boxWidth = 200;
+        const boxHeight = 100;
+        const boxX = 345; // Right aligned
+        
+        doc.rect(boxX, currentY, boxWidth, boxHeight)
+           .stroke(colors.primary);
+
+        // Summary title
+        doc.fontSize(12)
+           .fillColor(colors.primary)
+           .text('Οικονομικά Στοιχεία', boxX + 10, currentY + 10, {
+               width: boxWidth - 20,
+               align: 'center'
+           });
+
+        currentY += 30;
+
+        // Subtotal
+        doc.fontSize(10)
+           .fillColor(colors.dark)
+           .text('Καθαρό Ποσό:', boxX + 10, currentY)
+           .text(`${parseFloat(statement.subtotal || 0).toFixed(2)} ${locale.currencySymbol}`, 
+                 boxX + 10, currentY, { 
+                     width: boxWidth - 20,
+                     align: 'right' 
+                 });
+
+        currentY += 15;
+
+        // VAT if applicable
+        if (parseFloat(statement.vat_amount || 0) > 0) {
+            doc.text('ΦΠΑ (24%):', boxX + 10, currentY)
+               .text(`${parseFloat(statement.vat_amount).toFixed(2)} ${locale.currencySymbol}`, 
+                     boxX + 10, currentY, { 
+                         width: boxWidth - 20,
+                         align: 'right' 
+                     });
+            currentY += 15;
+        }
+
+        // Separator line
+        doc.moveTo(boxX + 10, currentY + 5)
+           .lineTo(boxX + boxWidth - 10, currentY + 5)
+           .stroke(colors.primary);
+
+        currentY += 15;
+
+        // Total amount
+        doc.fontSize(12)
+           .fillColor(colors.success)
+           .text('ΣΥΝΟΛΙΚΟ ΠΟΣΟ:', boxX + 10, currentY, { 
+               width: boxWidth - 20,
+               align: 'left' 
+           })
+           .text(`${parseFloat(statement.total_amount || 0).toFixed(2)} ${locale.currencySymbol}`, 
+                 boxX + 10, currentY, { 
+                     width: boxWidth - 20,
+                     align: 'right' 
+                 });
+
+        return currentY + 40;
+    }
+}
+
+module.exports = PaymentStatementTemplate;
