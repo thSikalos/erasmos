@@ -39,7 +39,10 @@ const createApplication = async (req, res) => {
         totalCommission = baseCommissionRes.rows.length > 0 ? parseFloat(baseCommissionRes.rows[0].amount) : 0;
         const fieldIds = Object.keys(field_values).map(id => parseInt(id));
         if (fieldIds.length > 0) {
-            const fieldCommissionsRes = await client.query("SELECT field_id, amount FROM user_field_commissions WHERE associate_id = $1 AND field_id = ANY($2::int[])", [associate_id, fieldIds]);
+            const fieldCommissionsRes = await client.query(
+                "SELECT ufc.field_id, ufc.amount FROM user_field_commissions ufc JOIN fields f ON ufc.field_id = f.id WHERE ufc.associate_id = $1 AND ufc.field_id = ANY($2::int[]) AND f.is_commissionable = true", 
+                [associate_id, fieldIds]
+            );
             for(const commissionRule of fieldCommissionsRes.rows) {
                 if (field_values[commissionRule.field_id] && String(field_values[commissionRule.field_id]) !== 'false') {
                     totalCommission += parseFloat(commissionRule.amount);
@@ -92,7 +95,10 @@ const updateApplication = async (req, res) => {
        
         const fieldIds = Object.keys(field_values).map(id => parseInt(id));
         if (fieldIds.length > 0) {
-            const fieldCommissionsRes = await client.query("SELECT field_id, amount FROM user_field_commissions WHERE associate_id = $1 AND field_id = ANY($2::int[])", [associate_id, fieldIds]);
+            const fieldCommissionsRes = await client.query(
+                "SELECT ufc.field_id, ufc.amount FROM user_field_commissions ufc JOIN fields f ON ufc.field_id = f.id WHERE ufc.associate_id = $1 AND ufc.field_id = ANY($2::int[]) AND f.is_commissionable = true", 
+                [associate_id, fieldIds]
+            );
             for(const commissionRule of fieldCommissionsRes.rows) {
                 if (field_values[commissionRule.field_id] && String(field_values[commissionRule.field_id]) !== 'false') {
                     totalCommission += parseFloat(commissionRule.amount);
@@ -479,6 +485,70 @@ const exportRenewals = async (req, res) => {
     }
 };
 
+// --- GET TEAM APPLICATIONS FOR PAYMENT MANAGEMENT ---
+const getTeamApplications = async (req, res) => {
+    const userId = req.user.id;
+    const userRole = req.user.role;
+    const { paid_status } = req.query; // 'paid', 'unpaid', or 'all'
+
+    try {
+        // Build user filter based on role
+        let userFilter = '';
+        let queryParams = [];
+        let paramIndex = 1;
+
+        if (userRole === 'TeamLeader' || userRole === 'Admin') {
+            // Get team members
+            const teamMembersResult = await pool.query(`SELECT id FROM users WHERE parent_user_id = $${paramIndex++}`, [userId]);
+            const teamMemberIds = teamMembersResult.rows.map(user => user.id);
+            const allUserIds = [userId, ...teamMemberIds];
+            
+            if (allUserIds.length === 0) {
+                return res.json([]);
+            }
+            userFilter = `a.user_id = ANY($${paramIndex++}::int[])`;
+            queryParams.push(allUserIds);
+        } else {
+            return res.status(403).json({ message: 'Access denied' });
+        }
+
+        // Build payment status filter
+        let paymentFilter = '';
+        if (paid_status === 'paid') {
+            paymentFilter = 'AND a.is_paid_by_company = TRUE';
+        } else if (paid_status === 'unpaid') {
+            paymentFilter = 'AND a.is_paid_by_company = FALSE';
+        }
+
+        const query = `
+            SELECT 
+                a.id, 
+                a.total_commission, 
+                a.is_paid_by_company, 
+                a.created_at,
+                c.full_name as customer_name,
+                c.phone as customer_phone,
+                comp.name as company_name,
+                u.name as associate_name
+            FROM applications a
+            JOIN customers c ON a.customer_id = c.id
+            JOIN companies comp ON a.company_id = comp.id
+            JOIN users u ON a.user_id = u.id
+            WHERE ${userFilter} 
+                AND a.status = 'Καταχωρήθηκε' 
+                ${paymentFilter}
+            ORDER BY a.created_at DESC
+        `;
+
+        const result = await pool.query(query, queryParams);
+        res.json(result.rows);
+
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).send('Server Error');
+    }
+};
+
 module.exports = {
     createApplication,
     getApplications,
@@ -489,5 +559,6 @@ module.exports = {
     getRenewals,
     getApplicationComments,
     addApplicationComment,
-    exportRenewals
+    exportRenewals,
+    getTeamApplications
 };

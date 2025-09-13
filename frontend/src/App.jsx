@@ -21,6 +21,7 @@ import CustomersPage from './pages/CustomersPage';
 import CustomerDetailPage from './pages/CustomerDetailPage';
 import ReportingPage from './pages/ReportingPage';
 import NotificationsPage from './pages/NotificationsPage';
+import ApplicationsPage from './pages/ApplicationsPage';
 import MainLayout from './components/MainLayout';
 import ProtectedRoute from './components/ProtectedRoute';
 import FinanceProtectedRoute from './components/FinanceProtectedRoute';
@@ -48,6 +49,7 @@ function App() {
           <Route path="/application/edit/:id" element={<EditApplicationPage />} />
           <Route path="/application/:id" element={<ApplicationDetailPage />} />
           <Route path="/renewals" element={<RenewalsPage />} />
+          <Route path="/applications" element={<ApplicationsPage />} />
           <Route path="/notifications" element={<NotificationsPage />} />
           <Route element={<FinanceProtectedRoute />}>
             <Route path="/payments" element={<PaymentsPage />} />

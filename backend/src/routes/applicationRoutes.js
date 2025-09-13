@@ -11,13 +11,15 @@ const {
     getRenewals,
     getApplicationComments,
     addApplicationComment,
-    exportRenewals // <-- ΝΕΟ
+    exportRenewals, // <-- ΝΕΟ
+    getTeamApplications
 } = require('../controllers/applicationController');
 
 router.use(authMiddleware);
 
 router.get('/renewals/export', exportRenewals); // <-- ΝΕΟ
 router.get('/renewals', getRenewals);
+router.get('/team-applications', getTeamApplications);
 
 router.post('/', createApplication);
 router.get('/', getApplications);
