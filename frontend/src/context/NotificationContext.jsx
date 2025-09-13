@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
+import NotificationManager from '../components/NotificationManager';
 
 const NotificationContext = createContext();
 
@@ -190,6 +191,7 @@ export const NotificationProvider = ({ children }) => {
     return (
         <NotificationContext.Provider value={contextValue}>
             {children}
+            <NotificationManager />
         </NotificationContext.Provider>
     );
 };

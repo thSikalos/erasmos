@@ -103,12 +103,7 @@ const CustomerDetailPage = () => {
     };
 
     const handleDelete = async () => {
-        const confirmed = await showDeleteConfirm(
-            'Διαγραφή Πελάτη',
-            'Είστε σίγουροι ότι θέλετε να μετακινήσετε αυτόν τον πελάτη στον κάδο ανακύκλωσης;'
-        );
-
-        if (confirmed) {
+        showDeleteConfirm(`τον πελάτη "${customer?.full_name || 'Unknown'}"`, async () => {
             setError('');
             try {
                 const config = { headers: { Authorization: `Bearer ${token}` } };
@@ -120,7 +115,7 @@ const CustomerDetailPage = () => {
                 setError(errorMessage);
                 showErrorToast('Σφάλμα', errorMessage);
             }
-        }
+        });
     };
 
     const handleAddNote = async (e) => {
