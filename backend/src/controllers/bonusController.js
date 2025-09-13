@@ -88,12 +88,15 @@ const getBonusProgress = async (req, res) => {
                     b.bonus_amount_per_application,
                     b.is_active,
                     b.created_at,
-                    -- Count applications for current month based on bonus companies (if specified)
+                    -- Count applications that were included in paid payment statements this month
                     (
-                        SELECT COUNT(*)
-                        FROM applications a
+                        SELECT COUNT(DISTINCT si.application_id)
+                        FROM statement_items si
+                        JOIN payment_statements ps ON si.statement_id = ps.id
+                        JOIN applications a ON si.application_id = a.id
                         WHERE a.user_id = b.target_user_id
-                        AND DATE_TRUNC('month', a.created_at) = DATE_TRUNC('month', CURRENT_DATE)
+                        AND DATE_TRUNC('month', ps.created_at) = DATE_TRUNC('month', CURRENT_DATE)
+                        AND ps.payment_status = 'paid'  -- Only count paid statements for bonus
                         AND (
                             -- If bonus has specific companies, count only those
                             EXISTS(SELECT 1 FROM bonus_companies bc WHERE bc.bonus_id = b.id)
@@ -114,11 +117,14 @@ const getBonusProgress = async (req, res) => {
                             'company_id', c.id,
                             'company_name', c.name,
                             'application_count', (
-                                SELECT COUNT(*)
-                                FROM applications a2
+                                SELECT COUNT(DISTINCT si2.application_id)
+                                FROM statement_items si2
+                                JOIN payment_statements ps2 ON si2.statement_id = ps2.id
+                                JOIN applications a2 ON si2.application_id = a2.id
                                 WHERE a2.user_id = b.target_user_id
                                 AND a2.company_id = c.id
-                                AND DATE_TRUNC('month', a2.created_at) = DATE_TRUNC('month', CURRENT_DATE)
+                                AND DATE_TRUNC('month', ps2.created_at) = DATE_TRUNC('month', CURRENT_DATE)
+                                AND ps2.payment_status = 'paid'
                             )
                         )
                         ELSE NULL END

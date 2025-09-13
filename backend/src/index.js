@@ -25,6 +25,14 @@ const app = express();
 const PORT = 3000;
 app.use(cors());
 app.use(express.json());
+
+// Add global request logging
+app.use((req, res, next) => {
+    console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
+    console.log('Request headers:', req.headers);
+    console.log('Request body:', req.body);
+    next();
+});
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // Debug middleware to log all requests
@@ -54,5 +62,23 @@ app.use('/api/attachments', attachmentRoutes);
 app.use('/api/admin-billing', adminBillingRoutes); // <-- ΝΕΟ
 app.use('/api/terms', termsRoutes);
 app.use('/api/ai', aiRoutes);
+
+// Global error handler
+process.on('uncaughtException', (error) => {
+    console.error('Uncaught Exception:', error);
+    console.error('Stack trace:', error.stack);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('Unhandled Rejection at:', promise);
+    console.error('Reason:', reason);
+});
+
+// Express error handler
+app.use((error, req, res, next) => {
+    console.error('Express error handler:', error);
+    console.error('Stack trace:', error.stack);
+    res.status(500).json({ message: 'Internal Server Error', error: error.message });
+});
 
 app.listen(PORT, () => { console.log(`Server is running on http://localhost:${PORT}`); });

@@ -72,8 +72,12 @@ const generateStatementPdf = async (req, res) => {
 };
 
 const createPaymentStatement = async (req, res) => {
+    console.log("=== CREATE PAYMENT STATEMENT START ===");
+    console.log("Request body:", req.body);
+    console.log("User:", req.user);
     const { recipient_id, application_ids } = req.body;
     const creator_id = req.user.id;
+    console.log("Parsed values - recipient_id:", recipient_id, "application_ids:", application_ids, "creator_id:", creator_id);
     if (!application_ids || application_ids.length === 0) { return res.status(400).json({ message: 'No applications selected.' }); }
     const client = await pool.connect();
     try {
@@ -103,81 +107,64 @@ const createPaymentStatement = async (req, res) => {
                 commissionsTotal += parseFloat(app.total_commission || 0);
             }
         }
-        // Calculate earned bonuses for current month
-        let bonusTotal = 0;
-        const activeBonusesQuery = `
-            SELECT b.*,
-                   COALESCE(json_agg(bc.company_id) FILTER (WHERE bc.company_id IS NOT NULL), '[]') as company_ids
-            FROM bonuses b
-            LEFT JOIN bonus_companies bc ON b.id = bc.bonus_id
-            WHERE b.target_user_id = $1
-            AND b.is_active = TRUE
-            GROUP BY b.id
+        // Calculate bonuses for the current month based on applications in payment statements
+        const bonusQuery = `
+            WITH bonus_progress AS (
+                SELECT
+                    b.id,
+                    b.name,
+                    b.application_count_target,
+                    b.bonus_amount_per_application,
+                    b.is_active,
+                    b.created_at,
+                    -- Count applications that were included in payment statements this month
+                    (
+                        SELECT COUNT(DISTINCT si.application_id)
+                        FROM statement_items si
+                        JOIN payment_statements ps ON si.statement_id = ps.id
+                        JOIN applications a ON si.application_id = a.id
+                        WHERE a.user_id = b.target_user_id
+                        AND DATE_TRUNC('month', ps.created_at) = DATE_TRUNC('month', CURRENT_DATE)
+                        AND ps.payment_status = 'paid'  -- Only count paid statements for bonus
+                        AND (
+                            -- If bonus has specific companies, count only those
+                            EXISTS(SELECT 1 FROM bonus_companies bc WHERE bc.bonus_id = b.id)
+                            AND a.company_id IN (
+                                SELECT bc.company_id
+                                FROM bonus_companies bc
+                                WHERE bc.bonus_id = b.id
+                            )
+                            OR
+                            -- If no specific companies, count all applications
+                            NOT EXISTS(SELECT 1 FROM bonus_companies bc WHERE bc.bonus_id = b.id)
+                        )
+                    ) as current_applications
+                FROM bonuses b
+                WHERE b.target_user_id = $1
+                AND b.is_active = true
+                GROUP BY b.id
+            )
+            SELECT
+                *,
+                CASE
+                    WHEN current_applications >= application_count_target
+                    THEN application_count_target * bonus_amount_per_application
+                    ELSE 0
+                END as earned_amount,
+                CASE
+                    WHEN current_applications >= application_count_target THEN true
+                    ELSE false
+                END as is_achieved
+            FROM bonus_progress
+            ORDER BY created_at DESC
         `;
-        const activeBonusesRes = await client.query(activeBonusesQuery, [recipient_id]);
 
-        for (const bonus of activeBonusesRes.rows) {
-            // Check if monthly bonus target is achieved (for current month)
-            let appCountQuery;
-            let queryParams = [recipient_id];
+        const bonusResult = await client.query(bonusQuery, [recipient_id]);
+        const bonuses = bonusResult.rows;
+        let bonusTotal = bonuses.reduce((sum, bonus) => sum + parseFloat(bonus.earned_amount || 0), 0);
 
-            if (bonus.company_ids && bonus.company_ids.length > 0) {
-                // Bonus applies to specific companies
-                appCountQuery = `
-                    SELECT COUNT(*)
-                    FROM applications
-                    WHERE user_id = $1
-                    AND DATE_TRUNC('month', created_at) = DATE_TRUNC('month', CURRENT_DATE)
-                    AND company_id = ANY($2::int[])
-                `;
-                queryParams.push(bonus.company_ids);
-            } else {
-                // Bonus applies to all applications
-                appCountQuery = `
-                    SELECT COUNT(*)
-                    FROM applications
-                    WHERE user_id = $1
-                    AND DATE_TRUNC('month', created_at) = DATE_TRUNC('month', CURRENT_DATE)
-                `;
-            }
-
-            const appCountRes = await client.query(appCountQuery, queryParams);
-            const totalAppsThisMonth = parseInt(appCountRes.rows[0].count);
-
-            if (totalAppsThisMonth >= bonus.application_count_target) {
-                // Calculate how many applications in this statement qualify for bonus
-                // Only count applications from current month that are in this statement
-                let bonusEligibleAppsCount = 0;
-
-                for (const appId of application_ids) {
-                    const appQuery = `
-                        SELECT company_id, created_at
-                        FROM applications
-                        WHERE id = $1
-                        AND user_id = $2
-                        AND DATE_TRUNC('month', created_at) = DATE_TRUNC('month', CURRENT_DATE)
-                    `;
-                    const appRes = await client.query(appQuery, [appId, recipient_id]);
-
-                    if (appRes.rows.length > 0) {
-                        const app = appRes.rows[0];
-
-                        if (bonus.company_ids && bonus.company_ids.length > 0) {
-                            // Check if app's company is in bonus target companies
-                            if (bonus.company_ids.includes(app.company_id)) {
-                                bonusEligibleAppsCount++;
-                            }
-                        } else {
-                            // All companies qualify
-                            bonusEligibleAppsCount++;
-                        }
-                    }
-                }
-
-                // For continuous monthly bonuses, each qualifying application gets the bonus
-                bonusTotal += bonusEligibleAppsCount * parseFloat(bonus.bonus_amount_per_application);
-            }
-        }
+        console.log("Bonus calculation result:", bonuses);
+        console.log("Total bonus amount:", bonusTotal);
         const clawbacksQuery = "SELECT id, amount FROM clawbacks WHERE user_id = $1 AND is_settled = FALSE FOR UPDATE";
         const clawbacksResult = await client.query(clawbacksQuery, [recipient_id]);
         const clawbacksTotal = clawbacksResult.rows.reduce((sum, cb) => sum + parseFloat(cb.amount), 0);
@@ -189,40 +176,17 @@ const createPaymentStatement = async (req, res) => {
         if (isVatLiable) { vatAmount = subtotal * 0.24; }
         const finalTotalAmount = subtotal + vatAmount;
 
-        // Collect bonus details for the statement
+        // Create detailed bonus breakdown for the statement
         let bonusDetails = '';
-        if (bonusTotal > 0) {
-            // Get bonus breakdown for this statement (current month applications)
-            const bonusDetailsQuery = `
-                SELECT b.name, COUNT(DISTINCT a.id) as app_count, b.bonus_amount_per_application,
-                       COALESCE(
-                           (SELECT string_agg(c.name, ', ')
-                            FROM companies c
-                            WHERE c.id = ANY(
-                                SELECT company_id FROM bonus_companies WHERE bonus_id = b.id
-                            )
-                           ), 'Όλες οι εταιρείες'
-                       ) as companies
-                FROM bonuses b
-                JOIN applications a ON (
-                    a.user_id = b.target_user_id
-                    AND DATE_TRUNC('month', a.created_at) = DATE_TRUNC('month', CURRENT_DATE)
-                    AND a.id = ANY($1::int[])
-                    AND (
-                        NOT EXISTS(SELECT 1 FROM bonus_companies bc WHERE bc.bonus_id = b.id)
-                        OR a.company_id IN (SELECT company_id FROM bonus_companies bc WHERE bc.bonus_id = b.id)
-                    )
-                )
-                WHERE b.target_user_id = $2
-                AND b.is_active = TRUE
-                GROUP BY b.id, b.name, b.bonus_amount_per_application
-            `;
-            const bonusDetailsRes = await client.query(bonusDetailsQuery, [application_ids, recipient_id]);
-
-            bonusDetails = bonusDetailsRes.rows.map(bonus =>
-                `${bonus.name}: ${bonus.app_count} αιτήσεις αυτόν τον μήνα από ${bonus.companies}`
-            ).join('; ');
+        if (bonuses.length > 0) {
+            const achievedBonuses = bonuses.filter(bonus => bonus.is_achieved);
+            if (achievedBonuses.length > 0) {
+                bonusDetails = achievedBonuses.map(bonus => {
+                    return `${bonus.name}: ${bonus.current_applications}/${bonus.application_count_target} αιτήσεις (€${bonus.earned_amount})`;
+                }).join(', ');
+            }
         }
+        console.log("Bonus details:", bonusDetails);
 
         const statementQuery = "INSERT INTO payment_statements (creator_id, recipient_id, total_amount, subtotal, vat_amount, bonus_amount, bonus_details) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id";
         const statementResult = await client.query(statementQuery, [creator_id, recipient_id, finalTotalAmount.toFixed(2), subtotal.toFixed(2), vatAmount.toFixed(2), bonusTotal.toFixed(2), bonusDetails]);
@@ -255,15 +219,23 @@ const createPaymentStatement = async (req, res) => {
         if (clawbacksResult.rows.length > 0) { const clawbackIds = clawbacksResult.rows.map(cb => cb.id); const settleClawbacksQuery = "UPDATE clawbacks SET is_settled = TRUE WHERE id = ANY($1::int[])"; await client.query(settleClawbacksQuery, [clawbackIds]); }
         await client.query('COMMIT');
         res.status(201).json({ message: 'Payment statement created successfully', statementId: newStatementId, subtotal, vatAmount, bonusTotal, finalTotalAmount });
-    } catch (err) { await client.query('ROLLBACK'); console.error("Error in createPaymentStatement:", err.message); res.status(500).json({ message: err.message || 'An error occurred while creating the statement.' }); } finally { client.release(); }
+    } catch (err) {
+        await client.query('ROLLBACK');
+        console.error("Error in createPaymentStatement:", err.message);
+        console.error("Full error stack:", err.stack);
+        console.error("Error details:", err);
+        res.status(500).json({ message: err.message || 'An error occurred while creating the statement.' });
+    } finally {
+        client.release();
+    }
 };
 
 const getStatements = async (req, res) => {
     const userId = req.user.id;
     const query = `
-        SELECT 
-            ps.*, 
-            creator.name as creator_name, 
+        SELECT
+            ps.*,
+            creator.name as creator_name,
             recipient.name as recipient_name,
             COALESCE(json_agg(si.application_id) FILTER (WHERE si.application_id IS NOT NULL), '[]') as application_ids
         FROM payment_statements ps
@@ -312,10 +284,264 @@ const createClawback = async (req, res) => {
     }
 };
 
-module.exports = { 
+// --- DELETE PAYMENT STATEMENT (DRAFT ONLY) ---
+const deletePaymentStatement = async (req, res) => {
+    const { id } = req.params;
+    const userId = req.user.id;
+
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+
+        // Check if statement exists and is draft status
+        const statementCheck = await client.query(
+            `SELECT id, creator_id, payment_status FROM payment_statements
+             WHERE id = $1 FOR UPDATE`,
+            [id]
+        );
+
+        if (statementCheck.rows.length === 0) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({ message: 'Payment statement not found' });
+        }
+
+        const statement = statementCheck.rows[0];
+
+        // Check if user has permission (must be creator or admin)
+        if (statement.creator_id !== userId && req.user.role !== 'Admin') {
+            await client.query('ROLLBACK');
+            return res.status(403).json({ message: 'Not authorized to delete this statement' });
+        }
+
+        // Check if statement is still in draft status
+        if (statement.payment_status !== 'draft') {
+            await client.query('ROLLBACK');
+            return res.status(400).json({ message: 'Cannot delete paid statement' });
+        }
+
+        // Delete statement items first (foreign key constraint)
+        await client.query('DELETE FROM statement_items WHERE statement_id = $1', [id]);
+
+        // Delete the statement
+        await client.query('DELETE FROM payment_statements WHERE id = $1', [id]);
+
+        await client.query('COMMIT');
+        res.json({ message: 'Payment statement deleted successfully' });
+
+    } catch (err) {
+        await client.query('ROLLBACK');
+        console.error('Error deleting payment statement:', err.message);
+        res.status(500).json({ message: 'Server error' });
+    } finally {
+        client.release();
+    }
+};
+
+// --- EDIT PAYMENT STATEMENT (DRAFT ONLY) ---
+const editPaymentStatement = async (req, res) => {
+    const { id } = req.params;
+    const { application_ids } = req.body;
+    const userId = req.user.id;
+
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+
+        // Check if statement exists and is draft status
+        const statementCheck = await client.query(
+            `SELECT id, creator_id, recipient_id, payment_status FROM payment_statements
+             WHERE id = $1 FOR UPDATE`,
+            [id]
+        );
+
+        if (statementCheck.rows.length === 0) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({ message: 'Payment statement not found' });
+        }
+
+        const statement = statementCheck.rows[0];
+
+        // Check permissions
+        if (statement.creator_id !== userId && req.user.role !== 'Admin') {
+            await client.query('ROLLBACK');
+            return res.status(403).json({ message: 'Not authorized to edit this statement' });
+        }
+
+        // Check if statement is still in draft status
+        if (statement.payment_status !== 'draft') {
+            await client.query('ROLLBACK');
+            return res.status(400).json({ message: 'Cannot edit paid statement' });
+        }
+
+        // Recalculate the statement with new applications
+        // Similar logic to createPaymentStatement but for updating existing statement
+
+        // Validate applications first
+        const appsCheckQuery = `SELECT id, is_paid_by_company, status, total_commission FROM applications WHERE id = ANY($1::int[]) FOR UPDATE`;
+        const appsCheckResult = await client.query(appsCheckQuery, [application_ids]);
+
+        if (appsCheckResult.rows.length !== application_ids.length) {
+            await client.query('ROLLBACK');
+            return res.status(400).json({ message: 'One or more application IDs are invalid.' });
+        }
+
+        // Check that applications are not in other statements
+        for (const app of appsCheckResult.rows) {
+            const itemCheckQuery = "SELECT id FROM statement_items WHERE application_id = $1 AND statement_id != $2";
+            const itemCheckResult = await client.query(itemCheckQuery, [app.id, id]);
+            if (itemCheckResult.rows.length > 0) {
+                await client.query('ROLLBACK');
+                return res.status(400).json({ message: `Application #${app.id} is already in another statement.` });
+            }
+            if (!app.is_paid_by_company || app.status !== 'Καταχωρήθηκε') {
+                await client.query('ROLLBACK');
+                return res.status(400).json({ message: `Application #${app.id} is not ready to be paid.` });
+            }
+        }
+
+        // Recalculate totals (similar to create logic)
+        let commissionsTotal = 0;
+        for (const app of appsCheckResult.rows) {
+            const fieldPaymentsQuery = `
+                SELECT SUM(cf.commission_amount) as field_commission_total
+                FROM field_payments fp
+                JOIN company_fields cf ON fp.field_id = cf.field_id
+                JOIN applications a ON fp.application_id = a.id AND a.company_id = cf.company_id
+                WHERE fp.application_id = $1 AND fp.is_paid_by_company = TRUE
+            `;
+            const fieldPaymentsResult = await client.query(fieldPaymentsQuery, [app.id]);
+            const fieldCommissionTotal = parseFloat(fieldPaymentsResult.rows[0].field_commission_total || 0);
+
+            if (fieldCommissionTotal > 0) {
+                commissionsTotal += fieldCommissionTotal;
+            } else {
+                commissionsTotal += parseFloat(app.total_commission || 0);
+            }
+        }
+
+        // Calculate bonus (but won't affect calculation since statement is still draft)
+        let bonusTotal = 0;
+
+        const clawbacksQuery = "SELECT id, amount FROM clawbacks WHERE user_id = $1 AND is_settled = FALSE FOR UPDATE";
+        const clawbacksResult = await client.query(clawbacksQuery, [statement.recipient_id]);
+        const clawbacksTotal = clawbacksResult.rows.reduce((sum, cb) => sum + parseFloat(cb.amount), 0);
+        const subtotal = commissionsTotal + bonusTotal - clawbacksTotal;
+
+        const userVatQuery = "SELECT is_vat_liable FROM users WHERE id = $1";
+        const userVatResult = await client.query(userVatQuery, [statement.recipient_id]);
+        const isVatLiable = userVatResult.rows.length > 0 && userVatResult.rows[0].is_vat_liable;
+
+        let vatAmount = 0;
+        if (isVatLiable) { vatAmount = subtotal * 0.24; }
+        const finalTotalAmount = subtotal + vatAmount;
+
+        // Update statement
+        await client.query(
+            `UPDATE payment_statements
+             SET total_amount = $1, subtotal = $2, vat_amount = $3, bonus_amount = $4, bonus_details = $5
+             WHERE id = $6`,
+            [finalTotalAmount.toFixed(2), subtotal.toFixed(2), vatAmount.toFixed(2), bonusTotal.toFixed(2), '', id]
+        );
+
+        // Delete existing items
+        await client.query('DELETE FROM statement_items WHERE statement_id = $1', [id]);
+
+        // Add new items
+        for (const appId of application_ids) {
+            const fieldPaymentsQuery = `
+                SELECT fp.field_id, cf.commission_amount
+                FROM field_payments fp
+                JOIN company_fields cf ON fp.field_id = cf.field_id AND fp.application_id IN (
+                    SELECT id FROM applications WHERE id = $1 AND company_id = cf.company_id
+                )
+                WHERE fp.application_id = $1 AND fp.is_paid_by_company = TRUE
+            `;
+            const fieldPaymentsResult = await client.query(fieldPaymentsQuery, [appId]);
+
+            if (fieldPaymentsResult.rows.length > 0) {
+                for (const fieldPayment of fieldPaymentsResult.rows) {
+                    const itemQuery = "INSERT INTO statement_items (statement_id, application_id, field_id) VALUES ($1, $2, $3)";
+                    await client.query(itemQuery, [id, appId, fieldPayment.field_id]);
+                }
+            } else {
+                const itemQuery = "INSERT INTO statement_items (statement_id, application_id) VALUES ($1, $2)";
+                await client.query(itemQuery, [id, appId]);
+            }
+        }
+
+        await client.query('COMMIT');
+        res.json({
+            message: 'Payment statement updated successfully',
+            subtotal,
+            vatAmount,
+            bonusTotal,
+            finalTotalAmount
+        });
+
+    } catch (err) {
+        await client.query('ROLLBACK');
+        console.error('Error editing payment statement:', err.message);
+        res.status(500).json({ message: 'Server error' });
+    } finally {
+        client.release();
+    }
+};
+
+// --- MARK PAYMENT STATEMENT AS PAID ---
+const markStatementAsPaid = async (req, res) => {
+    const { id } = req.params;
+    const userId = req.user.id;
+
+    try {
+        // Check if statement exists and user has permission
+        const statementCheck = await pool.query(
+            `SELECT id, creator_id, payment_status FROM payment_statements WHERE id = $1`,
+            [id]
+        );
+
+        if (statementCheck.rows.length === 0) {
+            return res.status(404).json({ message: 'Payment statement not found' });
+        }
+
+        const statement = statementCheck.rows[0];
+
+        // Check permissions
+        if (statement.creator_id !== userId && req.user.role !== 'Admin') {
+            return res.status(403).json({ message: 'Not authorized to modify this statement' });
+        }
+
+        // Check if statement is still in draft status
+        if (statement.payment_status !== 'draft') {
+            return res.status(400).json({ message: 'Statement is already marked as paid' });
+        }
+
+        // Mark as paid
+        const result = await pool.query(
+            `UPDATE payment_statements
+             SET payment_status = 'paid', paid_date = CURRENT_TIMESTAMP
+             WHERE id = $1
+             RETURNING *`,
+            [id]
+        );
+
+        res.json({
+            message: 'Payment statement marked as paid',
+            statement: result.rows[0]
+        });
+
+    } catch (err) {
+        console.error('Error marking statement as paid:', err.message);
+        res.status(500).json({ message: 'Server error' });
+    }
+};
+
+module.exports = {
     createPaymentStatement,
     createClawback,
     getStatements,
     updateStatementStatus,
-    generateStatementPdf
+    generateStatementPdf,
+    deletePaymentStatement,
+    editPaymentStatement,
+    markStatementAsPaid
 };

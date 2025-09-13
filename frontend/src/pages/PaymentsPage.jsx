@@ -106,14 +106,45 @@ const PaymentsPage = () => {
         .filter(app => selectedAppIds.has(app.application_id))
         .reduce((sum, app) => sum + (app.total_commission ? parseFloat(app.total_commission) : 0), 0);
 
-    const getStatusBadge = (status) => {
+    const getStatusBadge = (paymentStatus) => {
         const statusMap = {
-            'Pending': { emoji: '⏳', class: 'pending' },
-            'Paid': { emoji: '✅', class: 'paid' },
-            'Draft': { emoji: '📝', class: 'draft' }
+            'draft': { emoji: '📝', class: 'draft', text: 'Draft' },
+            'paid': { emoji: '✅', class: 'paid', text: 'Paid' }
         };
-        const statusInfo = statusMap[status] || { emoji: '📋', class: 'default' };
-        return `${statusInfo.emoji} ${status}`;
+        const statusInfo = statusMap[paymentStatus] || { emoji: '📋', class: 'default', text: paymentStatus };
+        return `${statusInfo.emoji} ${statusInfo.text}`;
+    };
+
+    const handleDeleteStatement = async (statementId) => {
+        if (!window.confirm('Είστε σίγουροι ότι θέλετε να διαγράψετε αυτή την ταμειακή κατάσταση;')) {
+            return;
+        }
+
+        try {
+            const config = { headers: { Authorization: `Bearer ${token}` } };
+            await axios.delete(`http://localhost:3000/api/payments/statements/${statementId}`, config);
+            setSuccessMessage('Η ταμειακή κατάσταση διαγράφηκε επιτυχώς!');
+            fetchData(); // Refresh data
+        } catch (error) {
+            console.error("Failed to delete statement", error);
+            setPaymentError('Σφάλμα κατά τη διαγραφή της ταμειακής κατάστασης');
+        }
+    };
+
+    const handleMarkAsPaid = async (statementId) => {
+        if (!window.confirm('Είστε σίγουροι ότι θέλετε να μαρκάρετε αυτή την ταμειακή ως πληρωμένη;')) {
+            return;
+        }
+
+        try {
+            const config = { headers: { Authorization: `Bearer ${token}` } };
+            await axios.patch(`http://localhost:3000/api/payments/statements/${statementId}/mark-paid`, {}, config);
+            setSuccessMessage('Η ταμειακή κατάσταση μαρκαρίστηκε ως πληρωμένη!');
+            fetchData(); // Refresh data
+        } catch (error) {
+            console.error("Failed to mark as paid", error);
+            setPaymentError('Σφάλμα κατά το μαρκάρισμα ως πληρωμένη');
+        }
     };
 
     return (
@@ -439,6 +470,42 @@ const PaymentsPage = () => {
                         box-shadow: 0 6px 20px rgba(239, 68, 68, 0.4);
                     }
 
+                    .mark-paid-button {
+                        padding: 8px 16px;
+                        background: linear-gradient(135deg, #10b981, #059669);
+                        color: white;
+                        border: none;
+                        border-radius: 8px;
+                        font-weight: 600;
+                        cursor: pointer;
+                        transition: all 0.3s ease;
+                        box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
+                        font-size: 0.9rem;
+                    }
+
+                    .mark-paid-button:hover {
+                        transform: translateY(-2px);
+                        box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4);
+                    }
+
+                    .delete-button {
+                        padding: 8px 16px;
+                        background: linear-gradient(135deg, #f59e0b, #d97706);
+                        color: white;
+                        border: none;
+                        border-radius: 8px;
+                        font-weight: 600;
+                        cursor: pointer;
+                        transition: all 0.3s ease;
+                        box-shadow: 0 4px 15px rgba(245, 158, 11, 0.3);
+                        font-size: 0.9rem;
+                    }
+
+                    .delete-button:hover {
+                        transform: translateY(-2px);
+                        box-shadow: 0 6px 20px rgba(245, 158, 11, 0.4);
+                    }
+
                     .status-badge {
                         padding: 6px 12px;
                         border-radius: 20px;
@@ -749,17 +816,40 @@ const PaymentsPage = () => {
                                         <td><strong>{parseFloat(st.total_amount).toFixed(2)} €</strong></td>
                                         <td>
                                             <span className="status-badge">
-                                                {getStatusBadge(st.status)}
+                                                {getStatusBadge(st.payment_status)}
                                             </span>
+                                            {st.paid_date && (
+                                                <div style={{fontSize: '0.8rem', color: '#666', marginTop: '2px'}}>
+                                                    Πληρώθηκε: {new Date(st.paid_date).toLocaleDateString('el-GR')}
+                                                </div>
+                                            )}
                                         </td>
                                         <td>{new Date(st.created_at).toLocaleDateString('el-GR')}</td>
                                         <td>
-                                            <button 
-                                                onClick={() => handleDownloadPdf(st.id)} 
-                                                className="pdf-button"
-                                            >
-                                                📄 PDF
-                                            </button>
+                                            <div style={{display: 'flex', gap: '5px', flexWrap: 'wrap'}}>
+                                                <button
+                                                    onClick={() => handleDownloadPdf(st.id)}
+                                                    className="pdf-button"
+                                                >
+                                                    📄 PDF
+                                                </button>
+                                                {st.payment_status === 'draft' && (
+                                                    <>
+                                                        <button
+                                                            onClick={() => handleMarkAsPaid(st.id)}
+                                                            className="mark-paid-button"
+                                                        >
+                                                            ✅ Πληρώθηκε
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleDeleteStatement(st.id)}
+                                                            className="delete-button"
+                                                        >
+                                                            🗑️ Διαγραφή
+                                                        </button>
+                                                    </>
+                                                )}
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}

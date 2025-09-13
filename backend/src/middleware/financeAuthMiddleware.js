@@ -1,4 +1,6 @@
 const financeAuthMiddleware = (req, res, next) => {
+    console.log("Finance auth middleware hit");
+    console.log("User role:", req.user?.role);
     // Αυτό το middleware τρέχει μετά το authMiddleware, οπότε έχουμε πρόσβαση στο req.user.
     const userRole = req.user.role;
 
