@@ -258,3 +258,324 @@ h3 { margin-top: 0; border-bottom: 1px solid #eee; padding-bottom: 0.5rem; }
     opacity: 0.6;
     text-decoration: line-through;
 }
+
+/* Applications Page */
+.applications-container {
+    background: white;
+    padding: 2rem;
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    width: 100%;
+    margin: 0;
+    align-self: flex-start;
+}
+
+.applications-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 2px solid #eee;
+    padding-bottom: 1rem;
+    margin-bottom: 2rem;
+}
+
+.applications-filters {
+    display: flex;
+    background-color: #f8f9fa;
+    border-radius: 6px;
+    padding: 4px;
+    margin-bottom: 1.5rem;
+}
+
+.filter-button {
+    flex: 1;
+    padding: 8px 16px;
+    border: none;
+    background: none;
+    color: #6c757d;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.875rem;
+    font-weight: 500;
+    transition: all 0.2s;
+}
+
+.filter-button.active {
+    background-color: white;
+    color: #007bff;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.filter-button:hover {
+    color: #495057;
+}
+
+.search-container {
+    position: relative;
+    margin-bottom: 1.5rem;
+}
+
+.search-input {
+    width: 100%;
+    padding: 10px 10px 10px 40px;
+    border: 1px solid #ced4da;
+    border-radius: 6px;
+    font-size: 1rem;
+    outline: none;
+    box-sizing: border-box;
+}
+
+.search-input:focus {
+    border-color: #007bff;
+    box-shadow: 0 0 0 2px rgba(0,123,255,0.25);
+}
+
+.search-icon {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #6c757d;
+    width: 20px;
+    height: 20px;
+}
+
+.loading-spinner {
+    text-align: center;
+    padding: 2rem;
+}
+
+.loading-spinner-icon {
+    display: inline-block;
+    width: 32px;
+    height: 32px;
+    border: 3px solid #f3f4f6;
+    border-top: 3px solid #007bff;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 2rem;
+    background-color: #f8f9fa;
+    border-radius: 6px;
+}
+
+.applications-table-container {
+    background: white;
+    border-radius: 6px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    overflow: hidden;
+}
+
+.applications-table-scroll {
+    overflow-x: auto;
+}
+
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.status-paid {
+    background-color: #d4edda;
+    color: #155724;
+}
+
+.status-unpaid {
+    background-color: #fff3cd;
+    color: #856404;
+}
+
+.action-link {
+    color: #007bff;
+    text-decoration: none;
+    margin-right: 1rem;
+    font-size: 0.875rem;
+    transition: color 0.2s;
+}
+
+.action-link:hover {
+    color: #0056b3;
+}
+
+.action-link.mark-paid {
+    color: #28a745;
+}
+
+.action-link.mark-paid:hover {
+    color: #1e7e34;
+}
+
+.info-box {
+    background-color: #e7f3ff;
+    border: 1px solid #b3d7ff;
+    border-radius: 6px;
+    padding: 1rem;
+    margin-top: 1.5rem;
+}
+
+.info-box h4 {
+    color: #004085;
+    margin: 0 0 0.5rem 0;
+    font-size: 0.875rem;
+    font-weight: 600;
+}
+
+.info-box ul {
+    margin: 0;
+    padding-left: 1rem;
+    color: #004085;
+    font-size: 0.875rem;
+}
+
+.info-box ul li {
+    margin-bottom: 0.25rem;
+}
+
+/* Commission Dialog */
+.dialog-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0,0,0,0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.dialog-content {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    max-width: 600px;
+    width: 90%;
+    max-height: 80vh;
+    overflow-y: auto;
+    padding: 1.5rem;
+}
+
+.dialog-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+}
+
+.dialog-header h3 {
+    margin: 0;
+    color: #333;
+    font-size: 1.25rem;
+}
+
+.dialog-close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: #6c757d;
+    padding: 0;
+    width: auto;
+}
+
+.dialog-close:hover {
+    color: #495057;
+}
+
+.commission-field-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem;
+    background-color: #f8f9fa;
+    border-radius: 6px;
+    margin-bottom: 0.75rem;
+}
+
+.commission-field-checkbox {
+    display: flex;
+    align-items: center;
+}
+
+.commission-field-checkbox input {
+    width: auto;
+    margin-right: 0.75rem;
+}
+
+.commission-total {
+    border-top: 1px solid #dee2e6;
+    padding-top: 1rem;
+    margin-top: 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.commission-total-amount {
+    font-size: 1.25rem;
+    font-weight: bold;
+    color: #28a745;
+}
+
+.warning-box {
+    background-color: #fff3cd;
+    border: 1px solid #ffeaa7;
+    border-radius: 6px;
+    padding: 1rem;
+    margin: 1rem 0;
+}
+
+.warning-box h4 {
+    color: #856404;
+    margin: 0 0 0.5rem 0;
+    font-size: 0.875rem;
+    font-weight: 600;
+}
+
+.warning-box p {
+    color: #856404;
+    margin: 0;
+    font-size: 0.875rem;
+}
+
+.dialog-buttons {
+    display: flex;
+    gap: 0.75rem;
+    margin-top: 1.5rem;
+}
+
+.dialog-buttons button {
+    flex: 1;
+    padding: 0.75rem;
+    border: none;
+    border-radius: 4px;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.button-cancel {
+    background-color: #6c757d;
+    color: white;
+}
+
+.button-cancel:hover {
+    background-color: #545b62;
+}
+
+.button-confirm {
+    background-color: #28a745;
+    color: white;
+}
+
+.button-confirm:hover {
+    background-color: #218838;
+}
