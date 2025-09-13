@@ -2,20 +2,22 @@ import React, { useState, useEffect, useContext } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
+import { useNotifications } from '../context/NotificationContext';
 import '../App.css';
 
 const CustomerDetailPage = () => {
     const { id } = useParams();
     const navigate = useNavigate();
     const { token } = useContext(AuthContext);
-    
+    const { showDeleteConfirm, showSuccessToast, showErrorToast } = useNotifications();
+
     const [customer, setCustomer] = useState(null);
     const [log, setLog] = useState([]);
     const [applications, setApplications] = useState([]);
     const [showAllApplications, setShowAllApplications] = useState(false);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
-    
+
     const [isEditing, setIsEditing] = useState(false);
     const [formData, setFormData] = useState({ full_name: '', phone: '', address: '', notes: '', phones: [], emails: [] });
 
@@ -101,14 +103,22 @@ const CustomerDetailPage = () => {
     };
 
     const handleDelete = async () => {
-        if (window.confirm('Είστε σίγουροι ότι θέλετε να μετακινήσετε αυτόν τον πελάτη στον κάδο ανακύκλωσης;')) {
+        const confirmed = await showDeleteConfirm(
+            'Διαγραφή Πελάτη',
+            'Είστε σίγουροι ότι θέλετε να μετακινήσετε αυτόν τον πελάτη στον κάδο ανακύκλωσης;'
+        );
+
+        if (confirmed) {
             setError('');
             try {
                 const config = { headers: { Authorization: `Bearer ${token}` } };
                 await axios.delete(`http://localhost:3000/api/customers/${id}`, config);
+                showSuccessToast('Επιτυχία', 'Ο πελάτης μετακινήθηκε στον κάδο ανακύκλωσης');
                 navigate('/customers');
             } catch (err) {
-                setError(err.response?.data?.message || 'Failed to delete customer');
+                const errorMessage = err.response?.data?.message || 'Αποτυχία διαγραφής πελάτη';
+                setError(errorMessage);
+                showErrorToast('Σφάλμα', errorMessage);
             }
         }
     };

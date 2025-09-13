@@ -2,6 +2,7 @@ import React, { useState, useEffect, useContext } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
+import { useNotifications } from '../context/NotificationContext';
 import FileUpload from '../components/FileUpload';
 import FilePreview from '../components/FilePreview';
 
@@ -9,6 +10,7 @@ const ApplicationDetailPage = () => {
     const { id } = useParams();
     const navigate = useNavigate();
     const { token, user } = useContext(AuthContext);
+    const { showErrorToast } = useNotifications();
     const [application, setApplication] = useState(null);
     const [comments, setComments] = useState([]);
     const [attachments, setAttachments] = useState([]);
@@ -104,7 +106,7 @@ const ApplicationDetailPage = () => {
     const handleFieldClawback = async (fieldId) => {
         const percentage = prompt('Εισάγετε το ποσοστό clawback σε δωδεκατημόρια (1-12):', '12');
         if (!percentage || isNaN(percentage) || percentage < 1 || percentage > 12) {
-            if (percentage !== null) alert('Παρακαλώ εισάγετε έναν αριθμό από 1 έως 12.');
+            if (percentage !== null) showErrorToast('Σφάλμα', 'Παρακαλώ εισάγετε έναν αριθμό από 1 έως 12.');
             return;
         }
         

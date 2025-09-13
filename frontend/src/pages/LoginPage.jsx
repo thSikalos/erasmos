@@ -2,6 +2,7 @@ import React, { useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
+import { useNotifications } from '../context/NotificationContext';
 import '../App.css';
 
 const LoginPage = () => {
@@ -10,6 +11,7 @@ const LoginPage = () => {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const { login } = useContext(AuthContext);
+  const { showInfoToast } = useNotifications();
   const navigate = useNavigate();
 
   const handleLogin = async (e) => {
@@ -447,7 +449,7 @@ const LoginPage = () => {
         {error && <div className="modern-error-message">❌ {error}</div>}
 
         <div className="login-links">
-          <a href="#" className="forgot-password-link" onClick={(e) => { e.preventDefault(); alert('Η λειτουργία "Ξέχασα τον κωδικό μου" θα διατεθεί σύντομα!'); }}>
+          <a href="#" className="forgot-password-link" onClick={(e) => { e.preventDefault(); showInfoToast('Πληροφορία', 'Η λειτουργία "Ξέχασα τον κωδικό μου" θα διατεθεί σύντομα!'); }}>
             🔑 Ξέχασα τον κωδικό μου
           </a>
           <a href="/register" className="new-user-link">

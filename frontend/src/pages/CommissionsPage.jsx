@@ -2,9 +2,11 @@ import React, { useState, useEffect, useContext } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
+import { useNotifications } from '../context/NotificationContext';
 
 const CommissionsPage = () => {
     const { token, user } = useContext(AuthContext);
+    const { showErrorToast } = useNotifications();
     const [team, setTeam] = useState([]);
     const [companies, setCompanies] = useState([]);
     const [fields, setFields] = useState([]);
@@ -94,7 +96,7 @@ const CommissionsPage = () => {
             setSuccessMessage('Η αμοιβή αποθηκεύτηκε!');
         } catch (error) {
             console.error("Failed to save commission", error);
-            alert('Σφάλμα κατά την αποθήκευση.');
+            showErrorToast('Σφάλμα', 'Σφάλμα κατά την αποθήκευση.');
         }
     };
 
@@ -159,7 +161,7 @@ const CommissionsPage = () => {
             setTimeout(() => setSuccessMessage(''), 3000);
         } catch (error) {
             console.error("Failed to create bonus", error);
-            alert('Σφάλμα κατά τη δημιουργία του bonus.');
+            showErrorToast('Σφάλμα', 'Σφάλμα κατά τη δημιουργία του bonus.');
         }
     };
     

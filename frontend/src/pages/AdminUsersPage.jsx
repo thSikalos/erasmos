@@ -2,6 +2,7 @@ import React, { useState, useEffect, useContext } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
+import { useNotifications } from '../context/NotificationContext';
 import '../App.css';
 
 const UserForm = ({ user, onSave, onCancel, teamLeaders }) => {
@@ -78,6 +79,7 @@ const UserForm = ({ user, onSave, onCancel, teamLeaders }) => {
 
 const AdminUsersPage = () => {
     const { token } = useContext(AuthContext);
+    const { showDeleteConfirm, showSuccessToast, showErrorToast } = useNotifications();
     const [users, setUsers] = useState([]);
     const [teamLeaders, setTeamLeaders] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -123,15 +125,19 @@ const AdminUsersPage = () => {
     };
 
     const handleDeleteUser = async (userId) => {
-        if(window.confirm('Are you sure you want to move this user to the recycle bin?')){
+        const user = users.find(u => u.id === userId);
+        showDeleteConfirm(`τον χρήστη "${user?.name || 'Unknown'}" (θα μεταφερθεί στον κάδο ανακύκλωσης)`, async () => {
             try {
                 const config = { headers: { Authorization: `Bearer ${token}` } };
                 await axios.delete(`http://localhost:3000/api/users/${userId}`, config);
+                showSuccessToast('Επιτυχία', 'Ο χρήστης μεταφέρθηκε στον κάδο ανακύκλωσης!');
                 fetchData();
-            } catch(err) {
-                setError(err.response?.data?.message || 'Failed to delete user');
+            } catch (err) {
+                const errorMessage = err.response?.data?.message || 'Failed to delete user';
+                setError(errorMessage);
+                showErrorToast('Σφάλμα', errorMessage);
             }
-        }
+        });
     };
 
     const openCreateForm = () => {

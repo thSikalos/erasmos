@@ -2,10 +2,12 @@ import React, { useState, useEffect, useContext } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
+import { useNotifications } from '../context/NotificationContext';
 import '../App.css';
 
 const AdminFieldsPage = () => {
     const { token } = useContext(AuthContext);
+    const { showDeleteConfirm, showSuccessToast, showErrorToast } = useNotifications();
     const [fields, setFields] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -51,16 +53,20 @@ const AdminFieldsPage = () => {
     };
 
     const handleDeleteClick = async (fieldId) => {
-        if (window.confirm('Είστε βέβαιοι ότι θέλετε να διαγράψετε αυτό το πεδίο;')) {
+        const field = fields.find(f => f.id === fieldId);
+        showDeleteConfirm(`το πεδίο "${field?.label || 'Unknown'}"`, async () => {
             setError('');
             try {
                 const config = { headers: { Authorization: `Bearer ${token}` } };
                 await axios.delete(`http://localhost:3000/api/fields/${fieldId}`, config);
+                showSuccessToast('Επιτυχία', 'Το πεδίο διαγράφηκε επιτυχώς!');
                 fetchData();
             } catch (err) {
-                setError(err.response?.data?.message || 'Failed to delete field');
+                const errorMessage = err.response?.data?.message || 'Failed to delete field';
+                setError(errorMessage);
+                showErrorToast('Σφάλμα', errorMessage);
             }
-        }
+        });
     };
 
     const handleSubmit = async (e) => {

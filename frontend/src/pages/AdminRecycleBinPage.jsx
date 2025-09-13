@@ -2,10 +2,12 @@ import React, { useState, useEffect, useContext } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
+import { useNotifications } from '../context/NotificationContext';
 import '../App.css';
 
 const AdminRecycleBinPage = () => {
     const { token } = useContext(AuthContext);
+    const { showErrorToast } = useNotifications();
     const [deletedCustomers, setDeletedCustomers] = useState([]);
     const [loading, setLoading] = useState(true);
 
@@ -46,7 +48,7 @@ const AdminRecycleBinPage = () => {
                 console.error("Failed to permanently delete customer", err);
             }
         } else if (confirmation !== null) {
-            alert("Το ΑΦΜ δεν ταιριάζει. Η διαγραφή ακυρώθηκε.");
+            showErrorToast("Σφάλμα", "Το ΑΦΜ δεν ταιριάζει. Η διαγραφή ακυρώθηκε.");
         }
     };
 

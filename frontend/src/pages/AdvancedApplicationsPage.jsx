@@ -2,10 +2,12 @@ import React, { useState, useEffect, useContext } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
+import { useNotifications } from '../context/NotificationContext';
 
 const AdvancedApplicationsPage = () => {
     const { token, user } = useContext(AuthContext);
     const navigate = useNavigate();
+    const { showErrorToast } = useNotifications();
     const [applications, setApplications] = useState([]);
     const [displayableFields, setDisplayableFields] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -76,7 +78,7 @@ const AdvancedApplicationsPage = () => {
     const handleFieldClawback = async (applicationId, fieldId) => {
         const percentage = prompt('Εισάγετε το ποσοστό clawback σε δωδεκατημόρια (1-12):', '12');
         if (!percentage || isNaN(percentage) || percentage < 1 || percentage > 12) {
-            if (percentage !== null) alert('Παρακαλώ εισάγετε έναν αριθμό από 1 έως 12.');
+            if (percentage !== null) showErrorToast('Σφάλμα', 'Παρακαλώ εισάγετε έναν αριθμό από 1 έως 12.');
             return;
         }
         

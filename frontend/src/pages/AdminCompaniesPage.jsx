@@ -2,10 +2,12 @@ import React, { useState, useEffect, useContext } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
+import { useNotifications } from '../context/NotificationContext';
 import '../App.css';
 
 const AdminCompaniesPage = () => {
     const { token } = useContext(AuthContext);
+    const { showDeleteConfirm, showSuccessToast, showErrorToast } = useNotifications();
     const [companies, setCompanies] = useState([]);
     const [fields, setFields] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -51,16 +53,20 @@ const AdminCompaniesPage = () => {
     };
 
     const handleDeleteClick = async (companyId) => {
-        if (window.confirm('Είστε βέβαιοι ότι θέλετε να διαγράψετε αυτή την εταιρεία; Αυτή η ενέργεια δεν μπορεί να αναιρεθεί.')) {
+        const company = companies.find(c => c.id === companyId);
+        showDeleteConfirm(`την εταιρεία "${company?.name || 'Unknown'}"`, async () => {
             setError('');
             try {
                 const config = { headers: { Authorization: `Bearer ${token}` } };
                 await axios.delete(`http://localhost:3000/api/companies/${companyId}`, config);
+                showSuccessToast('Επιτυχία', 'Η εταιρεία διαγράφηκε επιτυχώς!');
                 fetchData();
             } catch (err) {
-                setError(err.response?.data?.message || 'Failed to delete company');
+                const errorMessage = err.response?.data?.message || 'Failed to delete company';
+                setError(errorMessage);
+                showErrorToast('Σφάλμα', errorMessage);
             }
-        }
+        });
     };
 
     const handleFieldSelection = (fieldId) => {
