@@ -103,10 +103,81 @@ const createPaymentStatement = async (req, res) => {
                 commissionsTotal += parseFloat(app.total_commission || 0);
             }
         }
+        // Calculate earned bonuses for current month
         let bonusTotal = 0;
-        const activeBonusesQuery = "SELECT * FROM bonuses WHERE target_user_id = $1 AND is_active = TRUE AND start_date <= CURRENT_DATE AND end_date >= CURRENT_DATE";
+        const activeBonusesQuery = `
+            SELECT b.*,
+                   COALESCE(json_agg(bc.company_id) FILTER (WHERE bc.company_id IS NOT NULL), '[]') as company_ids
+            FROM bonuses b
+            LEFT JOIN bonus_companies bc ON b.id = bc.bonus_id
+            WHERE b.target_user_id = $1
+            AND b.is_active = TRUE
+            GROUP BY b.id
+        `;
         const activeBonusesRes = await client.query(activeBonusesQuery, [recipient_id]);
-        for (const bonus of activeBonusesRes.rows) { const appCountQuery = "SELECT COUNT(*) FROM applications WHERE user_id = $1 AND created_at BETWEEN $2 AND $3"; const appCountRes = await client.query(appCountQuery, [recipient_id, bonus.start_date, bonus.end_date]); const appCount = parseInt(appCountRes.rows[0].count); if (appCount >= bonus.application_count_target) { const bonusEligibleAppsCount = application_ids.length; bonusTotal += bonusEligibleAppsCount * parseFloat(bonus.bonus_amount_per_application); } }
+
+        for (const bonus of activeBonusesRes.rows) {
+            // Check if monthly bonus target is achieved (for current month)
+            let appCountQuery;
+            let queryParams = [recipient_id];
+
+            if (bonus.company_ids && bonus.company_ids.length > 0) {
+                // Bonus applies to specific companies
+                appCountQuery = `
+                    SELECT COUNT(*)
+                    FROM applications
+                    WHERE user_id = $1
+                    AND DATE_TRUNC('month', created_at) = DATE_TRUNC('month', CURRENT_DATE)
+                    AND company_id = ANY($2::int[])
+                `;
+                queryParams.push(bonus.company_ids);
+            } else {
+                // Bonus applies to all applications
+                appCountQuery = `
+                    SELECT COUNT(*)
+                    FROM applications
+                    WHERE user_id = $1
+                    AND DATE_TRUNC('month', created_at) = DATE_TRUNC('month', CURRENT_DATE)
+                `;
+            }
+
+            const appCountRes = await client.query(appCountQuery, queryParams);
+            const totalAppsThisMonth = parseInt(appCountRes.rows[0].count);
+
+            if (totalAppsThisMonth >= bonus.application_count_target) {
+                // Calculate how many applications in this statement qualify for bonus
+                // Only count applications from current month that are in this statement
+                let bonusEligibleAppsCount = 0;
+
+                for (const appId of application_ids) {
+                    const appQuery = `
+                        SELECT company_id, created_at
+                        FROM applications
+                        WHERE id = $1
+                        AND user_id = $2
+                        AND DATE_TRUNC('month', created_at) = DATE_TRUNC('month', CURRENT_DATE)
+                    `;
+                    const appRes = await client.query(appQuery, [appId, recipient_id]);
+
+                    if (appRes.rows.length > 0) {
+                        const app = appRes.rows[0];
+
+                        if (bonus.company_ids && bonus.company_ids.length > 0) {
+                            // Check if app's company is in bonus target companies
+                            if (bonus.company_ids.includes(app.company_id)) {
+                                bonusEligibleAppsCount++;
+                            }
+                        } else {
+                            // All companies qualify
+                            bonusEligibleAppsCount++;
+                        }
+                    }
+                }
+
+                // For continuous monthly bonuses, each qualifying application gets the bonus
+                bonusTotal += bonusEligibleAppsCount * parseFloat(bonus.bonus_amount_per_application);
+            }
+        }
         const clawbacksQuery = "SELECT id, amount FROM clawbacks WHERE user_id = $1 AND is_settled = FALSE FOR UPDATE";
         const clawbacksResult = await client.query(clawbacksQuery, [recipient_id]);
         const clawbacksTotal = clawbacksResult.rows.reduce((sum, cb) => sum + parseFloat(cb.amount), 0);
@@ -117,8 +188,44 @@ const createPaymentStatement = async (req, res) => {
         let vatAmount = 0;
         if (isVatLiable) { vatAmount = subtotal * 0.24; }
         const finalTotalAmount = subtotal + vatAmount;
-        const statementQuery = "INSERT INTO payment_statements (creator_id, recipient_id, total_amount, subtotal, vat_amount) VALUES ($1, $2, $3, $4, $5) RETURNING id";
-        const statementResult = await client.query(statementQuery, [creator_id, recipient_id, finalTotalAmount.toFixed(2), subtotal.toFixed(2), vatAmount.toFixed(2)]);
+
+        // Collect bonus details for the statement
+        let bonusDetails = '';
+        if (bonusTotal > 0) {
+            // Get bonus breakdown for this statement (current month applications)
+            const bonusDetailsQuery = `
+                SELECT b.name, COUNT(DISTINCT a.id) as app_count, b.bonus_amount_per_application,
+                       COALESCE(
+                           (SELECT string_agg(c.name, ', ')
+                            FROM companies c
+                            WHERE c.id = ANY(
+                                SELECT company_id FROM bonus_companies WHERE bonus_id = b.id
+                            )
+                           ), 'Όλες οι εταιρείες'
+                       ) as companies
+                FROM bonuses b
+                JOIN applications a ON (
+                    a.user_id = b.target_user_id
+                    AND DATE_TRUNC('month', a.created_at) = DATE_TRUNC('month', CURRENT_DATE)
+                    AND a.id = ANY($1::int[])
+                    AND (
+                        NOT EXISTS(SELECT 1 FROM bonus_companies bc WHERE bc.bonus_id = b.id)
+                        OR a.company_id IN (SELECT company_id FROM bonus_companies bc WHERE bc.bonus_id = b.id)
+                    )
+                )
+                WHERE b.target_user_id = $2
+                AND b.is_active = TRUE
+                GROUP BY b.id, b.name, b.bonus_amount_per_application
+            `;
+            const bonusDetailsRes = await client.query(bonusDetailsQuery, [application_ids, recipient_id]);
+
+            bonusDetails = bonusDetailsRes.rows.map(bonus =>
+                `${bonus.name}: ${bonus.app_count} αιτήσεις αυτόν τον μήνα από ${bonus.companies}`
+            ).join('; ');
+        }
+
+        const statementQuery = "INSERT INTO payment_statements (creator_id, recipient_id, total_amount, subtotal, vat_amount, bonus_amount, bonus_details) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id";
+        const statementResult = await client.query(statementQuery, [creator_id, recipient_id, finalTotalAmount.toFixed(2), subtotal.toFixed(2), vatAmount.toFixed(2), bonusTotal.toFixed(2), bonusDetails]);
         const newStatementId = statementResult.rows[0].id;
         // Check for field-level payments
         for (const appId of application_ids) {

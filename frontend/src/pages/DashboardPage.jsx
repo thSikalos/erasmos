@@ -4,6 +4,7 @@ import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
 import StatCard from '../components/StatCard';
 import RemindersWidget from '../components/RemindersWidget';
+import BonusProgressWidget from '../components/BonusProgressWidget';
 import '../App.css';
 
 const DashboardPage = () => {
@@ -497,7 +498,8 @@ const DashboardPage = () => {
                             </tbody>
                         </table>
                     </div>
-                    
+
+                    <BonusProgressWidget />
                     <RemindersWidget />
                 </div>
             )}

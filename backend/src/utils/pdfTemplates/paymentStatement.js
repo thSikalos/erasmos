@@ -151,11 +151,16 @@ class PaymentStatementTemplate {
         const { colors, locale } = this.brandConfig;
         let currentY = startY + 20;
 
+        // Calculate if we need extra space for bonuses
+        const hasBonus = statement.bonus_amount && parseFloat(statement.bonus_amount) > 0;
+        const baseHeight = 100;
+        const bonusHeight = hasBonus ? 45 : 0; // Extra space for bonus info
+        const boxHeight = baseHeight + bonusHeight;
+
         // Summary box
         const boxWidth = 200;
-        const boxHeight = 100;
         const boxX = 345; // Right aligned
-        
+
         doc.rect(boxX, currentY, boxWidth, boxHeight)
            .stroke(colors.primary);
 
@@ -169,14 +174,54 @@ class PaymentStatementTemplate {
 
         currentY += 30;
 
-        // Subtotal
+        // Commissions subtotal (excluding bonuses)
+        const commissionsAmount = parseFloat(statement.subtotal || 0) - parseFloat(statement.bonus_amount || 0);
+        doc.fontSize(10)
+           .fillColor(colors.dark)
+           .text('Αμοιβές:', boxX + 10, currentY)
+           .text(`${commissionsAmount.toFixed(2)} ${locale.currencySymbol}`,
+                 boxX + 10, currentY, {
+                     width: boxWidth - 20,
+                     align: 'right'
+                 });
+
+        currentY += 15;
+
+        // Bonus section if applicable
+        if (hasBonus) {
+            doc.fontSize(10)
+               .fillColor(colors.success)
+               .text('Bonuses:', boxX + 10, currentY)
+               .text(`${parseFloat(statement.bonus_amount).toFixed(2)} ${locale.currencySymbol}`,
+                     boxX + 10, currentY, {
+                         width: boxWidth - 20,
+                         align: 'right'
+                     });
+
+            currentY += 12;
+
+            // Bonus details if available
+            if (statement.bonus_details) {
+                doc.fontSize(8)
+                   .fillColor(colors.dark)
+                   .text(statement.bonus_details, boxX + 10, currentY, {
+                       width: boxWidth - 20,
+                       align: 'left'
+                   });
+                currentY += 18;
+            } else {
+                currentY += 3;
+            }
+        }
+
+        // Subtotal line
         doc.fontSize(10)
            .fillColor(colors.dark)
            .text('Καθαρό Ποσό:', boxX + 10, currentY)
-           .text(`${parseFloat(statement.subtotal || 0).toFixed(2)} ${locale.currencySymbol}`, 
-                 boxX + 10, currentY, { 
+           .text(`${parseFloat(statement.subtotal || 0).toFixed(2)} ${locale.currencySymbol}`,
+                 boxX + 10, currentY, {
                      width: boxWidth - 20,
-                     align: 'right' 
+                     align: 'right'
                  });
 
         currentY += 15;
@@ -184,10 +229,10 @@ class PaymentStatementTemplate {
         // VAT if applicable
         if (parseFloat(statement.vat_amount || 0) > 0) {
             doc.text('ΦΠΑ (24%):', boxX + 10, currentY)
-               .text(`${parseFloat(statement.vat_amount).toFixed(2)} ${locale.currencySymbol}`, 
-                     boxX + 10, currentY, { 
+               .text(`${parseFloat(statement.vat_amount).toFixed(2)} ${locale.currencySymbol}`,
+                     boxX + 10, currentY, {
                          width: boxWidth - 20,
-                         align: 'right' 
+                         align: 'right'
                      });
             currentY += 15;
         }
@@ -202,14 +247,14 @@ class PaymentStatementTemplate {
         // Total amount
         doc.fontSize(12)
            .fillColor(colors.success)
-           .text('ΣΥΝΟΛΙΚΟ ΠΟΣΟ:', boxX + 10, currentY, { 
+           .text('ΣΥΝΟΛΙΚΟ ΠΟΣΟ:', boxX + 10, currentY, {
                width: boxWidth - 20,
-               align: 'left' 
+               align: 'left'
            })
-           .text(`${parseFloat(statement.total_amount || 0).toFixed(2)} ${locale.currencySymbol}`, 
-                 boxX + 10, currentY, { 
+           .text(`${parseFloat(statement.total_amount || 0).toFixed(2)} ${locale.currencySymbol}`,
+                 boxX + 10, currentY, {
                      width: boxWidth - 20,
-                     align: 'right' 
+                     align: 'right'
                  });
 
         return currentY + 40;
