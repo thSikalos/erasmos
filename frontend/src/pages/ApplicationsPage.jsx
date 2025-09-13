@@ -8,8 +8,12 @@ const ApplicationsPage = () => {
     const [applications, setApplications] = useState([]);
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState('unpaid'); // 'all', 'paid', 'unpaid'
+    const [searchTerm, setSearchTerm] = useState('');
     const [successMessage, setSuccessMessage] = useState('');
     const [error, setError] = useState('');
+    const [showCommissionDialog, setShowCommissionDialog] = useState(false);
+    const [selectedApplication, setSelectedApplication] = useState(null);
+    const [commissionableFields, setCommissionableFields] = useState([]);
 
     const fetchApplications = async () => {
         if (!token) return;
@@ -33,7 +37,37 @@ const ApplicationsPage = () => {
         fetchApplications();
     }, [token, filter]);
 
+    const fetchCommissionableFields = async (applicationId) => {
+        try {
+            const config = { headers: { Authorization: `Bearer ${token}` } };
+            const response = await axios.get(
+                `http://localhost:3000/api/applications/${applicationId}/commissionable-fields`,
+                config
+            );
+            return response.data;
+        } catch (error) {
+            console.error("Failed to fetch commissionable fields", error);
+            return [];
+        }
+    };
+
     const handleMarkAsPaid = async (applicationId) => {
+        // First check if this application has commissionable fields
+        const fields = await fetchCommissionableFields(applicationId);
+        const app = applications.find(a => a.id === applicationId);
+        
+        if (fields.length > 0) {
+            // Show dialog for field-by-field payment selection
+            setSelectedApplication(app);
+            setCommissionableFields(fields);
+            setShowCommissionDialog(true);
+        } else {
+            // No commissionable fields, proceed with simple payment
+            await markApplicationAsPaid(applicationId);
+        }
+    };
+
+    const markApplicationAsPaid = async (applicationId) => {
         try {
             const config = { headers: { Authorization: `Bearer ${token}` } };
             await axios.patch(`http://localhost:3000/api/applications/${applicationId}/paid`, {}, config);
@@ -55,15 +89,30 @@ const ApplicationsPage = () => {
         return new Date(dateString).toLocaleDateString('el-GR');
     };
 
-    if (!user || (user.role !== 'TeamLeader' && user.role !== 'Admin')) {
+    if (!user) {
         return (
             <div className="container mx-auto px-4 py-8">
                 <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-                    Δεν έχετε δικαίωμα πρόσβασης σε αυτή τη σελίδα.
+                    Παρακαλώ συνδεθείτε για να δείτε τις αιτήσεις.
                 </div>
             </div>
         );
     }
+
+    const canMarkAsPaid = user.role === 'TeamLeader' || user.role === 'Admin';
+
+    // Filter applications based on search term
+    const filteredApplications = applications.filter(app => {
+        if (!searchTerm) return true;
+        const searchLower = searchTerm.toLowerCase();
+        return (
+            app.id.toString().includes(searchLower) ||
+            app.customer_name.toLowerCase().includes(searchLower) ||
+            app.customer_phone.toLowerCase().includes(searchLower) ||
+            app.associate_name.toLowerCase().includes(searchLower) ||
+            app.company_name.toLowerCase().includes(searchLower)
+        );
+    });
 
     return (
         <div className="container mx-auto px-4 py-8">
@@ -117,15 +166,38 @@ const ApplicationsPage = () => {
                 </button>
             </div>
 
+            {/* Search Input */}
+            <div className="mb-6">
+                <div className="relative">
+                    <input
+                        type="text"
+                        placeholder="Αναζήτηση αιτήσεων (ID, πελάτης, συνεργάτης, εταιρία, τηλέφωνο)..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="w-full px-4 py-2 pl-10 pr-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                    </div>
+                </div>
+            </div>
+
             {loading ? (
                 <div className="text-center py-8">
                     <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                     <p className="mt-2 text-gray-600">Φόρτωση αιτήσεων...</p>
                 </div>
-            ) : applications.length === 0 ? (
+            ) : filteredApplications.length === 0 ? (
                 <div className="text-center py-8">
                     <div className="bg-gray-100 rounded-lg p-8">
-                        <p className="text-gray-500">Δεν βρέθηκαν αιτήσεις για τα επιλεγμένα κριτήρια.</p>
+                        <p className="text-gray-500">
+                            {searchTerm 
+                                ? `Δεν βρέθηκαν αιτήσεις που να ταιριάζουν με "${searchTerm}"`
+                                : 'Δεν βρέθηκαν αιτήσεις για τα επιλεγμένα κριτήρια.'
+                            }
+                        </p>
                     </div>
                 </div>
             ) : (
@@ -161,7 +233,7 @@ const ApplicationsPage = () => {
                                 </tr>
                             </thead>
                             <tbody className="bg-white divide-y divide-gray-200">
-                                {applications.map((app) => (
+                                {filteredApplications.map((app) => (
                                     <tr key={app.id} className="hover:bg-gray-50">
                                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                                             #{app.id}
@@ -201,7 +273,7 @@ const ApplicationsPage = () => {
                                                 >
                                                     Προβολή
                                                 </Link>
-                                                {!app.is_paid_by_company && (
+                                                {!app.is_paid_by_company && canMarkAsPaid && (
                                                     <button
                                                         onClick={() => handleMarkAsPaid(app.id)}
                                                         className="text-green-600 hover:text-green-900 transition-colors"
@@ -233,6 +305,142 @@ const ApplicationsPage = () => {
                             <p>• Οι πληρωμένες αιτήσεις θα είναι διαθέσιμες για δημιουργία ταμειακών καταστάσεων</p>
                             <p>• Μόνο οι αιτήσεις με κατάσταση "Καταχωρήθηκε" εμφανίζονται εδώ</p>
                         </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Commission Fields Dialog */}
+            {showCommissionDialog && (
+                <CommissionDialog 
+                    application={selectedApplication}
+                    commissionableFields={commissionableFields}
+                    onClose={() => setShowCommissionDialog(false)}
+                    onConfirm={markApplicationAsPaid}
+                />
+            )}
+        </div>
+    );
+};
+
+// Commission Dialog Component
+const CommissionDialog = ({ application, commissionableFields, onClose, onConfirm }) => {
+    const [fieldPayments, setFieldPayments] = useState({});
+
+    useEffect(() => {
+        // Initialize all fields as paid by default
+        const initialPayments = {};
+        commissionableFields.forEach(field => {
+            initialPayments[field.id] = true;
+        });
+        setFieldPayments(initialPayments);
+    }, [commissionableFields]);
+
+    const handleFieldToggle = (fieldId) => {
+        setFieldPayments(prev => ({
+            ...prev,
+            [fieldId]: !prev[fieldId]
+        }));
+    };
+
+    const calculateTotalCommission = () => {
+        return commissionableFields.reduce((total, field) => {
+            return total + (fieldPayments[field.id] ? parseFloat(field.commission_amount) : 0);
+        }, 0);
+    };
+
+    const handleConfirm = () => {
+        // For now, we'll mark the entire application as paid
+        // In the future, this could track partial payments
+        onConfirm(application.id);
+        onClose();
+    };
+
+    return (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+            <div className="relative top-20 mx-auto p-5 border w-11/12 max-w-2xl shadow-lg rounded-md bg-white">
+                <div className="mt-3">
+                    <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-lg font-medium text-gray-900">
+                            Επιλογή Πληρωμής για Αίτηση #{application?.id}
+                        </h3>
+                        <button
+                            onClick={onClose}
+                            className="text-gray-400 hover:text-gray-600"
+                        >
+                            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
+
+                    <div className="mb-4">
+                        <p className="text-sm text-gray-600 mb-4">
+                            Αυτή η αίτηση έχει πεδία που δίνουν αμοιβή. Επιλέξτε ποια πεδία έχουν πληρωθεί:
+                        </p>
+
+                        <div className="space-y-3">
+                            {commissionableFields.map(field => (
+                                <div key={field.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                                    <div className="flex items-center">
+                                        <input
+                                            type="checkbox"
+                                            id={`field-${field.id}`}
+                                            checked={fieldPayments[field.id] || false}
+                                            onChange={() => handleFieldToggle(field.id)}
+                                            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                                        />
+                                        <label htmlFor={`field-${field.id}`} className="ml-3 block text-sm font-medium text-gray-700">
+                                            {field.label}
+                                        </label>
+                                    </div>
+                                    <div className="text-sm text-gray-900 font-medium">
+                                        €{parseFloat(field.commission_amount).toFixed(2)}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        <div className="mt-4 pt-4 border-t border-gray-200">
+                            <div className="flex justify-between items-center">
+                                <span className="text-base font-medium text-gray-900">
+                                    Συνολική Αμοιβή Προς Πληρωμή:
+                                </span>
+                                <span className="text-lg font-bold text-green-600">
+                                    €{calculateTotalCommission().toFixed(2)}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
+                        <div className="flex">
+                            <div className="flex-shrink-0">
+                                <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                                </svg>
+                            </div>
+                            <div className="ml-3">
+                                <h3 className="text-sm font-medium text-yellow-800">Σημαντικό</h3>
+                                <div className="mt-2 text-sm text-yellow-700">
+                                    <p>Μόνο τα επιλεγμένα πεδία θα μαρκαριστούν ως πληρωμένα. Τα μη επιλεγμένα πεδία θα παραμείνουν απλήρωτα για μελλοντική επεξεργασία.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="flex space-x-3">
+                        <button
+                            onClick={onClose}
+                            className="flex-1 px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 transition-colors"
+                        >
+                            Ακύρωση
+                        </button>
+                        <button
+                            onClick={handleConfirm}
+                            className="flex-1 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
+                        >
+                            Επιβεβαίωση Πληρωμής
+                        </button>
                     </div>
                 </div>
             </div>

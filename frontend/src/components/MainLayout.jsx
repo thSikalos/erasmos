@@ -419,12 +419,10 @@ const MainLayout = () => {
                         Ανανεώσεις
                     </NavLink>
                     
-                    {(user?.role === 'TeamLeader' || user?.role === 'Admin') && (
-                        <NavLink to="/applications" className="nav-link">
-                            <span className="nav-icon">📋</span>
-                            Αιτήσεις
-                        </NavLink>
-                    )}
+                    <NavLink to="/applications" className="nav-link">
+                        <span className="nav-icon">📋</span>
+                        Αιτήσεις
+                    </NavLink>
                     
                     {user?.role !== 'Secretary' && (
                         <NavLink to="/reporting" className="nav-link">

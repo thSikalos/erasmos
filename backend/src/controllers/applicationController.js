@@ -508,6 +508,10 @@ const getTeamApplications = async (req, res) => {
             }
             userFilter = `a.user_id = ANY($${paramIndex++}::int[])`;
             queryParams.push(allUserIds);
+        } else if (userRole === 'Associate') {
+            // Associates can only see their own applications
+            userFilter = `a.user_id = $${paramIndex++}`;
+            queryParams.push(userId);
         } else {
             return res.status(403).json({ message: 'Access denied' });
         }
@@ -549,6 +553,74 @@ const getTeamApplications = async (req, res) => {
     }
 };
 
+// --- GET COMMISSIONABLE FIELDS FOR AN APPLICATION ---
+const getApplicationCommissionableFields = async (req, res) => {
+    const { id } = req.params;
+
+    try {
+        // Get application with field values
+        const appQuery = `
+            SELECT a.id, a.field_values, a.user_id, a.company_id, a.total_commission
+            FROM applications a
+            WHERE a.id = $1
+        `;
+        const appResult = await pool.query(appQuery, [id]);
+        
+        if (appResult.rows.length === 0) {
+            return res.status(404).json({ message: 'Application not found' });
+        }
+
+        const application = appResult.rows[0];
+        const fieldValues = application.field_values || {};
+
+        // Get commissionable fields that have values in this application
+        const fieldsQuery = `
+            SELECT f.id, f.label, f.type
+            FROM fields f
+            WHERE f.is_commissionable = true
+            AND f.id = ANY($1::int[])
+        `;
+
+        const fieldIds = Object.keys(fieldValues).map(id => parseInt(id));
+        if (fieldIds.length === 0) {
+            return res.json([]);
+        }
+
+        const fieldsResult = await pool.query(fieldsQuery, [fieldIds]);
+        
+        // Get commission amounts for these fields
+        const commissionsQuery = `
+            SELECT ufc.field_id, ufc.amount
+            FROM user_field_commissions ufc
+            WHERE ufc.associate_id = $1 AND ufc.field_id = ANY($2::int[])
+        `;
+        
+        const commissionsResult = await pool.query(commissionsQuery, [application.user_id, fieldIds]);
+        const commissionMap = {};
+        commissionsResult.rows.forEach(row => {
+            commissionMap[row.field_id] = row.amount;
+        });
+
+        // Build response with field details and commission info
+        const commissionableFields = fieldsResult.rows
+            .filter(field => fieldValues[field.id] && String(fieldValues[field.id]) !== 'false')
+            .map(field => ({
+                id: field.id,
+                label: field.label,
+                type: field.type,
+                value: fieldValues[field.id],
+                commission_amount: commissionMap[field.id] || 0,
+                is_paid: false // Will be used for partial payments
+            }));
+
+        res.json(commissionableFields);
+
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).send('Server Error');
+    }
+};
+
 module.exports = {
     createApplication,
     getApplications,
@@ -560,5 +632,6 @@ module.exports = {
     getApplicationComments,
     addApplicationComment,
     exportRenewals,
-    getTeamApplications
+    getTeamApplications,
+    getApplicationCommissionableFields
 };

@@ -12,7 +12,8 @@ const {
     getApplicationComments,
     addApplicationComment,
     exportRenewals, // <-- ΝΕΟ
-    getTeamApplications
+    getTeamApplications,
+    getApplicationCommissionableFields
 } = require('../controllers/applicationController');
 
 router.use(authMiddleware);
@@ -26,6 +27,7 @@ router.get('/', getApplications);
 
 router.get('/:id/comments', getApplicationComments);
 router.post('/:id/comments', addApplicationComment);
+router.get('/:id/commissionable-fields', getApplicationCommissionableFields);
 
 router.get('/:id', getApplicationById);
 router.put('/:id', updateApplication);
