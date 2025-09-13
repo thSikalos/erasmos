@@ -7,6 +7,8 @@ const useSessionTimeout = (token, onTokenRefresh, onLogout) => {
     const warningTimerRef = useRef(null);
     const logoutTimerRef = useRef(null);
     const refreshTimerRef = useRef(null);
+    const countdownIntervalRef = useRef(null);
+    const tokenExpirationRef = useRef(null);
 
     const WARNING_TIME = 5 * 60 * 1000; // 5 λεπτά σε milliseconds
     const REFRESH_TIME = 2 * 60 * 1000; // 2 λεπτά πριν τη λήξη για auto-refresh
@@ -23,6 +25,10 @@ const useSessionTimeout = (token, onTokenRefresh, onLogout) => {
         if (refreshTimerRef.current) {
             clearTimeout(refreshTimerRef.current);
             refreshTimerRef.current = null;
+        }
+        if (countdownIntervalRef.current) {
+            clearInterval(countdownIntervalRef.current);
+            countdownIntervalRef.current = null;
         }
     }, []);
 
@@ -58,6 +64,33 @@ const useSessionTimeout = (token, onTokenRefresh, onLogout) => {
         clearAllTimers();
     }, [clearAllTimers]);
 
+    const startCountdown = useCallback((tokenExpiration) => {
+        tokenExpirationRef.current = tokenExpiration;
+
+        const updateCountdown = () => {
+            const now = Date.now();
+            const remainingTime = Math.floor((tokenExpiration - now) / 1000);
+
+            if (remainingTime > 0) {
+                setSessionWarning(prev => prev ? {
+                    ...prev,
+                    remainingTime
+                } : null);
+            } else {
+                clearAllTimers();
+                setSessionWarning(null);
+                console.log('[SESSION] Token expired, logging out');
+                onLogout();
+            }
+        };
+
+        // Update countdown every second
+        countdownIntervalRef.current = setInterval(updateCountdown, 1000);
+
+        // Initial update
+        updateCountdown();
+    }, [clearAllTimers, onLogout]);
+
     const setupTimers = useCallback((tokenExpiration) => {
         clearAllTimers();
 
@@ -84,47 +117,35 @@ const useSessionTimeout = (token, onTokenRefresh, onLogout) => {
         // Warning timer
         if (timeToWarning > 0) {
             warningTimerRef.current = setTimeout(() => {
-                const remainingTime = Math.floor((tokenExpiration - Date.now()) / 1000);
+                console.log('[SESSION] Showing session warning');
+                setSessionWarning({
+                    remainingTime: Math.floor((tokenExpiration - Date.now()) / 1000),
+                    onRefresh: handleRefreshClick,
+                    onDismiss: dismissWarning,
+                    onAutoRefreshToggle: () => setAutoRefresh(!autoRefresh)
+                });
 
-                if (remainingTime > 0) {
-                    console.log('[SESSION] Showing session warning, remaining time:', remainingTime);
-                    setSessionWarning({
-                        remainingTime,
-                        onRefresh: handleRefreshClick,
-                        onDismiss: dismissWarning,
-                        autoRefresh,
-                        onAutoRefreshToggle: () => setAutoRefresh(!autoRefresh)
-                    });
-
-                    // Set logout timer for when token actually expires
-                    logoutTimerRef.current = setTimeout(() => {
-                        console.log('[SESSION] Token expired, logging out');
-                        onLogout();
-                    }, remainingTime * 1000);
-                }
+                // Start the countdown
+                startCountdown(tokenExpiration);
             }, timeToWarning);
         } else if (timeToExpiry > 0) {
             // If we're already within warning time, show warning immediately
-            const remainingTime = Math.floor(timeToExpiry / 1000);
             console.log('[SESSION] Already within warning time, showing immediate warning');
             setSessionWarning({
-                remainingTime,
+                remainingTime: Math.floor(timeToExpiry / 1000),
                 onRefresh: handleRefreshClick,
                 onDismiss: dismissWarning,
-                autoRefresh,
                 onAutoRefreshToggle: () => setAutoRefresh(!autoRefresh)
             });
 
-            logoutTimerRef.current = setTimeout(() => {
-                console.log('[SESSION] Token expired, logging out');
-                onLogout();
-            }, timeToExpiry);
+            // Start the countdown immediately
+            startCountdown(tokenExpiration);
         } else {
             // Token already expired
             console.log('[SESSION] Token already expired');
             onLogout();
         }
-    }, [autoRefresh, handleRefreshClick, dismissWarning, refreshToken, onLogout]);
+    }, [autoRefresh, handleRefreshClick, dismissWarning, refreshToken, onLogout, startCountdown]);
 
     // Initialize timers when token changes
     useEffect(() => {

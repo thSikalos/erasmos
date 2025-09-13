@@ -4,6 +4,7 @@ const jwt = require('jsonwebtoken');
 const PDFDocument = require('pdfkit');
 const path = require('path');
 const documentGenerator = require('../utils/documentGenerator');
+const NotificationService = require('../services/notificationService');
 
 // --- GET ALL USERS (FOR ADMIN) ---
 const getAllUsers = async (req, res) => {
@@ -26,7 +27,25 @@ const createUser = async (req, res) => {
             "INSERT INTO users (name, email, password, role, parent_user_id, is_vat_liable) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *",
             [name, email, hashedPassword, role, parent_user_id || null, is_vat_liable]
         );
-        delete newUser.rows[0].password; 
+
+        // Send notification for new user registration
+        try {
+            await NotificationService.createNotification(
+                NotificationService.NOTIFICATION_TYPES.NEW_USER_REGISTRATION,
+                {
+                    user_id: newUser.rows[0].id,
+                    name: name,
+                    email: email,
+                    role: role,
+                    parent_user_id: parent_user_id
+                }
+            );
+        } catch (notificationError) {
+            console.error('Failed to send new user notification:', notificationError);
+            // Don't fail user creation if notification fails
+        }
+
+        delete newUser.rows[0].password;
         res.status(201).json(newUser.rows[0]);
     } catch (err) {
         if (err.code === '23505') { return res.status(400).json({ message: 'A user with this email already exists.' }); }
@@ -119,6 +138,23 @@ const registerUserRequest = async (req, res) => {
         };
 
         console.log('[REGISTRATION] New registration request:', registrationData);
+
+        // Send notification to all admins about the new registration lead
+        try {
+            await NotificationService.createNotification(
+                NotificationService.NOTIFICATION_TYPES.LOGIN_LEAD,
+                {
+                    name: fullName,
+                    email: email,
+                    phone: phone,
+                    message: message || 'Χωρίς μήνυμα',
+                    created_at: new Date()
+                }
+            );
+        } catch (notificationError) {
+            console.error('Failed to send login lead notification:', notificationError);
+            // Don't fail registration if notification fails
+        }
 
         // TODO: Send email notification to admin when email service is configured
         // This is a placeholder for the email service integration

@@ -9,31 +9,96 @@ const Header = () => {
     const [notifications, setNotifications] = useState([]);
     const [isNotificationPanelOpen, setIsNotificationPanelOpen] = useState(false);
     const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+    const [lastFetch, setLastFetch] = useState(null);
+    const [isPolling, setIsPolling] = useState(true);
 
-    const fetchNotifications = async () => {
-        if (!token) return;
+    const fetchNotifications = async (force = false) => {
+        if (!token || (!force && !isPolling)) return;
+
         try {
             const config = { headers: { Authorization: `Bearer ${token}` } };
             const res = await axios.get('http://localhost:3000/api/notifications', config);
+
+            // Check if there are new notifications
+            const hasNewNotifications = !lastFetch ||
+                res.data.length > notifications.length ||
+                (res.data.length > 0 && notifications.length > 0 && res.data[0].id !== notifications[0]?.id);
+
             setNotifications(res.data);
+            setLastFetch(new Date());
+
+            // If there are new notifications, briefly show they arrived
+            if (hasNewNotifications && res.data.length > notifications.length) {
+                console.log(`📬 ${res.data.length - notifications.length} new notification(s) received`);
+            }
         } catch (err) {
             console.error("Failed to fetch notifications", err);
         }
     };
 
     useEffect(() => {
-        fetchNotifications();
-        const interval = setInterval(fetchNotifications, 60000);
-        return () => clearInterval(interval);
-    }, [token]);
+        if (!token) return;
+
+        // Initial fetch
+        fetchNotifications(true);
+
+        // Smart polling: more frequent when there are unread notifications
+        const createPollingInterval = () => {
+            const unreadCount = notifications.filter(n => n.status === 'unread').length;
+            const interval = unreadCount > 0 ? 30000 : 60000; // 30s if unread, 60s otherwise
+
+            return setInterval(() => {
+                if (isPolling) {
+                    fetchNotifications();
+                }
+            }, interval);
+        };
+
+        let intervalId = createPollingInterval();
+
+        // Update interval when notification count changes
+        const timeoutId = setTimeout(() => {
+            clearInterval(intervalId);
+            intervalId = createPollingInterval();
+        }, 1000);
+
+        return () => {
+            clearInterval(intervalId);
+            clearTimeout(timeoutId);
+        };
+    }, [token, notifications.length, isPolling]);
 
     const handleMarkAsRead = async (notificationId) => {
         try {
             const config = { headers: { Authorization: `Bearer ${token}` } };
             await axios.patch(`http://localhost:3000/api/notifications/${notificationId}/read`, {}, config);
+
+            // Optimistically update UI while refetching
+            setNotifications(prev => prev.map(n =>
+                n.id === notificationId ? { ...n, status: 'read' } : n
+            ));
+
             fetchNotifications();
         } catch (err) {
             console.error("Failed to mark as read", err);
+            // Revert optimistic update on error
+            fetchNotifications(true);
+        }
+    };
+
+    const handleMarkAllAsRead = async () => {
+        try {
+            const config = { headers: { Authorization: `Bearer ${token}` } };
+            await axios.post('http://localhost:3000/api/notifications/mark-all-read', {}, config);
+
+            // Optimistically update all notifications to read
+            setNotifications(prev => prev.map(n => ({ ...n, status: 'read' })));
+
+            fetchNotifications();
+        } catch (err) {
+            console.error("Failed to mark all as read", err);
+            // Revert optimistic update on error
+            fetchNotifications(true);
         }
     };
 
@@ -148,6 +213,32 @@ const Header = () => {
 
                     .header-notification-item:hover {
                         background: rgba(102, 126, 234, 0.05);
+                    }
+
+                    .header-notification-actions {
+                        padding: 12px;
+                        background: rgba(102, 126, 234, 0.02);
+                        border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+                    }
+
+                    .mark-all-read-button {
+                        background: linear-gradient(135deg, #10b981, #059669);
+                        color: white;
+                        border: none;
+                        padding: 8px 16px;
+                        border-radius: 8px;
+                        font-size: 0.85rem;
+                        font-weight: 600;
+                        cursor: pointer;
+                        transition: all 0.3s ease;
+                        width: 100%;
+                        box-shadow: 0 2px 8px rgba(16, 185, 129, 0.2);
+                    }
+
+                    .mark-all-read-button:hover {
+                        background: linear-gradient(135deg, #059669, #047857);
+                        transform: translateY(-1px);
+                        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
                     }
 
                     .header-notification-item:last-child {
@@ -342,6 +433,17 @@ const Header = () => {
 
                         {isNotificationPanelOpen && (
                             <div className="header-notification-panel" onClick={(e) => e.stopPropagation()}>
+                                {notifications.length > 0 && unreadCount > 0 && (
+                                    <div className="header-notification-actions">
+                                        <button
+                                            onClick={handleMarkAllAsRead}
+                                            className="mark-all-read-button"
+                                            title="Σήμανση όλων ως διαβασμένα"
+                                        >
+                                            ✅ Σήμανση όλων ως διαβασμένα ({unreadCount})
+                                        </button>
+                                    </div>
+                                )}
                                 {notifications.length > 0 ? notifications.map(notif => (
                                     <div key={notif.id} className={`header-notification-item ${notif.status}`}>
                                         <p onClick={() => handleNotificationClick(notif)}>{notif.message}</p>

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useContext, useReducer, useCallback } from 
 import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
+import { useNotifications } from '../context/NotificationContext';
 import FileUpload from '../components/FileUpload';
 import '../App.css';
 
@@ -33,25 +34,6 @@ const StepIndicator = ({ currentStep, totalSteps }) => {
     );
 };
 
-// Toast notification component
-const Toast = ({ message, type, onClose }) => {
-    useEffect(() => {
-        const timer = setTimeout(onClose, 4000);
-        return () => clearTimeout(timer);
-    }, [onClose]);
-
-    return (
-        <div className={`toast toast-${type}`}>
-            <div className="toast-content">
-                <span className="toast-icon">
-                    {type === 'success' ? '✅' : type === 'error' ? '❌' : 'ℹ️'}
-                </span>
-                <span className="toast-message">{message}</span>
-            </div>
-            <button className="toast-close" onClick={onClose}>×</button>
-        </div>
-    );
-};
 
 // Progress bar component
 const ProgressBar = ({ currentStep, totalSteps }) => {
@@ -90,7 +72,6 @@ const initialState = {
     currentStep: 1,
     loading: false,
     error: '',
-    toast: null,
     
     // Modal state
     modalOpen: false,
@@ -133,10 +114,6 @@ const applicationReducer = (state, action) => {
             return { ...state, loading: action.loading };
         case 'SET_ERROR':
             return { ...state, error: action.error };
-        case 'SHOW_TOAST':
-            return { ...state, toast: action.toast };
-        case 'HIDE_TOAST':
-            return { ...state, toast: null };
         case 'SET_MODAL_OPEN':
             return { ...state, modalOpen: action.open };
         case 'SET_SELECTED_APPLICATION':
@@ -149,6 +126,7 @@ const applicationReducer = (state, action) => {
 const NewApplicationPage = () => {
     const { token, user } = useContext(AuthContext);
     const navigate = useNavigate();
+    const { showToastLocal, showSuccessToast, showErrorToast, showInfoToast } = useNotifications();
     const [companies, setCompanies] = useState([]);
     const [state, dispatch] = useReducer(applicationReducer, {
         ...initialState,
@@ -169,7 +147,7 @@ const NewApplicationPage = () => {
                 setCompanies(companiesRes.data);
             } catch (error) {
                 dispatch({ type: 'SET_ERROR', error: 'Αποτυχία φόρτωσης εταιρειών.' });
-                showToast('Αποτυχία φόρτωσης εταιρειών', 'error');
+                showToastLocalLocal('Αποτυχία φόρτωσης εταιρειών', 'error');
             } finally {
                 dispatch({ type: 'SET_LOADING', loading: false });
             }
@@ -177,16 +155,16 @@ const NewApplicationPage = () => {
         fetchCompanies();
     }, [token]);
 
-    // Helper functions
-    const showToast = (message, type = 'info') => {
-        dispatch({
-            type: 'SHOW_TOAST',
-            toast: { message, type, id: Date.now() }
-        });
-    };
+    // Helper functions - using global notifications
+    const showToastLocalLocal = (message, type = 'info') => {
+        const typeMap = {
+            'success': () => showSuccessToast('Επιτυχία', message),
+            'error': () => showErrorToast('Σφάλμα', message),
+            'info': () => showInfoToast('Πληροφορία', message),
+            'warning': () => showToastLocal('warning', 'Προειδοποίηση', message)
+        };
 
-    const hideToast = () => {
-        dispatch({ type: 'HIDE_TOAST' });
+        (typeMap[type] || typeMap['info'])();
     };
     
     // Debounced AFM check
@@ -201,7 +179,7 @@ const NewApplicationPage = () => {
             const res = await axios.get(`http://localhost:3000/api/customers/afm/${afm}`, config);
             dispatch({ type: 'SET_CUSTOMER_DETAILS', data: res.data });
             dispatch({ type: 'SET_CUSTOMER_STATUS', status: 'found' });
-            showToast(`Ο πελάτης βρέθηκε! ${res.data.applications_count || 0} προηγούμενες αιτήσεις`, 'success');
+            showToastLocal(`Ο πελάτης βρέθηκε! ${res.data.applications_count || 0} προηγούμενες αιτήσεις`, 'success');
         } catch (err) {
             if (err.response && err.response.status === 404) {
                 dispatch({ 
@@ -209,11 +187,11 @@ const NewApplicationPage = () => {
                     data: { id: null, afm: afm, full_name: '', phone: '', address: '' }
                 });
                 dispatch({ type: 'SET_CUSTOMER_STATUS', status: 'notFound' });
-                showToast('Πελάτης δεν βρέθηκε. Συμπληρώστε τα στοιχεία.', 'info');
+                showToastLocal('Πελάτης δεν βρέθηκε. Συμπληρώστε τα στοιχεία.', 'info');
             } else {
                 dispatch({ type: 'SET_ERROR', error: 'Σφάλμα κατά τον έλεγχο ΑΦΜ.' });
                 dispatch({ type: 'SET_CUSTOMER_STATUS', status: 'idle' });
-                showToast('Σφάλμα κατά τον έλεγχο ΑΦΜ', 'error');
+                showToastLocal('Σφάλμα κατά τον έλεγχο ΑΦΜ', 'error');
             }
         }
     }, [token]);
@@ -252,7 +230,7 @@ const NewApplicationPage = () => {
             const res = await axios.get(`http://localhost:3000/api/customers/afm/${state.afm}`, config);
             dispatch({ type: 'SET_CUSTOMER_DETAILS', data: res.data });
             dispatch({ type: 'SET_CUSTOMER_STATUS', status: 'found' });
-            showToast('Ο πελάτης βρέθηκε επιτυχώς!', 'success');
+            showToastLocal('Ο πελάτης βρέθηκε επιτυχώς!', 'success');
         } catch (err) {
             if (err.response && err.response.status === 404) {
                 dispatch({ 
@@ -260,11 +238,11 @@ const NewApplicationPage = () => {
                     data: { id: null, afm: state.afm, full_name: '', phone: '', address: '' }
                 });
                 dispatch({ type: 'SET_CUSTOMER_STATUS', status: 'notFound' });
-                showToast('Πελάτης δεν βρέθηκε. Συμπληρώστε τα στοιχεία.', 'info');
+                showToastLocal('Πελάτης δεν βρέθηκε. Συμπληρώστε τα στοιχεία.', 'info');
             } else {
                 dispatch({ type: 'SET_ERROR', error: 'Σφάλμα κατά τον έλεγχο ΑΦΜ.' });
                 dispatch({ type: 'SET_CUSTOMER_STATUS', status: 'idle' });
-                showToast('Σφάλμα κατά τον έλεγχο ΑΦΜ', 'error');
+                showToastLocal('Σφάλμα κατά τον έλεγχο ΑΦΜ', 'error');
             }
         }
     };
@@ -273,21 +251,21 @@ const NewApplicationPage = () => {
         switch (step) {
             case 1:
                 if (!state.afm) {
-                    showToast('Παρακαλώ εισάγετε ΑΦΜ', 'error');
+                    showToastLocal('Παρακαλώ εισάγετε ΑΦΜ', 'error');
                     return false;
                 }
                 if (state.customerStatus === 'idle' || state.customerStatus === 'checking') {
-                    showToast('Παρακαλώ ελέγξτε πρώτα το ΑΦΜ', 'error');
+                    showToastLocal('Παρακαλώ ελέγξτε πρώτα το ΑΦΜ', 'error');
                     return false;
                 }
                 if (!state.customerDetails.full_name) {
-                    showToast('Παρακαλώ εισάγετε ονοματεπώνυμο', 'error');
+                    showToastLocal('Παρακαλώ εισάγετε ονοματεπώνυμο', 'error');
                     return false;
                 }
                 return true;
             case 2:
                 if (!state.selectedCompanyId) {
-                    showToast('Παρακαλώ επιλέξτε εταιρεία', 'error');
+                    showToastLocal('Παρακαλώ επιλέξτε εταιρεία', 'error');
                     return false;
                 }
                 return true;
@@ -312,7 +290,7 @@ const NewApplicationPage = () => {
 
     const handleFileUpload = (fileData) => {
         dispatch({ type: 'ADD_FILE', file: fileData });
-        showToast('Αρχείο ανέβηκε επιτυχώς!', 'success');
+        showToastLocal('Αρχείο ανέβηκε επιτυχώς!', 'success');
     };
     
     const handleFilesChange = (files) => {
@@ -321,7 +299,7 @@ const NewApplicationPage = () => {
 
     const handleFileRemove = (index) => {
         dispatch({ type: 'REMOVE_FILE', index });
-        showToast('Αρχείο αφαιρέθηκε', 'info');
+        showToastLocal('Αρχείο αφαιρέθηκε', 'info');
     };
 
     const handleSubmit = async () => {
@@ -344,7 +322,7 @@ const NewApplicationPage = () => {
             
             // Then upload files if any exist
             if (state.uploadedFiles.length > 0) {
-                showToast('Ανεβάζουν τα αρχεία...', 'info');
+                showToastLocal('Ανεβάζουν τα αρχεία...', 'info');
                 let uploadedCount = 0;
                 
                 for (const fileInfo of state.uploadedFiles) {
@@ -373,12 +351,12 @@ const NewApplicationPage = () => {
                 }
                 
                 if (uploadedCount === state.uploadedFiles.length) {
-                    showToast('Αίτηση και αρχεία δημιουργήθηκαν επιτυχώς!', 'success');
+                    showToastLocal('Αίτηση και αρχεία δημιουργήθηκαν επιτυχώς!', 'success');
                 } else {
-                    showToast(`Αίτηση δημιουργήθηκε! ${uploadedCount}/${state.uploadedFiles.length} αρχεία ανέβηκαν.`, 'success');
+                    showToastLocal(`Αίτηση δημιουργήθηκε! ${uploadedCount}/${state.uploadedFiles.length} αρχεία ανέβηκαν.`, 'success');
                 }
             } else {
-                showToast('Αίτηση δημιουργήθηκε επιτυχώς!', 'success');
+                showToastLocal('Αίτηση δημιουργήθηκε επιτυχώς!', 'success');
             }
             setTimeout(() => {
                 navigate('/dashboard');
@@ -386,7 +364,7 @@ const NewApplicationPage = () => {
         } catch (err) {
             const errorMessage = err.response?.data?.message || 'Αποτυχία δημιουργίας αίτησης.';
             dispatch({ type: 'SET_ERROR', error: errorMessage });
-            showToast(errorMessage, 'error');
+            showToastLocal(errorMessage, 'error');
         } finally {
             dispatch({ type: 'SET_LOADING', loading: false });
         }
@@ -396,13 +374,6 @@ const NewApplicationPage = () => {
 
     return (
         <div className="modern-form-container">
-            {state.toast && (
-                <Toast
-                    message={state.toast.message}
-                    type={state.toast.type}
-                    onClose={hideToast}
-                />
-            )}
 
             <div className="form-header">
                 <Link to="/dashboard" className="back-link">

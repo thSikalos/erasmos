@@ -18,6 +18,9 @@ const ToastNotification = ({
 
     useEffect(() => {
         if (showCountdown && countdownTime > 0) {
+            // Set initial countdown
+            setCountdown(countdownTime);
+
             const interval = setInterval(() => {
                 setCountdown(prev => {
                     if (prev <= 1) {
@@ -31,6 +34,13 @@ const ToastNotification = ({
             return () => clearInterval(interval);
         }
     }, [showCountdown, countdownTime]);
+
+    // Update countdown when countdownTime prop changes
+    useEffect(() => {
+        if (showCountdown && countdownTime > 0) {
+            setCountdown(countdownTime);
+        }
+    }, [countdownTime, showCountdown]);
 
     useEffect(() => {
         if (duration > 0) {
@@ -212,10 +222,11 @@ const ToastNotification = ({
 
                     .toast-actions {
                         display: flex;
-                        gap: 10px;
+                        gap: 15px;
                         align-items: center;
-                        flex-wrap: wrap;
+                        justify-content: space-between;
                         margin-top: 15px;
+                        flex-wrap: wrap;
                     }
 
                     .toast-button {
@@ -241,29 +252,53 @@ const ToastNotification = ({
                         display: flex;
                         align-items: center;
                         gap: 8px;
-                        margin-top: 10px;
+                        margin: 0;
+                        padding: 8px 12px;
+                        background: rgba(255, 255, 255, 0.08);
+                        border-radius: 8px;
+                        border: 1px solid rgba(255, 255, 255, 0.1);
+                        transition: all 0.2s ease;
+                    }
+
+                    .auto-refresh-container:hover {
+                        background: rgba(255, 255, 255, 0.12);
                     }
 
                     .auto-refresh-checkbox {
-                        width: 16px;
-                        height: 16px;
+                        width: 18px;
+                        height: 18px;
                         border-radius: 4px;
-                        border: 2px solid rgba(255, 255, 255, 0.3);
+                        border: 2px solid rgba(255, 255, 255, 0.4);
                         background: transparent;
                         cursor: pointer;
-                        transition: all 0.2s ease;
+                        transition: all 0.3s ease;
+                        appearance: none;
+                        position: relative;
                     }
 
                     .auto-refresh-checkbox:checked {
                         background: ${colors.accent};
                         border-color: transparent;
+                        box-shadow: 0 2px 8px ${colors.glow};
+                    }
+
+                    .auto-refresh-checkbox:checked::after {
+                        content: '✓';
+                        position: absolute;
+                        top: 50%;
+                        left: 50%;
+                        transform: translate(-50%, -50%);
+                        color: white;
+                        font-size: 12px;
+                        font-weight: bold;
                     }
 
                     .auto-refresh-label {
-                        color: rgba(255, 255, 255, 0.8);
+                        color: rgba(255, 255, 255, 0.9);
                         font-size: 0.85rem;
                         cursor: pointer;
                         user-select: none;
+                        font-weight: 500;
                     }
 
                     @media (max-width: 480px) {
@@ -314,21 +349,21 @@ const ToastNotification = ({
                                     {actionLabel}
                                 </button>
                             )}
-                        </div>
-                    )}
 
-                    {onAutoRefreshToggle && (
-                        <div className="auto-refresh-container">
-                            <input
-                                type="checkbox"
-                                id="auto-refresh"
-                                className="auto-refresh-checkbox"
-                                checked={autoRefresh}
-                                onChange={onAutoRefreshToggle}
-                            />
-                            <label htmlFor="auto-refresh" className="auto-refresh-label">
-                                Αυτόματη ανανέωση συνεδρίας
-                            </label>
+                            {onAutoRefreshToggle && (
+                                <div className="auto-refresh-container">
+                                    <input
+                                        type="checkbox"
+                                        id="auto-refresh"
+                                        className="auto-refresh-checkbox"
+                                        checked={autoRefresh}
+                                        onChange={onAutoRefreshToggle}
+                                    />
+                                    <label htmlFor="auto-refresh" className="auto-refresh-label">
+                                        Αυτόματη ανανέωση
+                                    </label>
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>

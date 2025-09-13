@@ -2,6 +2,7 @@ const pool = require('../config/db');
 const ExcelJS = require('exceljs');
 const { getEffectiveUserId } = require('../utils/userUtils');
 const documentGenerator = require('../utils/documentGenerator');
+const NotificationService = require('../services/notificationService');
 
 const createApplication = async (req, res) => {
   const { company_id, field_values, contract_end_date, customerDetails, is_personal } = req.body;
@@ -61,7 +62,30 @@ const createApplication = async (req, res) => {
       const dataQuery = 'INSERT INTO application_values (application_id, field_id, value) VALUES ($1, $2, $3)';
       await client.query(dataQuery, [newApplicationId, fieldId, String(field_values[fieldId])]);
     }
-    
+
+    // Send notification for new application (except for personal applications)
+    if (!isPersonalRequest && team_leader_id) {
+      try {
+        const creatorQuery = 'SELECT name FROM users WHERE id = $1';
+        const creatorResult = await client.query(creatorQuery, [associate_id]);
+        const creatorName = creatorResult.rows[0]?.name || 'Unknown';
+
+        await NotificationService.createNotification(
+          NotificationService.NOTIFICATION_TYPES.NEW_APPLICATION,
+          {
+            application_id: newApplicationId,
+            creator_id: associate_id,
+            creator_name: creatorName,
+            customer_name: customerDetails.full_name,
+            company_id: company_id
+          }
+        );
+      } catch (notificationError) {
+        console.error('Failed to send new application notification:', notificationError);
+        // Don't fail the application creation if notification fails
+      }
+    }
+
     await client.query('COMMIT');
     res.status(201).json({ message: 'Application created successfully', applicationId: newApplicationId, totalCommission });
   } catch (err) {
@@ -170,7 +194,7 @@ const addApplicationComment = async (req, res) => {
     }
 };
 
-// --- UPDATE STATUS (with Notification Trigger) ---
+// --- UPDATE STATUS (with Enterprise Notification System) ---
 const updateApplicationStatus = async (req, res) => {
     const { id: applicationId } = req.params;
     const { status: newStatus, reason } = req.body;
@@ -178,25 +202,73 @@ const updateApplicationStatus = async (req, res) => {
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
-        const appRes = await client.query("SELECT user_id, status FROM applications WHERE id = $1", [applicationId]);
-        if (appRes.rows.length === 0) { throw new Error('Application not found'); }
+
+        // Get application details with customer information
+        const appRes = await client.query(`
+            SELECT a.user_id, a.status, c.full_name as customer_name, u.name as associate_name
+            FROM applications a
+            JOIN customers c ON a.customer_id = c.id
+            JOIN users u ON a.user_id = u.id
+            WHERE a.id = $1`, [applicationId]);
+
+        if (appRes.rows.length === 0) {
+            throw new Error('Application not found');
+        }
+
         const application = appRes.rows[0];
         const associateId = application.user_id;
         const currentStatus = application.status;
+        const customerName = application.customer_name;
+        const associateName = application.associate_name;
+
         const parentRes = await client.query("SELECT parent_user_id FROM users WHERE id = $1", [associateId]);
         const teamLeaderId = parentRes.rows[0]?.parent_user_id;
+
+        // Permission checks
         let isAllowed = false;
-        if ((requesterRole === 'TeamLeader' || requesterRole === 'Admin') && requesterId === teamLeaderId) { if ((currentStatus === 'Προς Καταχώρηση' || currentStatus === 'Καταχωρήθηκε') && (newStatus === 'Εκκρεμότητα' || newStatus === 'Καταχωρήθηκε')) { isAllowed = true; } }
-        if (requesterRole === 'Associate' && requesterId === associateId) { if (currentStatus === 'Εκκρεμότητα' && newStatus === 'Προς Καταχώρηση') { isAllowed = true; } }
-        if (!isAllowed) { return res.status(403).json({ message: "You don't have permission to perform this action." }); }
-       
-        const result = await client.query( "UPDATE applications SET status = $1, pending_reason = $2 WHERE id = $3 RETURNING *", [newStatus, (newStatus === 'Εκκρεμότητα' ? reason : null), applicationId] );
-        // --- ΔΗΜΙΟΥΡΓΙΑ ΕΙΔΟΠΟΙΗΣΗΣ ---
-        if ((requesterRole === 'TeamLeader' || requesterRole === 'Admin')) {
-            const message = `Η κατάσταση της αίτησης #${applicationId} άλλαξε σε "${newStatus}".`;
-            await client.query( `INSERT INTO notifications (user_id, message, channel, link_url) VALUES ($1, $2, 'in-app', $3)`, [associateId, message, `/application/${applicationId}`]);
+        if ((requesterRole === 'TeamLeader' || requesterRole === 'Admin') && requesterId === teamLeaderId) {
+            if ((currentStatus === 'Προς Καταχώρηση' || currentStatus === 'Καταχωρήθηκε') &&
+                (newStatus === 'Εκκρεμότητα' || newStatus === 'Καταχωρήθηκε')) {
+                isAllowed = true;
+            }
         }
-       
+        if (requesterRole === 'Associate' && requesterId === associateId) {
+            if (currentStatus === 'Εκκρεμότητα' && newStatus === 'Προς Καταχώρηση') {
+                isAllowed = true;
+            }
+        }
+        if (!isAllowed) {
+            return res.status(403).json({ message: "You don't have permission to perform this action." });
+        }
+
+        // Update application status
+        const result = await client.query(
+            "UPDATE applications SET status = $1, pending_reason = $2 WHERE id = $3 RETURNING *",
+            [newStatus, (newStatus === 'Εκκρεμότητα' ? reason : null), applicationId]
+        );
+
+        // Send enterprise notification for status changes
+        if (currentStatus !== newStatus) {
+            try {
+                await NotificationService.createNotification(
+                    NotificationService.NOTIFICATION_TYPES.APPLICATION_STATUS_CHANGE,
+                    {
+                        application_id: applicationId,
+                        original_creator_id: associateId,
+                        old_status: currentStatus,
+                        new_status: newStatus,
+                        customer_name: customerName,
+                        associate_name: associateName,
+                        changed_by: requesterId,
+                        reason: reason
+                    }
+                );
+            } catch (notificationError) {
+                console.error('Failed to send status change notification:', notificationError);
+                // Don't fail the status update if notification fails
+            }
+        }
+
         await client.query('COMMIT');
         res.json(result.rows[0]);
     } catch (err) {

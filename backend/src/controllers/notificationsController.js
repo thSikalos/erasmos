@@ -30,6 +30,26 @@ const markAsRead = async (req, res) => {
     }
 };
 
+// --- MARK ALL NOTIFICATIONS AS READ ---
+const markAllAsRead = async (req, res) => {
+    const userId = req.user.id;
+    try {
+        const query = `
+            UPDATE notifications
+            SET status = 'read'
+            WHERE user_id = $1 AND channel = 'in-app' AND status = 'unread'
+            RETURNING id`;
+        const result = await pool.query(query, [userId]);
+        res.json({
+            message: 'All notifications marked as read',
+            count: result.rows.length
+        });
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).send('Server Error');
+    }
+};
+
 // --- PREPARE VIBER MONTHLY SUMMARY DRAFTS ---
 const prepareViberSummary = async (req, res) => {
     const teamLeaderId = req.user.id;
@@ -123,6 +143,7 @@ const sendNotification = async (req, res) => {
 module.exports = {
     getMyNotifications,
     markAsRead,
+    markAllAsRead,
     prepareViberSummary,
     getDraftViberNotifications,
     sendNotification

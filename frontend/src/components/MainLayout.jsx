@@ -3,6 +3,7 @@ import { Outlet, NavLink, Link } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import Header from './Header';
 import ToastNotification from './ToastNotification';
+import NotificationManager from './NotificationManager';
 import '../App.css';
 
 const MainLayout = () => {
@@ -676,6 +677,9 @@ const MainLayout = () => {
                     onClose={sessionTimeout.sessionWarning.onDismiss}
                 />
             )}
+
+            {/* Global Notification Manager */}
+            <NotificationManager />
         </div>
     );
 };

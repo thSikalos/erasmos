@@ -1,4 +1,5 @@
 const pool = require('../config/db');
+const NotificationService = require('../services/notificationService');
 
 const getMyReminders = async (req, res) => {
     const userId = req.user.id;
@@ -50,6 +51,32 @@ const createReminder = async (req, res) => {
             "INSERT INTO reminders (creator_id, assignee_id, title, due_date) VALUES ($1, $2, $3, $4) RETURNING *",
             [creator_id, assignee_id, title, due_date]
         );
+
+        // Send notification for new reminder
+        try {
+            const creatorQuery = 'SELECT name, parent_user_id FROM users WHERE id = $1';
+            const creatorResult = await pool.query(creatorQuery, [creator_id]);
+            const creatorInfo = creatorResult.rows[0];
+
+            if (creatorInfo) {
+                await NotificationService.createNotification(
+                    NotificationService.NOTIFICATION_TYPES.NEW_REMINDER,
+                    {
+                        reminder_id: newReminder.rows[0].id,
+                        creator_id: creator_id,
+                        creator_name: creatorInfo.name,
+                        creator_parent_id: creatorInfo.parent_user_id,
+                        assignee_id: assignee_id,
+                        title: title,
+                        due_date: due_date
+                    }
+                );
+            }
+        } catch (notificationError) {
+            console.error('Failed to send reminder notification:', notificationError);
+            // Don't fail reminder creation if notification fails
+        }
+
         res.status(201).json(newReminder.rows[0]);
     } catch (err) {
         console.error(err.message);
