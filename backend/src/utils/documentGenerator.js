@@ -8,9 +8,10 @@ const BRAND_CONFIG = require('./brandConfig');
 const PaymentStatementTemplate = require('./pdfTemplates/paymentStatement');
 const TermsAcceptanceTemplate = require('./pdfTemplates/termsAcceptance');
 const InvoiceTemplate = require('./pdfTemplates/invoice');
+const ReportsPdfTemplate = require('./pdfTemplates/reports');
 
 // Excel Templates
-const ReportsTemplate = require('./excelTemplates/reports');
+const ReportsExcelTemplate = require('./excelTemplates/reports');
 const RenewalsTemplate = require('./excelTemplates/renewals');
 
 class DocumentGenerator {
@@ -22,7 +23,8 @@ class DocumentGenerator {
             paymentStatement: new PaymentStatementTemplate(this),
             termsAcceptance: new TermsAcceptanceTemplate(this),
             invoice: new InvoiceTemplate(this),
-            reports: new ReportsTemplate(this),
+            reportsPdf: new ReportsPdfTemplate(this),
+            reportsExcel: new ReportsExcelTemplate(this),
             renewals: new RenewalsTemplate(this)
         };
     }
@@ -241,6 +243,8 @@ class DocumentGenerator {
                 return this.generateTermsAcceptancePDF(data, issuerData, options);
             case 'invoice':
                 return this.generateInvoicePDF(data, issuerData, options);
+            case 'reports':
+                return this.generateReportsPDF(data, issuerData, options);
             default:
                 throw new Error(`Unknown PDF type: ${type}`);
         }
@@ -273,8 +277,12 @@ class DocumentGenerator {
         return this.templates.invoice.generate(data, issuerData, options);
     }
 
+    generateReportsPDF(data, issuerData, options) {
+        return this.templates.reportsPdf.generate(data, issuerData, options);
+    }
+
     generateReportsExcel(data, options) {
-        return this.templates.reports.generate(data, options);
+        return this.templates.reportsExcel.generate(data, options);
     }
 
     generateRenewalsExcel(data, options) {
