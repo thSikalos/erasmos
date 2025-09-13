@@ -11,6 +11,8 @@ const CustomerDetailPage = () => {
     
     const [customer, setCustomer] = useState(null);
     const [log, setLog] = useState([]);
+    const [applications, setApplications] = useState([]);
+    const [showAllApplications, setShowAllApplications] = useState(false);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     
@@ -25,13 +27,15 @@ const CustomerDetailPage = () => {
         setLoading(true);
         try {
             const config = { headers: { Authorization: `Bearer ${token}` } };
-            const [customerRes, logRes] = await Promise.all([
+            const [customerRes, logRes, applicationsRes] = await Promise.all([
                 axios.get(`http://localhost:3000/api/customers/${id}`, config),
-                axios.get(`http://localhost:3000/api/customers/${id}/communications`, config)
+                axios.get(`http://localhost:3000/api/customers/${id}/communications`, config),
+                axios.get(`http://localhost:3000/api/customers/${id}/applications`, config)
             ]);
             setCustomer(customerRes.data);
             setFormData(customerRes.data);
             setLog(logRes.data);
+            setApplications(applicationsRes.data);
         } catch (err) {
             setError('Failed to fetch customer data');
         } finally {
@@ -696,6 +700,166 @@ const CustomerDetailPage = () => {
                             align-items: stretch;
                         }
                     }
+                    
+                    .applications-section {
+                        background: rgba(255, 255, 255, 0.95);
+                        backdrop-filter: blur(10px);
+                        border-radius: 20px;
+                        padding: 30px;
+                        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+                        border: 1px solid rgba(255, 255, 255, 0.2);
+                    }
+                    
+                    .applications-grid {
+                        display: grid;
+                        grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+                        gap: 20px;
+                        margin-top: 20px;
+                    }
+                    
+                    .application-card {
+                        background: white;
+                        border-radius: 15px;
+                        padding: 25px;
+                        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+                        border: 1px solid #e5e7eb;
+                        transition: all 0.3s ease;
+                        cursor: pointer;
+                        position: relative;
+                        overflow: hidden;
+                    }
+                    
+                    .application-card::before {
+                        content: '';
+                        position: absolute;
+                        top: 0;
+                        left: 0;
+                        right: 0;
+                        height: 4px;
+                        background: linear-gradient(135deg, #667eea, #764ba2);
+                    }
+                    
+                    .application-card:hover {
+                        transform: translateY(-5px);
+                        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+                        border-color: #667eea;
+                    }
+                    
+                    .app-header {
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        margin-bottom: 20px;
+                        padding-bottom: 15px;
+                        border-bottom: 1px solid #f3f4f6;
+                    }
+                    
+                    .company-name {
+                        font-size: 1.1rem;
+                        font-weight: 700;
+                        color: #1f2937;
+                        flex: 1;
+                        margin-right: 10px;
+                    }
+                    
+                    .status-badge {
+                        padding: 4px 12px;
+                        border-radius: 20px;
+                        font-size: 0.75rem;
+                        font-weight: 600;
+                        text-transform: uppercase;
+                        letter-spacing: 0.5px;
+                    }
+                    
+                    .status-active {
+                        background: linear-gradient(135deg, #10b981, #059669);
+                        color: white;
+                    }
+                    
+                    .status-pending {
+                        background: linear-gradient(135deg, #f59e0b, #d97706);
+                        color: white;
+                    }
+                    
+                    .status-inactive, .status-cancelled {
+                        background: linear-gradient(135deg, #ef4444, #dc2626);
+                        color: white;
+                    }
+                    
+                    .status-completed {
+                        background: linear-gradient(135deg, #6b7280, #4b5563);
+                        color: white;
+                    }
+                    
+                    .app-details {
+                        display: grid;
+                        gap: 12px;
+                    }
+                    
+                    .app-detail {
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        padding: 8px 0;
+                    }
+                    
+                    .detail-label {
+                        font-size: 0.9rem;
+                        color: #6b7280;
+                        font-weight: 500;
+                    }
+                    
+                    .detail-value {
+                        font-size: 0.95rem;
+                        color: #1f2937;
+                        font-weight: 600;
+                    }
+                    
+                    .no-applications {
+                        text-align: center;
+                        padding: 40px 20px;
+                        color: #6b7280;
+                        font-style: italic;
+                        background: rgba(243, 244, 246, 0.5);
+                        border-radius: 12px;
+                        border: 2px dashed #d1d5db;
+                        margin-top: 20px;
+                    }
+                    
+                    .applications-count {
+                        font-size: 0.9rem;
+                        color: #6b7280;
+                        font-weight: 500;
+                        margin-left: 8px;
+                    }
+                    
+                    .show-more-container {
+                        display: flex;
+                        justify-content: center;
+                        margin-top: 20px;
+                    }
+                    
+                    .show-more-button {
+                        background: linear-gradient(135deg, #667eea, #764ba2);
+                        color: white;
+                        border: none;
+                        padding: 12px 24px;
+                        border-radius: 12px;
+                        font-weight: 600;
+                        cursor: pointer;
+                        transition: all 0.3s ease;
+                        font-size: 0.95rem;
+                        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+                        display: flex;
+                        align-items: center;
+                        gap: 8px;
+                    }
+                    
+                    .show-more-button:hover {
+                        background: linear-gradient(135deg, #5b21b6, #6d28d9);
+                        transform: translateY(-2px);
+                        box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+                    }
                 `}
             </style>
             
@@ -831,6 +995,77 @@ const CustomerDetailPage = () => {
                             <div className="notes-content">
                                 {customer.notes || 'Δεν υπάρχουν σημειώσεις για αυτόν τον πελάτη.'}
                             </div>
+                        </div>
+
+                        <div className="applications-section">
+                            <h2 className="section-title">
+                                🏢 Προϊόντα/Αιτήσεις Πελάτη 
+                                {applications.length > 0 && (
+                                    <span className="applications-count">({applications.length})</span>
+                                )}
+                            </h2>
+                            {applications.length > 0 ? (
+                                <>
+                                    <div className="applications-grid">
+                                        {(showAllApplications ? applications : applications.slice(0, 4)).map(app => (
+                                            <div 
+                                                key={app.application_id} 
+                                                className="application-card"
+                                                onClick={() => navigate(`/application/${app.application_id}`)}
+                                            >
+                                                <div className="app-header">
+                                                    <span className="company-name">{app.company_name}</span>
+                                                    <span className={`status-badge status-${app.status.toLowerCase().replace(' ', '-')}`}>
+                                                        {app.status}
+                                                    </span>
+                                                </div>
+                                                <div className="app-details">
+                                                    <div className="app-detail">
+                                                        <span className="detail-label">💰 Αμοιβή:</span>
+                                                        <span className="detail-value">€{app.total_commission}</span>
+                                                    </div>
+                                                    <div className="app-detail">
+                                                        <span className="detail-label">📅 Ημ/νία:</span>
+                                                        <span className="detail-value">
+                                                            {new Date(app.created_at).toLocaleDateString('el-GR')}
+                                                        </span>
+                                                    </div>
+                                                    {app.contract_end_date && (
+                                                        <div className="app-detail">
+                                                            <span className="detail-label">⏰ Λήξη:</span>
+                                                            <span className="detail-value">
+                                                                {new Date(app.contract_end_date).toLocaleDateString('el-GR')}
+                                                            </span>
+                                                        </div>
+                                                    )}
+                                                    <div className="app-detail">
+                                                        <span className="detail-label">🤝 Συνεργάτης:</span>
+                                                        <span className="detail-value">{app.associate_name}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    {applications.length > 4 && (
+                                        <div className="show-more-container">
+                                            <button 
+                                                className="show-more-button"
+                                                onClick={() => setShowAllApplications(!showAllApplications)}
+                                            >
+                                                {showAllApplications ? (
+                                                    <>⬆️ Εμφάνιση λιγότερων</>
+                                                ) : (
+                                                    <>⬇️ Εμφάνιση όλων ({applications.length - 4} ακόμη)</>
+                                                )}
+                                            </button>
+                                        </div>
+                                    )}
+                                </>
+                            ) : (
+                                <div className="no-applications">
+                                    🚫 Δεν υπάρχουν καταχωρημένες αιτήσεις για αυτόν τον πελάτη
+                                </div>
+                            )}
                         </div>
                     </>
                 )}

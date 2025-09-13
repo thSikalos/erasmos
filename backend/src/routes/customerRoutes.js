@@ -14,7 +14,8 @@ const {
   addCommunicationLog,
   getDeletedCustomers,
   restoreCustomer,
-  permanentDeleteCustomer
+  permanentDeleteCustomer,
+  getCustomerApplications
 } = require('../controllers/customerController');
 
 // --- ADMIN ONLY ROUTES ---
@@ -32,5 +33,6 @@ router.put('/:id', updateCustomer);
 router.delete('/:id', deleteCustomer); // Αυτό είναι το soft delete
 router.get('/:id/communications', getCommunicationLog);
 router.post('/:id/communications', addCommunicationLog);
+router.get('/:id/applications', getCustomerApplications);
 
 module.exports = router;

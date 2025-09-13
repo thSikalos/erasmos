@@ -258,6 +258,59 @@ const permanentDeleteCustomer = async (req, res) => {
     }
 };
 
+// --- GET CUSTOMER APPLICATIONS ---
+const getCustomerApplications = async (req, res) => {
+    const { id } = req.params;
+    const { id: userId, role: userRole } = req.user;
+    
+    try {
+        let applicationsQuery;
+        let queryParams = [id];
+        
+        const baseQuery = `
+            SELECT 
+                app.id as application_id, app.status, app.created_at, app.total_commission, 
+                app.contract_end_date, app.is_paid_by_company,
+                co.name as company_name, co.id as company_id,
+                u.name as associate_name, u.id as associate_id
+            FROM applications app
+            JOIN companies co ON app.company_id = co.id
+            JOIN users u ON app.user_id = u.id
+            WHERE app.customer_id = $1
+        `;
+        
+        if (userRole === 'Secretary') {
+            const effectiveUserId = await getEffectiveUserId(req.user);
+            const teamMembersResult = await pool.query('SELECT id FROM users WHERE parent_user_id = $1', [effectiveUserId]);
+            const teamMemberIds = teamMembersResult.rows.map(user => user.id);
+            const allUserIds = [effectiveUserId, ...teamMemberIds];
+            
+            if (allUserIds.length > 0) {
+                applicationsQuery = `${baseQuery} AND app.user_id = ANY($2::int[]) ORDER BY app.created_at DESC`;
+                queryParams.push(allUserIds);
+            } else {
+                applicationsQuery = `${baseQuery} AND 1=0 ORDER BY app.created_at DESC`;
+            }
+        } else if (userRole === 'TeamLeader' || userRole === 'Admin') {
+            const teamMembersResult = await pool.query('SELECT id FROM users WHERE parent_user_id = $1', [userId]);
+            const teamMemberIds = teamMembersResult.rows.map(user => user.id);
+            const allUserIds = [userId, ...teamMemberIds];
+            
+            applicationsQuery = `${baseQuery} AND app.user_id = ANY($2::int[]) ORDER BY app.created_at DESC`;
+            queryParams.push(allUserIds);
+        } else {
+            applicationsQuery = `${baseQuery} AND app.user_id = $2 ORDER BY app.created_at DESC`;
+            queryParams.push(userId);
+        }
+        
+        const result = await pool.query(applicationsQuery, queryParams);
+        res.json(result.rows);
+    } catch (err) {
+        console.error('Error in getCustomerApplications:', err.message);
+        res.status(500).send('Server Error');
+    }
+};
+
 module.exports = {
   createCustomer,
   getAllCustomers,
@@ -269,5 +322,6 @@ module.exports = {
   addCommunicationLog,
   getDeletedCustomers,
   restoreCustomer,
-  permanentDeleteCustomer
+  permanentDeleteCustomer,
+  getCustomerApplications
 };

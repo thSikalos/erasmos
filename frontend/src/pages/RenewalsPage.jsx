@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
 import '../App.css';
 
 const RenewalsPage = () => {
     const { token } = useContext(AuthContext);
+    const navigate = useNavigate();
     const [renewals, setRenewals] = useState([]);
     const [loading, setLoading] = useState(true);
     const [filters, setFilters] = useState({ startDate: '', endDate: '' });
@@ -15,13 +16,19 @@ const RenewalsPage = () => {
             if (!token) return;
             setLoading(true);
             try {
+                const params = {};
+                if (filters.startDate && filters.startDate.trim() !== '') {
+                    params.startDate = filters.startDate;
+                }
+                if (filters.endDate && filters.endDate.trim() !== '') {
+                    params.endDate = filters.endDate;
+                }
+                
                 const config = { 
                     headers: { Authorization: `Bearer ${token}` },
-                    params: {
-                        startDate: filters.startDate || undefined,
-                        endDate: filters.endDate || undefined
-                    }
+                    params: params
                 };
+                console.log('Renewals request params:', params);
                 const res = await axios.get('http://localhost:3000/api/applications/renewals', config);
                 setRenewals(res.data);
             } catch (err) {
@@ -34,12 +41,15 @@ const RenewalsPage = () => {
     }, [token, filters]);
 
     const handleExport = () => {
-        const queryParams = new URLSearchParams({
-            token: token,
-            startDate: filters.startDate || '',
-            endDate: filters.endDate || ''
-        }).toString();
+        const params = { token: token };
+        if (filters.startDate && filters.startDate.trim() !== '') {
+            params.startDate = filters.startDate;
+        }
+        if (filters.endDate && filters.endDate.trim() !== '') {
+            params.endDate = filters.endDate;
+        }
         
+        const queryParams = new URLSearchParams(params).toString();
         const url = `http://localhost:3000/api/applications/renewals/export?${queryParams}`;
         window.open(url, '_blank');
     };
@@ -426,6 +436,10 @@ const RenewalsPage = () => {
                         transition: all 0.2s ease;
                     }
                     
+                    .modern-renewals-table tbody tr {
+                        cursor: pointer;
+                    }
+                    
                     .modern-renewals-table tbody tr:hover {
                         background: #f8fafc;
                         transform: scale(1.01);
@@ -685,7 +699,7 @@ const RenewalsPage = () => {
                             {renewals.map(r => {
                                 const expiryInfo = getExpiryStatus(r.contract_end_date);
                                 return (
-                                    <tr key={r.application_id}>
+                                    <tr key={r.application_id} onClick={() => navigate(`/application/${r.application_id}`)}>
                                         <td className="customer-name">{r.customer_name}</td>
                                         <td className="customer-phone">{r.customer_phone || 'Δεν έχει καταχωρηθεί'}</td>
                                         <td className="company-name">{r.company_name}</td>

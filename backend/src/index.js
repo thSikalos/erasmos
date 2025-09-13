@@ -26,6 +26,15 @@ app.use(cors());
 app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
+// Debug middleware to log all requests
+app.use((req, res, next) => {
+    console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
+    if (req.url.includes('renewals')) {
+        console.log('RENEWALS REQUEST DETECTED:', req.method, req.url, req.query);
+    }
+    next();
+});
+
 pool.query('SELECT NOW()', (err, res) => { if(err) { console.error('Database connection error:', err.stack); } else { console.log('Successfully connected to the database.'); } });
 
 app.use('/', mainRoutes);

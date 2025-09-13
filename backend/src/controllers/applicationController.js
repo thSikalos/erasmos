@@ -235,6 +235,7 @@ const getApplicationById = async (req, res) => {
 
 // --- GET APPLICATIONS ---
 const getApplications = async (req, res) => {
+    console.log('=== getApplications called ===');
     const { id: userId, role: userRole } = req.user;
     try {
         let query;
@@ -299,8 +300,10 @@ const markAsPaid = async (req, res) => {
 
 // --- GET RENEWALS (CORRECTED FOR EMPTY TEAMS) ---
 const getRenewals = async (req, res) => {
+    console.log('=== getRenewals function called ===');
     const { id: userId, role: userRole } = req.user;
     const { startDate, endDate } = req.query;
+    console.log('getRenewals called with:', { userId, userRole, startDate, endDate });
     try {
         let userFilter;
         let queryParams = [];
@@ -309,7 +312,7 @@ const getRenewals = async (req, res) => {
         if (userRole === 'Secretary') {
             // Secretary inherits TeamLeader's data access
             const effectiveUserId = await getEffectiveUserId(req.user);
-            const teamMembersResult = await pool.query(`SELECT id FROM users WHERE parent_user_id = $${paramIndex++}`, [effectiveUserId]);
+            const teamMembersResult = await pool.query(`SELECT id FROM users WHERE parent_user_id = $1`, [effectiveUserId]);
             const teamMemberIds = teamMembersResult.rows.map(user => user.id);
             const allUserIds = [effectiveUserId, ...teamMemberIds];
            
@@ -319,7 +322,7 @@ const getRenewals = async (req, res) => {
             userFilter = `app.user_id = ANY($${paramIndex++}::int[])`;
             queryParams.push(allUserIds);
         } else if (userRole === 'TeamLeader' || userRole === 'Admin') {
-            const teamMembersResult = await pool.query(`SELECT id FROM users WHERE parent_user_id = $${paramIndex++}`, [userId]);
+            const teamMembersResult = await pool.query(`SELECT id FROM users WHERE parent_user_id = $1`, [userId]);
             const teamMemberIds = teamMembersResult.rows.map(user => user.id);
             const allUserIds = [userId, ...teamMemberIds];
            
@@ -335,9 +338,9 @@ const getRenewals = async (req, res) => {
             queryParams.push(userId);
         }
         let dateFilter = `app.contract_end_date BETWEEN CURRENT_DATE - INTERVAL '7 days' AND CURRENT_DATE + INTERVAL '30 days'`;
-        if (startDate && endDate) {
+        if (startDate && startDate.trim() !== '' && endDate && endDate.trim() !== '') {
             dateFilter = `app.contract_end_date BETWEEN $${paramIndex++} AND $${paramIndex++}`;
-            queryParams.push(startDate, endDate);
+            queryParams.push(startDate.trim(), endDate.trim());
         }
         const query = `
             SELECT app.id as application_id, cust.full_name as customer_name, cust.phone as customer_phone,
@@ -349,8 +352,12 @@ const getRenewals = async (req, res) => {
             WHERE ${userFilter} AND ${dateFilter}
             ORDER BY app.contract_end_date ASC;
         `;
-       
+        
+        console.log('Final query:', query);
+        console.log('Query params:', queryParams);
+        
         const result = await pool.query(query, queryParams);
+        console.log('Query returned', result.rows.length, 'renewals');
         res.json(result.rows);
     } catch (err) {
         console.error(err.message);

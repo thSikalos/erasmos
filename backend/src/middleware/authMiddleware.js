@@ -20,10 +20,13 @@ const authMiddleware = (req, res, next) => {
   try {
     // Επιβεβαίωση του token
     const decoded = jwt.verify(token, 'mySuperSecretKey123');
+    console.log('Auth middleware - decoded token:', decoded);
     // Επισύναψη των στοιχείων του χρήστη στο request για να είναι διαθέσιμα στους controllers
-    req.user = decoded.user;
+    req.user = decoded.user || decoded; // Try both decoded.user and decoded directly
+    console.log('Auth middleware - req.user set to:', req.user);
     next(); // Προχώρα στην επόμενη συνάρτηση
   } catch (err) {
+    console.log('Auth middleware - token verification failed:', err.message);
     res.status(401).json({ message: 'Token is not valid' });
   }
 };
