@@ -245,7 +245,7 @@ const generateInvoicePdf = async (req, res) => {
 
         // Set response headers
         res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', `attachment; filename="τιμολογιο_${id}.pdf"`);
+        res.setHeader('Content-Disposition', `attachment; filename="invoice_${id}.pdf"`);
         
         // Pipe the document to response
         doc.pipe(res);
@@ -276,52 +276,57 @@ const generateInvoiceExcel = async (req, res) => {
 
         const invoice = invoiceRes.rows[0];
 
-        // Create a new workbook and worksheet
+        // Create a new workbook and worksheet with English name to avoid corruption
         const workbook = new ExcelJS.Workbook();
-        const worksheet = workbook.addWorksheet('Τιμολόγιο');
+        const worksheet = workbook.addWorksheet('Invoice');
 
-        // Add header information
-        worksheet.getCell('A1').value = 'ΤΙΜΟΛΟΓΙΟ';
+        // Add header information using English labels
+        worksheet.getCell('A1').value = 'INVOICE';
         worksheet.getCell('A1').font = { bold: true, size: 16 };
 
-        worksheet.getCell('A3').value = 'Αριθμός:';
+        worksheet.getCell('A3').value = 'Number:';
         worksheet.getCell('B3').value = invoice.id;
-        worksheet.getCell('A4').value = 'Ημερομηνία:';
-        worksheet.getCell('B4').value = new Date(invoice.issue_date).toLocaleDateString('el-GR');
+        worksheet.getCell('A4').value = 'Date:';
+        worksheet.getCell('B4').value = new Date(invoice.created_at).toLocaleDateString('en-GB');
 
         worksheet.getCell('A6').value = 'Team Leader:';
         worksheet.getCell('B6').value = invoice.team_leader_name;
         worksheet.getCell('A7').value = 'Email:';
         worksheet.getCell('B7').value = invoice.team_leader_email;
-        worksheet.getCell('A8').value = 'ΑΦΜ:';
+        worksheet.getCell('A8').value = 'Tax ID:';
         worksheet.getCell('B8').value = invoice.team_leader_afm;
 
         // Add financial details
-        worksheet.getCell('A10').value = 'Περίοδος:';
-        worksheet.getCell('B10').value = `${new Date(invoice.period_start).toLocaleDateString('el-GR')} - ${new Date(invoice.period_end).toLocaleDateString('el-GR')}`;
+        worksheet.getCell('A10').value = 'Period:';
+        worksheet.getCell('B10').value = `${new Date(invoice.start_date).toLocaleDateString('en-GB')} - ${new Date(invoice.end_date).toLocaleDateString('en-GB')}`;
 
-        worksheet.getCell('A12').value = 'Αιτήσεις:';
-        worksheet.getCell('B12').value = invoice.total_applications;
+        worksheet.getCell('A12').value = 'Applications:';
+        worksheet.getCell('B12').value = invoice.application_count;
 
-        worksheet.getCell('A13').value = 'Υποσύνολο:';
-        worksheet.getCell('B13').value = parseFloat(invoice.subtotal);
-        worksheet.getCell('B13').numFmt = '€#,##0.00';
+        worksheet.getCell('A13').value = 'Base Charge:';
+        worksheet.getCell('B13').value = parseFloat(invoice.base_charge);
+        worksheet.getCell('B13').numFmt = '#,##0.00';
 
-        if (invoice.discount_amount && parseFloat(invoice.discount_amount) > 0) {
-            worksheet.getCell('A14').value = 'Έκπτωση:';
-            worksheet.getCell('B14').value = -parseFloat(invoice.discount_amount);
-            worksheet.getCell('B14').numFmt = '€#,##0.00';
+        worksheet.getCell('A14').value = 'Subtotal:';
+        worksheet.getCell('B14').value = parseFloat(invoice.subtotal);
+        worksheet.getCell('B14').numFmt = '#,##0.00';
+
+        if (invoice.discount_applied && parseFloat(invoice.discount_applied) > 0) {
+            const discountAmount = parseFloat(invoice.base_charge) * (parseFloat(invoice.discount_applied) / 100);
+            worksheet.getCell('A15').value = `Discount (${invoice.discount_applied}%):`;
+            worksheet.getCell('B15').value = -discountAmount;
+            worksheet.getCell('B15').numFmt = '#,##0.00';
         }
 
-        worksheet.getCell('A15').value = 'ΦΠΑ 24%:';
-        worksheet.getCell('B15').value = parseFloat(invoice.vat_amount);
-        worksheet.getCell('B15').numFmt = '€#,##0.00';
+        worksheet.getCell('A16').value = 'VAT 24%:';
+        worksheet.getCell('B16').value = parseFloat(invoice.vat_amount);
+        worksheet.getCell('B16').numFmt = '#,##0.00';
 
-        worksheet.getCell('A16').value = 'ΣΥΝΟΛΟ:';
-        worksheet.getCell('B16').value = parseFloat(invoice.total_amount);
-        worksheet.getCell('B16').numFmt = '€#,##0.00';
-        worksheet.getCell('A16').font = { bold: true };
-        worksheet.getCell('B16').font = { bold: true };
+        worksheet.getCell('A17').value = 'TOTAL:';
+        worksheet.getCell('B17').value = parseFloat(invoice.total_charge);
+        worksheet.getCell('B17').numFmt = '#,##0.00';
+        worksheet.getCell('A17').font = { bold: true };
+        worksheet.getCell('B17').font = { bold: true };
 
         // Set column widths
         worksheet.getColumn('A').width = 20;
@@ -329,7 +334,7 @@ const generateInvoiceExcel = async (req, res) => {
 
         // Set response headers for Excel file
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-        res.setHeader('Content-Disposition', `attachment; filename="timologio_${invoice.id}.xlsx"`);
+        res.setHeader('Content-Disposition', `attachment; filename="invoice_${invoice.id}.xlsx"`);
 
         // Write to response
         await workbook.xlsx.write(res);

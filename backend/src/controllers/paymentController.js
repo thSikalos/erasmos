@@ -632,15 +632,15 @@ const generateStatementExcel = async (req, res) => {
 
         // Create a new workbook and worksheet
         const workbook = new ExcelJS.Workbook();
-        const worksheet = workbook.addWorksheet('Ταμειακή Κατάσταση');
+        const worksheet = workbook.addWorksheet('Payment Statement');
 
         // Add headers
         worksheet.columns = [
-            { header: 'Αριθμός Αίτησης', key: 'application_id', width: 15 },
-            { header: 'Πελάτης', key: 'customer_name', width: 30 },
-            { header: 'Εταιρία', key: 'company_name', width: 25 },
-            { header: 'Τύπος', key: 'item_type', width: 20 },
-            { header: 'Προμήθεια (€)', key: 'commission_amount', width: 15 }
+            { header: 'Application ID', key: 'application_id', width: 15 },
+            { header: 'Customer', key: 'customer_name', width: 30 },
+            { header: 'Company', key: 'company_name', width: 25 },
+            { header: 'Type', key: 'item_type', width: 20 },
+            { header: 'Commission (€)', key: 'commission_amount', width: 15 }
         ];
 
         // Style the header row
@@ -667,38 +667,38 @@ const generateStatementExcel = async (req, res) => {
         // Add summary section
         const summaryRowStart = worksheet.lastRow.number + 2;
 
-        worksheet.getCell(`A${summaryRowStart}`).value = 'Σύνολο Προμηθειών:';
+        worksheet.getCell(`A${summaryRowStart}`).value = 'Total Commissions:';
         worksheet.getCell(`A${summaryRowStart}`).font = { bold: true };
         worksheet.getCell(`E${summaryRowStart}`).value = parseFloat(statement.subtotal) - parseFloat(statement.bonus_amount || 0);
-        worksheet.getCell(`E${summaryRowStart}`).numFmt = '€#,##0.00';
+        worksheet.getCell(`E${summaryRowStart}`).numFmt = '#,##0.00';
 
         if (statement.bonus_amount && parseFloat(statement.bonus_amount) > 0) {
             worksheet.getCell(`A${summaryRowStart + 1}`).value = 'Bonus:';
             worksheet.getCell(`A${summaryRowStart + 1}`).font = { bold: true };
             worksheet.getCell(`E${summaryRowStart + 1}`).value = parseFloat(statement.bonus_amount);
-            worksheet.getCell(`E${summaryRowStart + 1}`).numFmt = '€#,##0.00';
+            worksheet.getCell(`E${summaryRowStart + 1}`).numFmt = '#,##0.00';
         }
 
-        worksheet.getCell(`A${summaryRowStart + 2}`).value = 'Υποσύνολο:';
+        worksheet.getCell(`A${summaryRowStart + 2}`).value = 'Subtotal:';
         worksheet.getCell(`A${summaryRowStart + 2}`).font = { bold: true };
         worksheet.getCell(`E${summaryRowStart + 2}`).value = parseFloat(statement.subtotal);
-        worksheet.getCell(`E${summaryRowStart + 2}`).numFmt = '€#,##0.00';
+        worksheet.getCell(`E${summaryRowStart + 2}`).numFmt = '#,##0.00';
 
         if (statement.vat_amount && parseFloat(statement.vat_amount) > 0) {
-            worksheet.getCell(`A${summaryRowStart + 3}`).value = 'ΦΠΑ 24%:';
+            worksheet.getCell(`A${summaryRowStart + 3}`).value = 'VAT 24%:';
             worksheet.getCell(`A${summaryRowStart + 3}`).font = { bold: true };
             worksheet.getCell(`E${summaryRowStart + 3}`).value = parseFloat(statement.vat_amount);
-            worksheet.getCell(`E${summaryRowStart + 3}`).numFmt = '€#,##0.00';
+            worksheet.getCell(`E${summaryRowStart + 3}`).numFmt = '#,##0.00';
         }
 
-        worksheet.getCell(`A${summaryRowStart + 4}`).value = 'Σύνολο:';
+        worksheet.getCell(`A${summaryRowStart + 4}`).value = 'Total:';
         worksheet.getCell(`A${summaryRowStart + 4}`).font = { bold: true };
         worksheet.getCell(`E${summaryRowStart + 4}`).value = parseFloat(statement.total_amount);
-        worksheet.getCell(`E${summaryRowStart + 4}`).numFmt = '€#,##0.00';
+        worksheet.getCell(`E${summaryRowStart + 4}`).numFmt = '#,##0.00';
 
         // Set response headers for Excel file
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-        res.setHeader('Content-Disposition', `attachment; filename="tameiaki_katastasi_${id}.xlsx"`);
+        res.setHeader('Content-Disposition', `attachment; filename="payment_statement_${id}.xlsx"`);
 
         // Write to response
         await workbook.xlsx.write(res);
