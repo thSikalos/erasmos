@@ -499,19 +499,21 @@ const getTeamApplications = async (req, res) => {
 
         if (userRole === 'TeamLeader' || userRole === 'Admin') {
             // Get team members
-            const teamMembersResult = await pool.query(`SELECT id FROM users WHERE parent_user_id = $${paramIndex++}`, [userId]);
+            const teamMembersResult = await pool.query('SELECT id FROM users WHERE parent_user_id = $1', [userId]);
             const teamMemberIds = teamMembersResult.rows.map(user => user.id);
             const allUserIds = [userId, ...teamMemberIds];
             
             if (allUserIds.length === 0) {
                 return res.json([]);
             }
-            userFilter = `a.user_id = ANY($${paramIndex++}::int[])`;
+            userFilter = `a.user_id = ANY($${paramIndex}::int[])`;
             queryParams.push(allUserIds);
+            paramIndex++;
         } else if (userRole === 'Associate') {
             // Associates can only see their own applications
-            userFilter = `a.user_id = $${paramIndex++}`;
+            userFilter = `a.user_id = $${paramIndex}`;
             queryParams.push(userId);
+            paramIndex++;
         } else {
             return res.status(403).json({ message: 'Access denied' });
         }
