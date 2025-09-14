@@ -2,19 +2,43 @@ import React, { useState, useEffect, useContext } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
+import SmartPagination from '../components/SmartPagination';
+import { useSearchWithPagination } from '../hooks/usePagination';
 
 const ApplicationsPage = () => {
     const { token, user } = useContext(AuthContext);
     const [applications, setApplications] = useState([]);
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState('all'); // 'all', 'paid', 'unpaid'
-    const [searchTerm, setSearchTerm] = useState('');
     const [successMessage, setSuccessMessage] = useState('');
     const [error, setError] = useState('');
     const [showCommissionDialog, setShowCommissionDialog] = useState(false);
     const [selectedApplication, setSelectedApplication] = useState(null);
     const [commissionableFields, setCommissionableFields] = useState([]);
     const [displayFields, setDisplayFields] = useState([]);
+
+    // Search function for applications
+    const searchFunction = (app, searchTerm) => {
+        const searchLower = searchTerm.toLowerCase();
+        return (
+            app.id.toString().includes(searchLower) ||
+            app.customer_name?.toLowerCase().includes(searchLower) ||
+            app.customer_phone?.toLowerCase().includes(searchLower) ||
+            app.associate_name?.toLowerCase().includes(searchLower) ||
+            app.company_name?.toLowerCase().includes(searchLower)
+        );
+    };
+
+    // Use search with pagination hook
+    const {
+        searchTerm,
+        handleSearchChange,
+        currentItems: currentApplications,
+        currentPage,
+        totalPages,
+        totalItems,
+        goToPage
+    } = useSearchWithPagination(applications, searchFunction, 10);
 
     const fetchApplications = async () => {
         if (!token) return;
@@ -123,18 +147,6 @@ const ApplicationsPage = () => {
 
     const canMarkAsPaid = user.role === 'TeamLeader' || user.role === 'Admin';
 
-    // Filter applications based on search term
-    const filteredApplications = applications.filter(app => {
-        if (!searchTerm) return true;
-        const searchLower = searchTerm.toLowerCase();
-        return (
-            app.id.toString().includes(searchLower) ||
-            app.customer_name.toLowerCase().includes(searchLower) ||
-            app.customer_phone.toLowerCase().includes(searchLower) ||
-            app.associate_name.toLowerCase().includes(searchLower) ||
-            app.company_name.toLowerCase().includes(searchLower)
-        );
-    });
 
     return (
         <div className="applications-container">
@@ -182,7 +194,7 @@ const ApplicationsPage = () => {
                     type="text"
                     placeholder="Αναζήτηση αιτήσεων (ID, πελάτης, συνεργάτης, εταιρία, τηλέφωνο)..."
                     value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
+                    onChange={(e) => handleSearchChange(e.target.value)}
                     className="search-input"
                 />
                 <svg className="search-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -195,7 +207,7 @@ const ApplicationsPage = () => {
                     <div className="loading-spinner-icon"></div>
                     <p>Φόρτωση αιτήσεων...</p>
                 </div>
-            ) : filteredApplications.length === 0 ? (
+            ) : totalItems === 0 ? (
                 <div className="empty-state">
                     <p>
                         {searchTerm 
@@ -224,7 +236,7 @@ const ApplicationsPage = () => {
                                 </tr>
                             </thead>
                             <tbody>
-                                {filteredApplications.map((app) => (
+                                {currentApplications.map((app) => (
                                     <tr key={app.id}>
                                         <td>#{app.id}</td>
                                         {displayFields.length > 0 && (
@@ -289,6 +301,16 @@ const ApplicationsPage = () => {
                     <li>Μόνο οι αιτήσεις με κατάσταση "Καταχωρήθηκε" εμφανίζονται εδώ</li>
                 </ul>
             </div>
+
+            {/* Smart Pagination */}
+            <SmartPagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={goToPage}
+                itemsPerPage={10}
+                totalItems={totalItems}
+                showInfo={true}
+            />
 
             {/* Commission Fields Dialog */}
             {showCommissionDialog && (

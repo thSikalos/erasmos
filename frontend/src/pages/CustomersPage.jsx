@@ -2,6 +2,8 @@ import React, { useState, useEffect, useContext } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
+import SmartPagination from '../components/SmartPagination';
+import { useSearchWithPagination } from '../hooks/usePagination';
 import '../App.css';
 
 const CustomersPage = () => {
@@ -9,15 +11,35 @@ const CustomersPage = () => {
     const navigate = useNavigate();
     const [customers, setCustomers] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [searchTerm, setSearchTerm] = useState('');
+
+    // Search function for customers
+    const searchFunction = (customer, searchTerm) => {
+        const searchLower = searchTerm.toLowerCase();
+        return (
+            customer.full_name?.toLowerCase().includes(searchLower) ||
+            customer.phone?.toLowerCase().includes(searchLower) ||
+            customer.afm?.toLowerCase().includes(searchLower) ||
+            customer.email?.toLowerCase().includes(searchLower)
+        );
+    };
+
+    // Use search with pagination hook
+    const {
+        searchTerm,
+        handleSearchChange,
+        currentItems: currentCustomers,
+        currentPage,
+        totalPages,
+        totalItems,
+        goToPage
+    } = useSearchWithPagination(customers, searchFunction, 15);
 
     useEffect(() => {
         const fetchCustomers = async () => {
             if (!token) return;
             try {
-                const config = { 
-                    headers: { Authorization: `Bearer ${token}` },
-                    params: { search: searchTerm }
+                const config = {
+                    headers: { Authorization: `Bearer ${token}` }
                 };
                 const res = await axios.get('http://localhost:3000/api/customers', config);
                 setCustomers(res.data);
@@ -27,10 +49,9 @@ const CustomersPage = () => {
                 setLoading(false);
             }
         };
-        
-        const delayDebounceFn = setTimeout(() => { fetchCustomers(); }, 300);
-        return () => clearTimeout(delayDebounceFn);
-    }, [token, searchTerm]);
+
+        fetchCustomers();
+    }, [token]);
 
     if (loading) {
         return (
@@ -473,7 +494,7 @@ const CustomersPage = () => {
                         type="text"
                         placeholder="Αναζήτηση με Όνομα ή ΑΦΜ..."
                         value={searchTerm}
-                        onChange={e => setSearchTerm(e.target.value)}
+                        onChange={e => handleSearchChange(e.target.value)}
                         className="modern-search-input"
                     />
                 </div>
@@ -483,7 +504,7 @@ const CustomersPage = () => {
                 <div className="content-header">
                     <h2 className="section-title">
                         👥 Λίστα Πελατών
-                        <span className="customers-count">{customers.length}</span>
+                        <span className="customers-count">{totalItems}</span>
                     </h2>
                 </div>
                 
@@ -493,12 +514,12 @@ const CustomersPage = () => {
                             Αποτελέσματα για: <span className="search-highlight">"{searchTerm}"</span>
                         </span>
                         <span className="results-text">
-                            {customers.length} πελάτες βρέθηκαν
+                            {totalItems} πελάτες βρέθηκαν
                         </span>
                     </div>
                 )}
                 
-                {customers.length > 0 ? (
+                {totalItems > 0 ? (
                     <table className="modern-customers-table">
                         <thead>
                             <tr>
@@ -509,7 +530,7 @@ const CustomersPage = () => {
                             </tr>
                         </thead>
                         <tbody>
-                            {customers.map(c => (
+                            {currentCustomers.map(c => (
                                 <tr key={c.id} onClick={() => navigate(`/customers/${c.id}`)}>
                                     <td className="customer-name">{c.full_name}</td>
                                     <td><span className="customer-afm">{c.afm}</span></td>
@@ -533,6 +554,16 @@ const CustomersPage = () => {
                         </p>
                     </div>
                 )}
+
+                {/* Smart Pagination */}
+                <SmartPagination
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    onPageChange={goToPage}
+                    itemsPerPage={15}
+                    totalItems={totalItems}
+                    showInfo={true}
+                />
             </div>
         </div>
     );

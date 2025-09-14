@@ -3,6 +3,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
+import SmartPagination from '../components/SmartPagination';
+import { useSearchWithPagination } from '../hooks/usePagination';
 
 const AdvancedApplicationsPage = () => {
     const { token, user } = useContext(AuthContext);
@@ -11,12 +13,36 @@ const AdvancedApplicationsPage = () => {
     const [applications, setApplications] = useState([]);
     const [displayableFields, setDisplayableFields] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [searchTerm, setSearchTerm] = useState('');
     const [successMessage, setSuccessMessage] = useState('');
     const [error, setError] = useState('');
     const [expandedRows, setExpandedRows] = useState(new Set());
-    const [currentPage, setCurrentPage] = useState(1);
-    const applicationsPerPage = 10;
+
+    // Search function for applications
+    const searchFunction = (app, searchTerm) => {
+        const searchLower = searchTerm.toLowerCase();
+        return (
+            app.id.toString().includes(searchLower) ||
+            app.customer_name?.toLowerCase().includes(searchLower) ||
+            app.customer_phone?.toLowerCase().includes(searchLower) ||
+            app.associate_name?.toLowerCase().includes(searchLower) ||
+            app.company_name?.toLowerCase().includes(searchLower) ||
+            Object.values(app.display_fields || {}).some(value =>
+                value && value.toString().toLowerCase().includes(searchLower)
+            )
+        );
+    };
+
+    // Use search with pagination hook
+    const {
+        searchTerm,
+        handleSearchChange,
+        currentItems: currentApplications,
+        currentPage,
+        totalPages,
+        totalItems,
+        goToPage,
+        resetPagination
+    } = useSearchWithPagination(applications, searchFunction, 10);
 
     // Fetch applications data
     const fetchApplications = async () => {
@@ -120,38 +146,16 @@ const AdvancedApplicationsPage = () => {
         }
     };
 
-    // Filter applications based on search term
-    const filteredApplications = applications.filter(app => {
-        if (!searchTerm) return true;
-        const searchLower = searchTerm.toLowerCase();
-        return (
-            app.id.toString().includes(searchLower) ||
-            app.customer_name.toLowerCase().includes(searchLower) ||
-            app.customer_phone.toLowerCase().includes(searchLower) ||
-            app.associate_name.toLowerCase().includes(searchLower) ||
-            app.company_name.toLowerCase().includes(searchLower) ||
-            Object.values(app.display_fields || {}).some(value => 
-                value && value.toString().toLowerCase().includes(searchLower)
-            )
-        );
-    });
-
-    // Pagination calculations
-    const totalPages = Math.ceil(filteredApplications.length / applicationsPerPage);
-    const indexOfLastApplication = currentPage * applicationsPerPage;
-    const indexOfFirstApplication = indexOfLastApplication - applicationsPerPage;
-    const currentApplications = filteredApplications.slice(indexOfFirstApplication, indexOfLastApplication);
-
-    // Reset to first page when search changes
-    const handleSearchChange = (e) => {
-        setSearchTerm(e.target.value);
-        setCurrentPage(1);
+    // Handle page change - close expanded rows when changing page
+    const handlePageChange = (page) => {
+        goToPage(page);
+        setExpandedRows(new Set());
     };
 
-    // Handle page change
-    const handlePageChange = (page) => {
-        setCurrentPage(page);
-        setExpandedRows(new Set()); // Close expanded rows when changing page
+    // Handle search change - also reset expanded rows
+    const handleSearch = (e) => {
+        handleSearchChange(e.target.value);
+        setExpandedRows(new Set());
     };
 
     // Determine payment status display
@@ -364,7 +368,7 @@ const AdvancedApplicationsPage = () => {
                         type="text"
                         placeholder="🔍 Αναζήτηση αιτήσεων (ID, πελάτης, συνεργάτης, εταιρία, τηλέφωνο, πεδία)..."
                         value={searchTerm}
-                        onChange={handleSearchChange}
+                        onChange={handleSearch}
                         className="search-input"
                     />
                     <svg className="search-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -378,7 +382,7 @@ const AdvancedApplicationsPage = () => {
                     <div className="loading-spinner-icon"></div>
                     <p>Φόρτωση αιτήσεων...</p>
                 </div>
-            ) : filteredApplications.length === 0 ? (
+            ) : totalItems === 0 ? (
                 <div className="empty-state">
                     <p>
                         {searchTerm 
@@ -775,106 +779,15 @@ const AdvancedApplicationsPage = () => {
                 </div>
             )}
 
-            {/* Pagination */}
-            {filteredApplications.length > 0 && (
-                <div className="pagination-section">
-                    <style>
-                        {`
-                            .pagination-section {
-                                background: rgba(255, 255, 255, 0.15);
-                                backdrop-filter: blur(10px);
-                                border-radius: 20px;
-                                padding: 25px;
-                                margin: 25px auto;
-                                box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
-                                border: 1px solid rgba(255, 255, 255, 0.2);
-                                max-width: 1400px;
-                            }
-                            
-                            .pagination-info {
-                                text-align: center;
-                                color: #6b7280;
-                                margin-bottom: 20px;
-                                font-size: 0.95rem;
-                            }
-                            
-                            .pagination {
-                                display: flex;
-                                justify-content: center;
-                                align-items: center;
-                                gap: 8px;
-                                flex-wrap: wrap;
-                            }
-                            
-                            .pagination-button {
-                                background: rgba(255, 255, 255, 0.15);
-                                color: #667eea;
-                                border: 2px solid #e5e7eb;
-                                padding: 10px 16px;
-                                border-radius: 10px;
-                                font-weight: 600;
-                                font-size: 0.9rem;
-                                cursor: pointer;
-                                transition: all 0.3s ease;
-                                min-width: 45px;
-                            }
-                            
-                            .pagination-button:hover:not(:disabled) {
-                                background: linear-gradient(135deg, #667eea, #764ba2);
-                                color: white;
-                                border-color: #667eea;
-                                transform: translateY(-2px);
-                                box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
-                            }
-                            
-                            .pagination-button.active {
-                                background: linear-gradient(135deg, #667eea, #764ba2);
-                                color: white;
-                                border-color: #667eea;
-                                box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
-                            }
-                            
-                            .pagination-button:disabled {
-                                opacity: 0.4;
-                                cursor: not-allowed;
-                            }
-                        `}
-                    </style>
-                    
-                    <div className="pagination-info">
-                        📄 Εμφάνιση {indexOfFirstApplication + 1} - {Math.min(indexOfLastApplication, filteredApplications.length)} από {filteredApplications.length} αιτήσεις
-                    </div>
-                    {totalPages > 1 && (
-                        <div className="pagination">
-                            <button 
-                                onClick={() => handlePageChange(currentPage - 1)}
-                                disabled={currentPage === 1}
-                                className="pagination-button"
-                            >
-                                ⬅️ Προηγούμενη
-                            </button>
-                            
-                            {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
-                                <button
-                                    key={page}
-                                    onClick={() => handlePageChange(page)}
-                                    className={`pagination-button ${currentPage === page ? 'active' : ''}`}
-                                >
-                                    {page}
-                                </button>
-                            ))}
-                            
-                            <button 
-                                onClick={() => handlePageChange(currentPage + 1)}
-                                disabled={currentPage === totalPages}
-                                className="pagination-button"
-                            >
-                                Επόμενη ➡️
-                            </button>
-                        </div>
-                    )}
-                </div>
-            )}
+            {/* Smart Pagination */}
+            <SmartPagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={handlePageChange}
+                itemsPerPage={10}
+                totalItems={totalItems}
+                showInfo={true}
+            />
 
             <div className="info-section">
                 <style>
