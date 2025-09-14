@@ -4,6 +4,53 @@ const fs = require('fs');
 const path = require('path');
 const ExcelJS = require('exceljs');
 
+// Helper function to get statement items with dynamic field values
+const getStatementItems = async (statementId) => {
+    const itemsQuery = `
+        SELECT DISTINCT
+            a.id as application_id,
+            c.full_name as customer_name,
+            comp.name as company_name,
+            CASE
+                WHEN si.field_id IS NOT NULL THEN f.label
+                ELSE 'Αίτηση'
+            END as item_type,
+            CASE
+                WHEN si.field_id IS NOT NULL THEN COALESCE(cf.commission_amount, 0)
+                ELSE COALESCE(a.total_commission, 0)
+            END as commission_amount,
+            a.id as sort_application_id,
+            COALESCE(f.label, 'ZZZZZ') as sort_field_label,
+            -- Get dynamic field value for display in applications table
+            (
+                SELECT av.value
+                FROM application_values av
+                JOIN fields display_f ON av.field_id = display_f.id
+                WHERE av.application_id = a.id
+                AND display_f.show_in_applications_table = true
+                LIMIT 1
+            ) as dynamic_field_value,
+            (
+                SELECT display_f.label
+                FROM application_values av
+                JOIN fields display_f ON av.field_id = display_f.id
+                WHERE av.application_id = a.id
+                AND display_f.show_in_applications_table = true
+                LIMIT 1
+            ) as dynamic_field_label
+        FROM statement_items si
+        JOIN applications a ON si.application_id = a.id
+        JOIN customers c ON a.customer_id = c.id
+        JOIN companies comp ON a.company_id = comp.id
+        LEFT JOIN fields f ON si.field_id = f.id
+        LEFT JOIN company_fields cf ON si.field_id = cf.field_id AND a.company_id = cf.company_id
+        WHERE si.statement_id = $1
+        ORDER BY sort_application_id, sort_field_label
+    `;
+    const itemsRes = await pool.query(itemsQuery, [statementId]);
+    return itemsRes.rows;
+};
+
 // --- GENERATE PDF FOR A STATEMENT (ENTERPRISE VERSION) ---
 const generateStatementPdf = async (req, res) => {
     const { id } = req.params;
@@ -22,33 +69,8 @@ const generateStatementPdf = async (req, res) => {
         }
         const statement = statementRes.rows[0];
 
-        // Fetch statement items with field-level details
-        const itemsQuery = `
-            SELECT DISTINCT
-                a.id as application_id,
-                c.full_name as customer_name,
-                comp.name as company_name,
-                CASE
-                    WHEN si.field_id IS NOT NULL THEN f.label
-                    ELSE 'Αίτηση'
-                END as item_type,
-                CASE
-                    WHEN si.field_id IS NOT NULL THEN COALESCE(cf.commission_amount, 0)
-                    ELSE COALESCE(a.total_commission, 0)
-                END as commission_amount,
-                a.id as sort_application_id,
-                COALESCE(f.label, 'ZZZZZ') as sort_field_label
-            FROM statement_items si
-            JOIN applications a ON si.application_id = a.id
-            JOIN customers c ON a.customer_id = c.id
-            JOIN companies comp ON a.company_id = comp.id
-            LEFT JOIN fields f ON si.field_id = f.id
-            LEFT JOIN company_fields cf ON si.field_id = cf.field_id AND a.company_id = cf.company_id
-            WHERE si.statement_id = $1
-            ORDER BY sort_application_id, sort_field_label
-        `;
-        const itemsRes = await pool.query(itemsQuery, [id]);
-        const items = itemsRes.rows;
+        // Fetch statement items with field-level details and dynamic field values
+        const items = await getStatementItems(id);
 
         // Prepare data for the new document generator
         const documentData = {
@@ -602,41 +624,22 @@ const generateStatementExcel = async (req, res) => {
         }
         const statement = statementRes.rows[0];
 
-        // Fetch statement items with field-level details
-        const itemsQuery = `
-            SELECT DISTINCT
-                a.id as application_id,
-                c.full_name as customer_name,
-                comp.name as company_name,
-                CASE
-                    WHEN si.field_id IS NOT NULL THEN f.label
-                    ELSE 'Αίτηση'
-                END as item_type,
-                CASE
-                    WHEN si.field_id IS NOT NULL THEN COALESCE(cf.commission_amount, 0)
-                    ELSE COALESCE(a.total_commission, 0)
-                END as commission_amount,
-                a.id as sort_application_id,
-                COALESCE(f.label, 'ZZZZZ') as sort_field_label
-            FROM statement_items si
-            JOIN applications a ON si.application_id = a.id
-            JOIN customers c ON a.customer_id = c.id
-            JOIN companies comp ON a.company_id = comp.id
-            LEFT JOIN fields f ON si.field_id = f.id
-            LEFT JOIN company_fields cf ON si.field_id = cf.field_id AND a.company_id = cf.company_id
-            WHERE si.statement_id = $1
-            ORDER BY sort_application_id, sort_field_label
-        `;
-        const itemsRes = await pool.query(itemsQuery, [id]);
-        const items = itemsRes.rows;
+        // Fetch statement items with field-level details and dynamic field values
+        const items = await getStatementItems(id);
 
         // Create a new workbook and worksheet
         const workbook = new ExcelJS.Workbook();
         const worksheet = workbook.addWorksheet('Payment Statement');
 
-        // Add headers
+        // Get dynamic field label for header (if exists)
+        const dynamicFieldLabel = items.length > 0 && items[0].dynamic_field_label
+            ? items[0].dynamic_field_label
+            : 'Αίτηση';
+
+        // Add headers - include dynamic field column
         worksheet.columns = [
             { header: 'Application ID', key: 'application_id', width: 15 },
+            { header: dynamicFieldLabel, key: 'dynamic_field_value', width: 20 },
             { header: 'Customer', key: 'customer_name', width: 30 },
             { header: 'Company', key: 'company_name', width: 25 },
             { header: 'Type', key: 'item_type', width: 20 },
@@ -657,6 +660,7 @@ const generateStatementExcel = async (req, res) => {
         items.forEach((item) => {
             worksheet.addRow({
                 application_id: item.application_id,
+                dynamic_field_value: item.dynamic_field_value || `#${item.application_id}`,
                 customer_name: item.customer_name,
                 company_name: item.company_name,
                 item_type: item.item_type,

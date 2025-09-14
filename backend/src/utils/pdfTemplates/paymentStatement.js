@@ -85,9 +85,14 @@ class PaymentStatementTemplate {
         const { colors } = this.brandConfig;
         let currentY = startY;
 
-        // Table headers
-        const headers = ['#', 'Είδος', 'Εταιρία', 'Πελάτης', 'Αμοιβή'];
-        const columnWidths = [30, 80, 120, 180, 80];
+        // Get dynamic field label for header (if exists)
+        const dynamicFieldLabel = items.length > 0 && items[0].dynamic_field_label
+            ? items[0].dynamic_field_label
+            : 'Αίτηση';
+
+        // Table headers - include dynamic field column
+        const headers = ['#', dynamicFieldLabel, 'Είδος', 'Εταιρία', 'Πελάτης', 'Αμοιβή'];
+        const columnWidths = [25, 70, 70, 100, 150, 75];
         const tableWidth = columnWidths.reduce((sum, width) => sum + width, 0);
         const startX = 50;
 
@@ -123,6 +128,7 @@ class PaymentStatementTemplate {
             // Row data
             const rowData = [
                 (index + 1).toString(),
+                item.dynamic_field_value || `#${item.application_id}`,
                 item.item_type || 'Αίτηση',
                 item.company_name || 'N/A',
                 item.customer_name || 'N/A',
