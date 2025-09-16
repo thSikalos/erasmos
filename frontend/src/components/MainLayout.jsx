@@ -636,6 +636,11 @@ const MainLayout = () => {
                         <span className="nav-icon">🔔</span>
                         Ειδοποιήσεις
                     </NavLink>
+
+                    <NavLink to="/infoportal" className="nav-link">
+                        <span className="nav-icon">ℹ️</span>
+                        InfoPortal
+                    </NavLink>
                     
                     {(user?.role === 'Admin' || user?.role === 'TeamLeader') && (
                         <NavLink to="/commissions" className="nav-link">

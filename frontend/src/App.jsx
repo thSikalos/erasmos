@@ -25,6 +25,7 @@ import ReportingPage from './pages/ReportingPage';
 import NotificationsPage from './pages/NotificationsPage';
 import ApplicationsPage from './pages/ApplicationsPage';
 import ProfilePage from './pages/ProfilePage';
+import InfoPortalPage from './pages/InfoPortalPage';
 import MainLayout from './components/MainLayout';
 import ProtectedRoute from './components/ProtectedRoute';
 import FinanceProtectedRoute from './components/FinanceProtectedRoute';
@@ -55,6 +56,7 @@ function App() {
             <Route path="/renewals" element={<RenewalsPage />} />
             <Route path="/applications" element={<ApplicationsPage />} />
             <Route path="/notifications" element={<NotificationsPage />} />
+            <Route path="/infoportal" element={<InfoPortalPage />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route element={<FinanceProtectedRoute />}>
               <Route path="/payments" element={<PaymentsPage />} />

@@ -19,6 +19,7 @@ const notificationsRoutes = require('./routes/notificationsRoutes');
 const remindersRoutes = require('./routes/remindersRoutes');
 const attachmentRoutes = require('./routes/attachmentRoutes');
 const adminBillingRoutes = require('./routes/adminBillingRoutes'); // <-- ΝΕΟ
+const infoPortalRoutes = require('./routes/infoPortalRoutes');
 
 const app = express();
 const PORT = 3000;
@@ -59,6 +60,7 @@ app.use('/api/notifications', notificationsRoutes);
 app.use('/api/reminders', remindersRoutes);
 app.use('/api/attachments', attachmentRoutes);
 app.use('/api/admin-billing', adminBillingRoutes); // <-- ΝΕΟ
+app.use('/api/infoportal', infoPortalRoutes);
 app.use('/api/ai', aiRoutes);
 
 // Global error handler
