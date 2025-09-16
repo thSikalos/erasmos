@@ -1,13 +1,20 @@
 FROM node:18-alpine
 
+# Install chromium for puppeteer
+RUN apk add --no-cache chromium
+
 # Set working directory
 WORKDIR /app
 
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies
-RUN npm ci --only=production
+# Set puppeteer to use system chromium
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+
+# Install dependencies (including dev dependencies for development)
+RUN npm install
 
 # Copy source code
 COPY . .

@@ -1,4 +1,4 @@
-FROM node:18-alpine
+FROM node:20-alpine
 
 # Set working directory
 WORKDIR /app
@@ -7,7 +7,7 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install dependencies
-RUN npm ci
+RUN npm install
 
 # Copy source code
 COPY . .
@@ -15,9 +15,10 @@ COPY . .
 # Expose port
 EXPOSE 5173
 
-# Create non-root user
+# Create non-root user and set permissions
 RUN addgroup -g 1001 -S nodejs
 RUN adduser -S nodejs -u 1001
+RUN chown -R nodejs:nodejs /app
 USER nodejs
 
 # Start the development server
