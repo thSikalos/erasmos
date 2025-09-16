@@ -7,6 +7,7 @@ const {
     uploadFile,
     getAttachments,
     getDownloadUrl,
+    getPreviewUrl,
     serveLocalFile,
     deleteAttachment,
     getFileCategories,
@@ -47,6 +48,7 @@ router.use(authMiddleware);
 // File management routes
 router.post('/:applicationId/upload', upload.single('file'), uploadFile);
 router.get('/:applicationId', getAttachments);
+router.get('/preview/:id', getPreviewUrl);
 router.get('/download/:id', getDownloadUrl);
 router.get('/file/:id', serveLocalFile);
 router.delete('/:id', deleteAttachment);

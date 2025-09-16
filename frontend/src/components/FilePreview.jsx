@@ -61,7 +61,7 @@ const FilePreview = ({ attachment, onClose, onDelete }) => {
         try {
             const config = { headers: { Authorization: `Bearer ${token}` } };
             const response = await axios.get(
-                `http://localhost:3000/api/attachments/download/${attachment.id}`,
+                `http://localhost:3000/api/attachments/preview/${attachment.id}`,
                 config
             );
 

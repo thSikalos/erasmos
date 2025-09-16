@@ -154,6 +154,55 @@ const getDownloadUrl = async (req, res) => {
     }
 };
 
+// --- GET PREVIEW URL ---
+const getPreviewUrl = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        // Get attachment info
+        const attachmentQuery = `SELECT cloud_url, file_name, file_path, application_id FROM attachments WHERE id = $1`;
+        const attachmentResult = await pool.query(attachmentQuery, [id]);
+
+        if (attachmentResult.rows.length === 0) {
+            return res.status(404).json({ message: 'File not found' });
+        }
+
+        const attachment = attachmentResult.rows[0];
+
+        // Check if file is stored in cloud or locally
+        if (attachment.cloud_url) {
+            // File is in cloud storage, extract S3 key from URL
+            const urlParts = attachment.cloud_url.split('/');
+            const bucketIndex = urlParts.findIndex(part => part.includes('s3'));
+            const s3Key = urlParts.slice(bucketIndex + 1).join('/'); // Extract everything after bucket domain
+
+            const signedUrl = s3.getSignedUrl('getObject', {
+                Bucket: process.env.S3_BUCKET_NAME,
+                Key: s3Key,
+                Expires: 3600 // 1 hour - NO ResponseContentDisposition for inline viewing
+            });
+
+            res.json({
+                url: signedUrl,
+                filename: attachment.file_name
+            });
+        } else if (attachment.file_path) {
+            // File is stored locally, create local preview URL
+            const localUrl = `${req.protocol}://${req.get('host')}/api/attachments/file/${id}`;
+            res.json({
+                url: localUrl,
+                filename: attachment.file_name
+            });
+        } else {
+            return res.status(404).json({ message: 'File location not found' });
+        }
+
+    } catch (error) {
+        console.error('Preview URL error:', error);
+        res.status(500).json({ message: 'Failed to generate preview URL' });
+    }
+};
+
 // --- SERVE LOCAL FILE ---
 const serveLocalFile = async (req, res) => {
     try {
@@ -356,6 +405,7 @@ module.exports = {
     uploadFile,
     getAttachments,
     getDownloadUrl,
+    getPreviewUrl,
     serveLocalFile,
     deleteAttachment,
     getFileCategories,
