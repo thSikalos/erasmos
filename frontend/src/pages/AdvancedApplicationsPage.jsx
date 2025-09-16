@@ -632,7 +632,7 @@ const AdvancedApplicationsPage = () => {
                         <table className="modern-applications-table">
                             <thead>
                                 <tr>
-                                    <th></th> {/* Expand column */}
+                                    <th></th>
                                     <th>ID</th>
                                     <th>Πελάτης</th>
                                     <th>Συνεργάτης</th>

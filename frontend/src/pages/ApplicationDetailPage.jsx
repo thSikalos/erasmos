@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext, useCallback, useMemo } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
@@ -26,7 +26,7 @@ const ApplicationDetailPage = () => {
     const [selectedFile, setSelectedFile] = useState(null);
     const [showFileUpload, setShowFileUpload] = useState(false);
 
-    const fetchData = async () => {
+    const fetchData = useCallback(async () => {
         if (!token) return;
         setLoading(true);
         try {
@@ -45,9 +45,9 @@ const ApplicationDetailPage = () => {
         } finally {
             setLoading(false);
         }
-    };
+    }, [id, token]);
 
-    useEffect(() => { fetchData(); }, [id, token]);
+    useEffect(() => { fetchData(); }, [fetchData]);
     
     const handleStatusChange = (newStatus) => {
         if (newStatus === 'Εκκρεμότητα') {

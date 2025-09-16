@@ -2,7 +2,7 @@ import React, { useContext, useEffect, useRef } from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 
-const ProtectedRoute = () => {
+const ProtectedRoute = React.memo(() => {
     const { token, user, sessionState } = useContext(AuthContext);
     const location = useLocation();
     const redirectLogRef = useRef(new Set());
@@ -24,6 +24,6 @@ const ProtectedRoute = () => {
 
     console.log('[PROTECTED_ROUTE] Access granted to:', location.pathname);
     return <Outlet />;
-};
+});
 
 export default ProtectedRoute;

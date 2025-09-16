@@ -1,4 +1,4 @@
-import React, { createContext, useState, useEffect } from 'react';
+import React, { createContext, useState, useEffect, useCallback, useMemo } from 'react';
 import axios from 'axios';
 import { jwtDecode } from 'jwt-decode';
 import { useNavigate } from 'react-router-dom';
@@ -17,7 +17,7 @@ export const AuthProvider = ({ children }) => {
   });
   const navigate = useNavigate();
 
-  const refreshTokenFromServer = async () => {
+  const refreshTokenFromServer = useCallback(async () => {
     try {
       const config = { headers: { Authorization: `Bearer ${token}` } };
       const response = await axios.post('http://localhost:3000/api/users/refresh-token', {}, config);
@@ -38,9 +38,9 @@ export const AuthProvider = ({ children }) => {
       console.error('[AUTH] Token refresh failed:', error);
       return false;
     }
-  };
+  }, [token]);
 
-  const logout = () => {
+  const logout = useCallback(() => {
     console.log('[AUTH] User logout initiated');
     localStorage.removeItem('token');
     setAuthToken(null);
@@ -51,7 +51,7 @@ export const AuthProvider = ({ children }) => {
       lastTokenCheck: null
     });
     navigate('/login');
-  };
+  }, [navigate]);
 
   useEffect(() => {
     const interceptor = axios.interceptors.response.use(
@@ -80,46 +80,46 @@ export const AuthProvider = ({ children }) => {
         } else {
           setAuthToken(storedToken);
           setUser(decoded.user);
-          setSessionState(prev => ({
-            ...prev,
+          setSessionState({
+            redirectInProgress: false,
             lastTokenCheck: Date.now()
-          }));
+          });
           console.log('[AUTH] User authenticated successfully');
         }
-      } catch (error) { 
+      } catch (error) {
         console.log('[AUTH] Token decode error:', error);
-        logout(); 
+        logout();
       }
     } else {
       console.log('[AUTH] No token found in localStorage');
     }
     setLoading(false);
     return () => { axios.interceptors.response.eject(interceptor); };
-  }, [navigate]);
+  }, []); // Remove navigate dependency
 
-  const login = (newToken) => {
+  const login = useCallback((newToken) => {
     console.log('[AUTH] Login initiated with new token');
     localStorage.setItem('token', newToken);
     setAuthToken(newToken);
     const decodedUser = jwtDecode(newToken).user;
     console.log('[AUTH] New user login:', decodedUser?.email);
-    
+
     setUser(decodedUser);
     setToken(newToken);
     setSessionState({
       redirectInProgress: false,
       lastTokenCheck: Date.now()
     });
-    
+
     console.log('[AUTH] Redirecting to /dashboard');
     navigate('/dashboard');
-  };
+  }, [navigate]);
 
 
   // Session timeout hook
   const sessionTimeout = useSessionTimeout(token, refreshTokenFromServer, logout);
 
-  const value = {
+  const value = useMemo(() => ({
     token,
     user,
     loading,
@@ -127,7 +127,7 @@ export const AuthProvider = ({ children }) => {
     logout,
     sessionState,
     sessionTimeout
-  };
+  }), [token, user, loading, login, logout, sessionState, sessionTimeout]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

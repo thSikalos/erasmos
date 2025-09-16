@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { jwtDecode } from 'jwt-decode';
 
 const useSessionTimeout = (token, onTokenRefresh, onLogout) => {
@@ -10,8 +10,8 @@ const useSessionTimeout = (token, onTokenRefresh, onLogout) => {
     const countdownIntervalRef = useRef(null);
     const tokenExpirationRef = useRef(null);
 
-    const WARNING_TIME = 5 * 60 * 1000; // 5 λεπτά σε milliseconds
-    const REFRESH_TIME = 2 * 60 * 1000; // 2 λεπτά πριν τη λήξη για auto-refresh
+    const WARNING_TIME = useMemo(() => 5 * 60 * 1000, []); // 5 λεπτά σε milliseconds
+    const REFRESH_TIME = useMemo(() => 2 * 60 * 1000, []); // 2 λεπτά πριν τη λήξη για auto-refresh
 
     const clearAllTimers = useCallback(() => {
         if (warningTimerRef.current) {
@@ -67,7 +67,7 @@ const useSessionTimeout = (token, onTokenRefresh, onLogout) => {
     const startCountdown = useCallback((tokenExpiration) => {
         tokenExpirationRef.current = tokenExpiration;
 
-        const updateCountdown = () => {
+        const updateCountdown = useCallback(() => {
             const now = Date.now();
             const remainingTime = Math.floor((tokenExpiration - now) / 1000);
 
@@ -82,7 +82,7 @@ const useSessionTimeout = (token, onTokenRefresh, onLogout) => {
                 console.log('[SESSION] Token expired, logging out');
                 onLogout();
             }
-        };
+        }, [tokenExpiration, clearAllTimers, onLogout]);
 
         // Update countdown every second
         countdownIntervalRef.current = setInterval(updateCountdown, 1000);
@@ -122,7 +122,7 @@ const useSessionTimeout = (token, onTokenRefresh, onLogout) => {
                     remainingTime: Math.floor((tokenExpiration - Date.now()) / 1000),
                     onRefresh: handleRefreshClick,
                     onDismiss: dismissWarning,
-                    onAutoRefreshToggle: () => setAutoRefresh(!autoRefresh)
+                    onAutoRefreshToggle: useCallback(() => setAutoRefresh(prev => !prev), [])
                 });
 
                 // Start the countdown
@@ -135,7 +135,7 @@ const useSessionTimeout = (token, onTokenRefresh, onLogout) => {
                 remainingTime: Math.floor(timeToExpiry / 1000),
                 onRefresh: handleRefreshClick,
                 onDismiss: dismissWarning,
-                onAutoRefreshToggle: () => setAutoRefresh(!autoRefresh)
+                onAutoRefreshToggle: useCallback(() => setAutoRefresh(prev => !prev), [])
             });
 
             // Start the countdown immediately
