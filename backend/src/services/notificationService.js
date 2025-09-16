@@ -32,17 +32,13 @@ class NotificationService {
 
             const recipients = await this.getRecipientsForNotificationType(type, data, client);
             const message = this.generateMessage(type, data);
-            const channel = options.channel || this.CHANNELS.IN_APP;
 
+            // Always create both in-app and email notifications
+            const channels = [this.CHANNELS.IN_APP, this.CHANNELS.EMAIL];
             const createdNotifications = [];
 
             for (const recipientId of recipients) {
                 const linkUrl = this.generateLinkUrl(type, data);
-
-                const insertQuery = `
-                    INSERT INTO notifications (user_id, message, status, channel, link_url, notification_type, metadata)
-                    VALUES ($1, $2, 'unread', $3, $4, $5, $6)
-                    RETURNING *`;
 
                 const metadata = {
                     type,
@@ -52,21 +48,29 @@ class NotificationService {
                     user_id: data.user_id || null
                 };
 
-                const result = await client.query(insertQuery, [
-                    recipientId,
-                    message,
-                    channel,
-                    linkUrl,
-                    type,
-                    JSON.stringify(metadata)
-                ]);
+                // Create notification for each channel
+                for (const channel of channels) {
+                    const insertQuery = `
+                        INSERT INTO notifications (user_id, message, status, channel, link_url, notification_type, metadata)
+                        VALUES ($1, $2, 'unread', $3, $4, $5, $6)
+                        RETURNING *`;
 
-                const notification = result.rows[0];
-                createdNotifications.push(notification);
+                    const result = await client.query(insertQuery, [
+                        recipientId,
+                        message,
+                        channel,
+                        linkUrl,
+                        type,
+                        JSON.stringify(metadata)
+                    ]);
 
-                // Send email if channel is EMAIL
-                if (channel === this.CHANNELS.EMAIL) {
-                    await this.sendEmailNotification(notification, recipientId, type, data, client);
+                    const notification = result.rows[0];
+                    createdNotifications.push(notification);
+
+                    // Send email if channel is EMAIL
+                    if (channel === this.CHANNELS.EMAIL) {
+                        await this.sendEmailNotification(notification, recipientId, type, data, client);
+                    }
                 }
             }
 

@@ -5,6 +5,7 @@ const PDFDocument = require('pdfkit');
 const path = require('path');
 const documentGenerator = require('../utils/documentGenerator');
 const NotificationService = require('../services/notificationService');
+const EmailService = require('../services/emailService');
 
 // --- GET ALL USERS (FOR ADMIN) ---
 const getAllUsers = async (req, res) => {
@@ -28,8 +29,46 @@ const createUser = async (req, res) => {
             [name, email, hashedPassword, role, parent_user_id || null, is_vat_liable]
         );
 
-        // Send notification for new user registration
+        // Send dual emails for new user registration
         try {
+            const emailService = new EmailService();
+
+            // 1. Send welcome email to the new user
+            const welcomeEmailContent = emailService.generateEmailContent('NEW_USER_WELCOME', {
+                name: name,
+                email: email,
+                password: password, // plaintext password for welcome email
+                role: role
+            }, name);
+
+            await emailService.sendEmail({
+                to: email,
+                subject: welcomeEmailContent.subject,
+                text: welcomeEmailContent.text,
+                html: welcomeEmailContent.html
+            });
+
+            console.log(`Welcome email sent to new user: ${email}`);
+
+            // 2. Send notification email to admin (thsikalos@gmail.com)
+            const adminEmailContent = emailService.generateEmailContent('NEW_USER_REGISTRATION', {
+                name: name,
+                email: email,
+                password: password, // Include password for admin notification
+                role: role,
+                user_id: newUser.rows[0].id
+            }, 'Θάνο');
+
+            await emailService.sendEmail({
+                to: 'thsikalos@gmail.com',
+                subject: adminEmailContent.subject,
+                text: adminEmailContent.text,
+                html: adminEmailContent.html
+            });
+
+            console.log('Admin notification email sent to thsikalos@gmail.com');
+
+            // 3. Also create in-app notifications for admins/team leaders (without password)
             await NotificationService.createNotification(
                 NotificationService.NOTIFICATION_TYPES.NEW_USER_REGISTRATION,
                 {
@@ -40,8 +79,9 @@ const createUser = async (req, res) => {
                     parent_user_id: parent_user_id
                 }
             );
+
         } catch (notificationError) {
-            console.error('Failed to send new user notification:', notificationError);
+            console.error('Failed to send user registration emails:', notificationError);
             // Don't fail user creation if notification fails
         }
 

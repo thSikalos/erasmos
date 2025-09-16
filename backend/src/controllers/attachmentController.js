@@ -54,9 +54,9 @@ const uploadFile = async (req, res) => {
 
         // Save to database
         const dbQuery = `
-            INSERT INTO attachments 
-            (application_id, uploaded_by, filename, original_filename, file_path, s3_key, file_size, mime_type, file_category) 
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) 
+            INSERT INTO attachments
+            (application_id, user_id, file_name, file_path, cloud_url, file_size, file_type, category)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
             RETURNING *
         `;
         
@@ -64,13 +64,12 @@ const uploadFile = async (req, res) => {
         const dbResult = await pool.query(dbQuery, [
             applicationId,
             userId,
-            fileName,
-            file.originalname,
-            s3Result.Location,
-            s3Key,
-            file.size,
-            file.mimetype,
-            'document'
+            file.originalname, // file_name
+            s3Result.Location, // file_path
+            s3Result.Location, // cloud_url
+            file.size,         // file_size
+            file.mimetype,     // file_type
+            'Άλλο'            // category
         ]);
 
         console.log('Database save successful');
@@ -92,9 +91,9 @@ const getAttachments = async (req, res) => {
         const { applicationId } = req.params;
         
         const query = `
-            SELECT id, filename, original_filename, file_size, mime_type, file_category, created_at
-            FROM attachments 
-            WHERE application_id = $1 
+            SELECT id, file_name, file_path, file_size, file_type, category, created_at, cloud_url
+            FROM attachments
+            WHERE application_id = $1
             ORDER BY created_at DESC
         `;
         const result = await pool.query(query, [applicationId]);

@@ -233,15 +233,30 @@ const FileUpload = ({ applicationId, onUploadSuccess, disabled = false, preUploa
     };
 
     return (
-        <div className="file-upload-container">
-            <div className="file-upload-category">
-                <label htmlFor="category-select">Κατηγορία Αρχείου:</label>
-                <select 
+        <div style={{ margin: '20px 0' }}>
+            <div style={{ marginBottom: '15px' }}>
+                <label htmlFor="category-select" style={{
+                    display: 'block',
+                    marginBottom: '5px',
+                    fontWeight: 'bold',
+                    color: '#333'
+                }}>
+                    Κατηγορία Αρχείου:
+                </label>
+                <select
                     id="category-select"
                     value={selectedCategory}
                     onChange={(e) => setSelectedCategory(e.target.value)}
                     disabled={disabled || isUploading}
-                    className="category-select"
+                    style={{
+                        width: '200px',
+                        padding: '8px 12px',
+                        border: '1px solid #ddd',
+                        borderRadius: '4px',
+                        fontSize: '14px',
+                        backgroundColor: disabled || isUploading ? '#f5f5f5' : 'white',
+                        cursor: disabled || isUploading ? 'not-allowed' : 'pointer'
+                    }}
                 >
                     {categories.map(category => (
                         <option key={category} value={category}>{category}</option>
@@ -250,11 +265,21 @@ const FileUpload = ({ applicationId, onUploadSuccess, disabled = false, preUploa
             </div>
 
             <div
-                className={`file-upload-zone ${isDragOver ? 'drag-over' : ''} ${disabled || isUploading ? 'disabled' : ''}`}
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
                 onClick={handleButtonClick}
+                style={{
+                    border: `2px dashed ${isDragOver ? '#28a745' : '#ccc'}`,
+                    borderRadius: '8px',
+                    padding: '40px 20px',
+                    textAlign: 'center',
+                    cursor: disabled || isUploading ? 'not-allowed' : 'pointer',
+                    transition: 'all 0.3s ease',
+                    backgroundColor: isDragOver ? '#f0fff0' : disabled || isUploading ? '#f5f5f5' : '#fafafa',
+                    opacity: disabled || isUploading ? 0.6 : 1,
+                    transform: isDragOver ? 'scale(1.02)' : 'scale(1)'
+                }}
             >
                 <input
                     ref={fileInputRef}
@@ -266,34 +291,97 @@ const FileUpload = ({ applicationId, onUploadSuccess, disabled = false, preUploa
                 />
 
                 {isUploading ? (
-                    <div className="upload-progress">
-                        <div className="progress-bar">
-                            <div 
-                                className="progress-fill" 
-                                style={{ width: `${uploadProgress}%` }}
-                            ></div>
+                    <div style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: '10px',
+                        width: '100%'
+                    }}>
+                        <div style={{
+                            width: '300px',
+                            height: '20px',
+                            backgroundColor: '#e0e0e0',
+                            borderRadius: '10px',
+                            overflow: 'hidden'
+                        }}>
+                            <div style={{
+                                width: `${uploadProgress}%`,
+                                height: '100%',
+                                background: 'linear-gradient(90deg, #28a745, #20c997)',
+                                transition: 'width 0.3s ease',
+                                borderRadius: '10px'
+                            }}></div>
                         </div>
-                        <span className="progress-text">Μεταφόρτωση: {uploadProgress}%</span>
+                        <span style={{
+                            fontWeight: 'bold',
+                            color: '#28a745',
+                            fontSize: '14px'
+                        }}>
+                            Μεταφόρτωση: {uploadProgress}%
+                        </span>
                     </div>
                 ) : (
-                    <div className="upload-placeholder">
-                        <div className="upload-icon">📎</div>
-                        <div className="upload-text">
-                            <strong>Κάντε κλικ ή σύρετε αρχεία εδώ</strong>
+                    <div style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: '15px'
+                    }}>
+                        <div style={{
+                            fontSize: '48px',
+                            opacity: 0.6
+                        }}>📎</div>
+                        <div style={{
+                            color: '#666',
+                            lineHeight: '1.5'
+                        }}>
+                            <strong style={{
+                                color: '#333',
+                                fontSize: '16px'
+                            }}>Κάντε κλικ ή σύρετε αρχεία εδώ</strong>
                             <br />
-                            <small>Υποστηρίζονται: PDF, DOC, JPG, PNG, TXT, ZIP (μέχρι 50MB)</small>
+                            <small style={{
+                                fontSize: '12px',
+                                color: '#888'
+                            }}>Υποστηρίζονται: PDF, DOC, JPG, PNG, TXT, ZIP (μέχρι 50MB)</small>
                         </div>
                     </div>
                 )}
             </div>
 
             {uploadError && (
-                <div className="upload-error">
-                    <span className="error-icon">❌</span>
-                    <span className="error-text">{uploadError}</span>
-                    <button 
-                        className="error-close"
+                <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    marginTop: '15px',
+                    padding: '12px',
+                    backgroundColor: '#f8d7da',
+                    border: '1px solid #f5c6cb',
+                    borderRadius: '4px',
+                    color: '#721c24'
+                }}>
+                    <span style={{ fontSize: '18px' }}>❌</span>
+                    <span style={{ flex: 1, fontSize: '14px' }}>{uploadError}</span>
+                    <button
                         onClick={() => setUploadError(null)}
+                        style={{
+                            background: 'none',
+                            border: 'none',
+                            fontSize: '20px',
+                            cursor: 'pointer',
+                            color: '#721c24',
+                            padding: 0,
+                            width: '24px',
+                            height: '24px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            borderRadius: '50%'
+                        }}
+                        onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(114, 28, 36, 0.1)'}
+                        onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
                     >
                         ×
                     </button>
@@ -301,22 +389,90 @@ const FileUpload = ({ applicationId, onUploadSuccess, disabled = false, preUploa
             )}
 
             {preUploadMode && pendingFiles.length > 0 && (
-                <div className="pending-files">
-                    <h4>Επιλεγμένα Αρχεία ({pendingFiles.length})</h4>
+                <div style={{
+                    marginTop: '20px',
+                    padding: '15px',
+                    border: '1px solid #e0e0e0',
+                    borderRadius: '8px',
+                    backgroundColor: '#f8f9fa'
+                }}>
+                    <h4 style={{
+                        margin: '0 0 15px 0',
+                        color: '#333',
+                        fontSize: '16px',
+                        fontWeight: '600'
+                    }}>
+                        Επιλεγμένα Αρχεία ({pendingFiles.length})
+                    </h4>
                     {pendingFiles.map(file => (
-                        <div key={file.id} className="pending-file">
-                            <span className="file-icon">{getFileIcon(file.name)}</span>
-                            <div className="file-info">
-                                <div className="file-name">{file.name}</div>
-                                <div className="file-details">
-                                    <span className="file-size">{formatFileSize(file.size)}</span>
-                                    <span className="file-category">• {file.category}</span>
+                        <div key={file.id} style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '12px',
+                            padding: '10px',
+                            marginBottom: '8px',
+                            backgroundColor: 'white',
+                            border: '1px solid #dee2e6',
+                            borderRadius: '6px',
+                            transition: 'all 0.2s ease'
+                        }}>
+                            <span style={{
+                                fontSize: '24px',
+                                flexShrink: 0
+                            }}>
+                                {getFileIcon(file.name)}
+                            </span>
+                            <div style={{
+                                flex: 1,
+                                minWidth: 0
+                            }}>
+                                <div style={{
+                                    fontWeight: '500',
+                                    color: '#333',
+                                    fontSize: '14px',
+                                    marginBottom: '4px',
+                                    wordBreak: 'break-word'
+                                }}>
+                                    {file.name}
+                                </div>
+                                <div style={{
+                                    fontSize: '12px',
+                                    color: '#666',
+                                    display: 'flex',
+                                    gap: '8px'
+                                }}>
+                                    <span style={{ fontWeight: '500' }}>
+                                        {formatFileSize(file.size)}
+                                    </span>
+                                    <span style={{
+                                        color: '#007bff',
+                                        fontWeight: '500'
+                                    }}>
+                                        • {file.category}
+                                    </span>
                                 </div>
                             </div>
-                            <button 
-                                className="remove-file"
+                            <button
                                 onClick={() => removeFile(file.id)}
                                 title="Αφαίρεση αρχείου"
+                                style={{
+                                    background: 'none',
+                                    border: 'none',
+                                    fontSize: '20px',
+                                    cursor: 'pointer',
+                                    color: '#dc3545',
+                                    padding: '4px',
+                                    width: '28px',
+                                    height: '28px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    borderRadius: '50%',
+                                    transition: 'background-color 0.2s ease',
+                                    flexShrink: 0
+                                }}
+                                onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(220, 53, 69, 0.1)'}
+                                onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
                             >
                                 ×
                             </button>
@@ -324,269 +480,6 @@ const FileUpload = ({ applicationId, onUploadSuccess, disabled = false, preUploa
                     ))}
                 </div>
             )}
-
-            <style jsx>{`
-                .file-upload-container {
-                    margin: 20px 0;
-                }
-
-                .file-upload-category {
-                    margin-bottom: 15px;
-                }
-
-                .file-upload-category label {
-                    display: block;
-                    margin-bottom: 5px;
-                    font-weight: bold;
-                    color: #333;
-                }
-
-                .category-select {
-                    width: 200px;
-                    padding: 8px 12px;
-                    border: 1px solid #ddd;
-                    border-radius: 4px;
-                    font-size: 14px;
-                    background-color: white;
-                }
-
-                .category-select:disabled {
-                    background-color: #f5f5f5;
-                    cursor: not-allowed;
-                }
-
-                .file-upload-zone {
-                    border: 2px dashed #ccc;
-                    border-radius: 8px;
-                    padding: 40px 20px;
-                    text-align: center;
-                    cursor: pointer;
-                    transition: all 0.3s ease;
-                    background-color: #fafafa;
-                }
-
-                .file-upload-zone:hover:not(.disabled) {
-                    border-color: #007bff;
-                    background-color: #f0f8ff;
-                }
-
-                .file-upload-zone.drag-over {
-                    border-color: #28a745;
-                    background-color: #f0fff0;
-                    transform: scale(1.02);
-                }
-
-                .file-upload-zone.disabled {
-                    opacity: 0.6;
-                    cursor: not-allowed;
-                    background-color: #f5f5f5;
-                }
-
-                .upload-placeholder {
-                    display: flex;
-                    flex-direction: column;
-                    align-items: center;
-                    gap: 15px;
-                }
-
-                .upload-icon {
-                    font-size: 48px;
-                    opacity: 0.6;
-                }
-
-                .upload-text {
-                    color: #666;
-                    line-height: 1.5;
-                }
-
-                .upload-text strong {
-                    color: #333;
-                    font-size: 16px;
-                }
-
-                .upload-text small {
-                    font-size: 12px;
-                    color: #888;
-                }
-
-                .upload-progress {
-                    display: flex;
-                    flex-direction: column;
-                    align-items: center;
-                    gap: 10px;
-                    width: 100%;
-                }
-
-                .progress-bar {
-                    width: 300px;
-                    height: 20px;
-                    background-color: #e0e0e0;
-                    border-radius: 10px;
-                    overflow: hidden;
-                }
-
-                .progress-fill {
-                    height: 100%;
-                    background: linear-gradient(90deg, #28a745, #20c997);
-                    transition: width 0.3s ease;
-                    border-radius: 10px;
-                }
-
-                .progress-text {
-                    font-weight: bold;
-                    color: #28a745;
-                    font-size: 14px;
-                }
-
-                .upload-error {
-                    display: flex;
-                    align-items: center;
-                    gap: 10px;
-                    margin-top: 15px;
-                    padding: 12px;
-                    background-color: #f8d7da;
-                    border: 1px solid #f5c6cb;
-                    border-radius: 4px;
-                    color: #721c24;
-                }
-
-                .error-icon {
-                    font-size: 18px;
-                }
-
-                .error-text {
-                    flex: 1;
-                    font-size: 14px;
-                }
-
-                .error-close {
-                    background: none;
-                    border: none;
-                    font-size: 20px;
-                    cursor: pointer;
-                    color: #721c24;
-                    padding: 0;
-                    width: 24px;
-                    height: 24px;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                }
-
-                .error-close:hover {
-                    background-color: rgba(114, 28, 36, 0.1);
-                    border-radius: 50%;
-                }
-
-                .pending-files {
-                    margin-top: 20px;
-                    padding: 15px;
-                    border: 1px solid #e0e0e0;
-                    border-radius: 8px;
-                    background-color: #f8f9fa;
-                }
-
-                .pending-files h4 {
-                    margin: 0 0 15px 0;
-                    color: #333;
-                    font-size: 16px;
-                    font-weight: 600;
-                }
-
-                .pending-file {
-                    display: flex;
-                    align-items: center;
-                    gap: 12px;
-                    padding: 10px;
-                    margin-bottom: 8px;
-                    background-color: white;
-                    border: 1px solid #dee2e6;
-                    border-radius: 6px;
-                    transition: all 0.2s ease;
-                }
-
-                .pending-file:hover {
-                    background-color: #f0f8ff;
-                    border-color: #007bff;
-                }
-
-                .pending-file:last-child {
-                    margin-bottom: 0;
-                }
-
-                .file-icon {
-                    font-size: 24px;
-                    flex-shrink: 0;
-                }
-
-                .file-info {
-                    flex: 1;
-                    min-width: 0;
-                }
-
-                .file-name {
-                    font-weight: 500;
-                    color: #333;
-                    font-size: 14px;
-                    margin-bottom: 4px;
-                    word-break: break-word;
-                }
-
-                .file-details {
-                    font-size: 12px;
-                    color: #666;
-                    display: flex;
-                    gap: 8px;
-                }
-
-                .file-size {
-                    font-weight: 500;
-                }
-
-                .file-category {
-                    color: #007bff;
-                    font-weight: 500;
-                }
-
-                .remove-file {
-                    background: none;
-                    border: none;
-                    font-size: 20px;
-                    cursor: pointer;
-                    color: #dc3545;
-                    padding: 4px;
-                    width: 28px;
-                    height: 28px;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    border-radius: 50%;
-                    transition: background-color 0.2s ease;
-                    flex-shrink: 0;
-                }
-
-                .remove-file:hover {
-                    background-color: rgba(220, 53, 69, 0.1);
-                }
-
-                @media (max-width: 768px) {
-                    .file-upload-zone {
-                        padding: 30px 15px;
-                    }
-                    
-                    .upload-icon {
-                        font-size: 36px;
-                    }
-                    
-                    .progress-bar {
-                        width: 250px;
-                    }
-                    
-                    .category-select {
-                        width: 100%;
-                    }
-                }
-            `}</style>
         </div>
     );
 };
