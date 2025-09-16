@@ -340,10 +340,11 @@ const FilePreview = ({ attachment, onClose, onDelete }) => {
                     display: flex;
                     align-items: center;
                     justify-content: space-between;
-                    padding: 15px 20px;
+                    padding: 8px 15px;
                     border-bottom: 1px solid #eee;
                     background-color: #f8f9fa;
                     flex-shrink: 0;
+                    min-height: 60px;
                 }
 
                 .file-info {
@@ -354,7 +355,7 @@ const FilePreview = ({ attachment, onClose, onDelete }) => {
                 }
 
                 .file-icon {
-                    font-size: 48px;
+                    font-size: 36px;
                     flex-shrink: 0;
                 }
 
@@ -364,21 +365,21 @@ const FilePreview = ({ attachment, onClose, onDelete }) => {
                 }
 
                 .file-name {
-                    margin: 0 0 5px 0;
-                    font-size: 18px;
+                    margin: 0 0 3px 0;
+                    font-size: 16px;
                     font-weight: bold;
                     color: #333;
                     word-break: break-word;
                 }
 
                 .file-meta {
-                    font-size: 14px;
+                    font-size: 12px;
                     color: #666;
-                    margin-bottom: 5px;
+                    margin-bottom: 2px;
                 }
 
                 .file-stats {
-                    font-size: 12px;
+                    font-size: 11px;
                     color: #888;
                 }
 
@@ -408,10 +409,11 @@ const FilePreview = ({ attachment, onClose, onDelete }) => {
                 .file-preview-content {
                     flex: 1;
                     display: flex;
-                    align-items: center;
-                    justify-content: center;
+                    align-items: stretch;
+                    justify-content: stretch;
                     position: relative;
                     overflow: hidden;
+                    min-height: 0;
                 }
 
                 .preview-error {
@@ -502,25 +504,37 @@ const FilePreview = ({ attachment, onClose, onDelete }) => {
                     border-radius: 6px;
                 }
 
+                .pdf-preview,
+                .text-preview {
+                    width: 100%;
+                    height: 100%;
+                    flex: 1;
+                    display: flex;
+                    flex-direction: column;
+                }
+
                 .pdf-preview iframe,
                 .text-preview iframe {
                     width: 100%;
                     height: 100%;
+                    flex: 1;
                     border: none;
+                    min-height: 0;
                 }
 
                 .file-preview-actions {
                     display: flex;
                     gap: 10px;
-                    padding: 15px 20px;
+                    padding: 8px 15px;
                     border-top: 1px solid #eee;
                     background-color: #f8f9fa;
                     flex-shrink: 0;
+                    min-height: 50px;
                 }
 
                 .action-button {
                     flex: 1;
-                    padding: 12px 20px;
+                    padding: 8px 16px;
                     border: 1px solid #ddd;
                     border-radius: 6px;
                     font-size: 14px;
