@@ -300,7 +300,7 @@ const FilePreview = ({ attachment, onClose, onDelete }) => {
                 )}
             </div>
 
-            <style jsx>{`
+            <style>{`
                 .file-preview-modal {
                     position: fixed;
                     top: 0;

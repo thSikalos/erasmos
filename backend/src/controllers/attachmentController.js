@@ -110,30 +110,81 @@ const getDownloadUrl = async (req, res) => {
         const { id } = req.params;
 
         // Get attachment info
-        const attachmentQuery = `SELECT s3_key, filename FROM attachments WHERE id = $1`;
+        const attachmentQuery = `SELECT cloud_url, file_name, file_path FROM attachments WHERE id = $1`;
         const attachmentResult = await pool.query(attachmentQuery, [id]);
-        
+
         if (attachmentResult.rows.length === 0) {
             return res.status(404).json({ message: 'File not found' });
         }
 
         const attachment = attachmentResult.rows[0];
 
-        // Generate signed URL
-        const signedUrl = s3.getSignedUrl('getObject', {
-            Bucket: process.env.S3_BUCKET_NAME,
-            Key: attachment.s3_key,
-            Expires: 3600 // 1 hour
-        });
-
-        res.json({ 
-            url: signedUrl, 
-            filename: attachment.filename 
-        });
+        // Check if file is stored in cloud or locally
+        if (attachment.cloud_url) {
+            // File is in cloud storage, return cloud URL directly
+            res.json({
+                url: attachment.cloud_url,
+                filename: attachment.file_name
+            });
+        } else if (attachment.file_path) {
+            // File is stored locally, create local download URL
+            const localUrl = `${req.protocol}://${req.get('host')}/api/attachments/file/${id}`;
+            res.json({
+                url: localUrl,
+                filename: attachment.file_name
+            });
+        } else {
+            return res.status(404).json({ message: 'File location not found' });
+        }
 
     } catch (error) {
         console.error('Download URL error:', error);
         res.status(500).json({ message: 'Failed to generate download URL' });
+    }
+};
+
+// --- SERVE LOCAL FILE ---
+const serveLocalFile = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        // Get attachment info
+        const attachmentQuery = `SELECT file_path, file_name, file_type FROM attachments WHERE id = $1`;
+        const attachmentResult = await pool.query(attachmentQuery, [id]);
+
+        if (attachmentResult.rows.length === 0) {
+            return res.status(404).json({ message: 'File not found' });
+        }
+
+        const attachment = attachmentResult.rows[0];
+
+        if (!attachment.file_path) {
+            return res.status(404).json({ message: 'File path not found' });
+        }
+
+        // Serve the file
+        const fs = require('fs');
+        const path = require('path');
+
+        const filePath = path.resolve(attachment.file_path);
+
+        if (!fs.existsSync(filePath)) {
+            return res.status(404).json({ message: 'Physical file not found' });
+        }
+
+        // Set appropriate headers
+        res.setHeader('Content-Disposition', `attachment; filename="${attachment.file_name}"`);
+        if (attachment.file_type) {
+            res.setHeader('Content-Type', attachment.file_type);
+        }
+
+        // Stream the file
+        const fileStream = fs.createReadStream(filePath);
+        fileStream.pipe(res);
+
+    } catch (error) {
+        console.error('Serve local file error:', error);
+        res.status(500).json({ message: 'Failed to serve file' });
     }
 };
 
@@ -155,15 +206,19 @@ const deleteAttachment = async (req, res) => {
         const attachment = attachmentResult.rows[0];
 
         // Check permissions
-        if (userRole !== 'Admin' && attachment.uploaded_by !== userId) {
+        if (userRole !== 'Admin' && attachment.user_id !== userId) {
             return res.status(403).json({ message: 'Not authorized to delete this file' });
         }
 
-        // Delete from S3
-        await s3.deleteObject({
-            Bucket: process.env.S3_BUCKET_NAME,
-            Key: attachment.s3_key
-        }).promise();
+        // Delete from S3 if cloud URL exists
+        if (attachment.cloud_url) {
+            // Extract S3 key from cloud URL
+            const s3Key = `attachments/${attachment.application_id}/${attachment.file_name}`;
+            await s3.deleteObject({
+                Bucket: process.env.S3_BUCKET_NAME,
+                Key: s3Key
+            }).promise();
+        }
 
         // Delete from database
         await pool.query('DELETE FROM attachments WHERE id = $1', [id]);
@@ -290,6 +345,7 @@ module.exports = {
     uploadFile,
     getAttachments,
     getDownloadUrl,
+    serveLocalFile,
     deleteAttachment,
     getFileCategories,
     getFileAnalytics,

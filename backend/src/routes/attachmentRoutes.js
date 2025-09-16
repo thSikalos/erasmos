@@ -3,13 +3,14 @@ const multer = require('multer');
 const router = express.Router();
 const authMiddleware = require('../middleware/authMiddleware');
 const adminMiddleware = require('../middleware/adminMiddleware');
-const { 
-    uploadFile, 
-    getAttachments, 
-    getDownloadUrl, 
-    deleteAttachment, 
-    getFileCategories, 
-    getFileAnalytics 
+const {
+    uploadFile,
+    getAttachments,
+    getDownloadUrl,
+    serveLocalFile,
+    deleteAttachment,
+    getFileCategories,
+    getFileAnalytics
 } = require('../controllers/attachmentController');
 
 // Configure multer for memory storage (we'll upload to S3 directly)
@@ -47,6 +48,7 @@ router.use(authMiddleware);
 router.post('/:applicationId/upload', upload.single('file'), uploadFile);
 router.get('/:applicationId', getAttachments);
 router.get('/download/:id', getDownloadUrl);
+router.get('/file/:id', serveLocalFile);
 router.delete('/:id', deleteAttachment);
 
 // File categories and configuration
