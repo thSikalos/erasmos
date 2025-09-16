@@ -1,4 +1,5 @@
 const pool = require('../config/db');
+const EmailService = require('./emailService');
 
 class NotificationService {
     static NOTIFICATION_TYPES = {
@@ -13,9 +14,10 @@ class NotificationService {
 
     static CHANNELS = {
         IN_APP: 'in-app',
-        VIBER: 'viber',
         EMAIL: 'email'
     };
+
+    static emailService = new EmailService();
 
     /**
      * Creates a new notification with role-based routing
@@ -59,7 +61,13 @@ class NotificationService {
                     JSON.stringify(metadata)
                 ]);
 
-                createdNotifications.push(result.rows[0]);
+                const notification = result.rows[0];
+                createdNotifications.push(notification);
+
+                // Send email if channel is EMAIL
+                if (channel === this.CHANNELS.EMAIL) {
+                    await this.sendEmailNotification(notification, recipientId, type, data, client);
+                }
             }
 
             await client.query('COMMIT');
@@ -270,6 +278,66 @@ class NotificationService {
         } catch (error) {
             console.error('Failed to get notification stats:', error);
             throw error;
+        }
+    }
+
+    /**
+     * Send email notification to recipient
+     */
+    static async sendEmailNotification(notification, recipientId, type, data, client) {
+        try {
+            // Get recipient email and name
+            const userQuery = `SELECT email, name FROM users WHERE id = $1`;
+            const userResult = await client.query(userQuery, [recipientId]);
+
+            if (userResult.rows.length === 0) {
+                console.warn(`User not found for email notification: ${recipientId}`);
+                return;
+            }
+
+            const user = userResult.rows[0];
+            if (!user.email) {
+                console.warn(`No email address for user: ${recipientId}`);
+                return;
+            }
+
+            // Generate email content
+            const emailContent = this.emailService.generateEmailContent(type, data, user.name);
+
+            // Send email
+            const result = await this.emailService.sendEmail({
+                to: user.email,
+                subject: emailContent.subject,
+                text: emailContent.text,
+                html: emailContent.html
+            });
+
+            // Update notification status based on email result
+            if (result.success) {
+                await client.query(
+                    `UPDATE notifications SET status = 'sent' WHERE id = $1`,
+                    [notification.id]
+                );
+                console.log(`Email sent successfully to ${user.email} for notification ${notification.id}`);
+            } else {
+                await client.query(
+                    `UPDATE notifications SET status = 'failed' WHERE id = $1`,
+                    [notification.id]
+                );
+                console.error(`Failed to send email to ${user.email}:`, result.error);
+            }
+
+        } catch (error) {
+            console.error('Error sending email notification:', error);
+            // Mark as failed
+            try {
+                await client.query(
+                    `UPDATE notifications SET status = 'failed' WHERE id = $1`,
+                    [notification.id]
+                );
+            } catch (updateError) {
+                console.error('Failed to update notification status:', updateError);
+            }
         }
     }
 

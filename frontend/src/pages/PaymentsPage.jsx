@@ -2,11 +2,18 @@ import React, { useState, useEffect, useContext, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
-import ToastNotification from '../components/ToastNotification';
-import ConfirmationModal from '../components/ConfirmationModal';
+import { useNotifications } from '../context/NotificationContext';
 
 const PaymentsPage = () => {
     const { token, user } = useContext(AuthContext);
+    const {
+        showDeleteConfirm,
+        showConfirmModal,
+        showSuccessToast,
+        showErrorToast,
+        showInfoToast,
+        showPaymentToast
+    } = useNotifications();
     const [team, setTeam] = useState([]);
     const [applications, setApplications] = useState([]);
     const [statements, setStatements] = useState([]);
@@ -17,8 +24,6 @@ const PaymentsPage = () => {
     const [successMessage, setSuccessMessage] = useState('');
     const [editingStatement, setEditingStatement] = useState(null);
     const [displayFields, setDisplayFields] = useState([]);
-    const [toast, setToast] = useState(null);
-    const [confirmModal, setConfirmModal] = useState(null);
 
     const fetchData = async () => {
         if (!token) return;
@@ -45,24 +50,6 @@ const PaymentsPage = () => {
     useEffect(() => {
         fetchData();
     }, [token, user]);
-
-    // Toast utility functions
-    const showToast = (type, title, message, duration = 5000) => {
-        setToast({ type, title, message, duration });
-    };
-
-    const hideToast = () => {
-        setToast(null);
-    };
-
-    // Modal utility functions
-    const showConfirmModal = (title, message, type, onConfirm) => {
-        setConfirmModal({ title, message, type, onConfirm });
-    };
-
-    const hideConfirmModal = () => {
-        setConfirmModal(null);
-    };
 
     const handleAppSelection = (appId) => {
         const newSelection = new Set(selectedAppIds);
@@ -105,20 +92,20 @@ const PaymentsPage = () => {
                 await axios.put(`http://localhost:3000/api/payments/statements/${editingStatement}`, {
                     application_ids: Array.from(selectedAppIds)
                 }, config);
-                showToast('success', 'Επιτυχής Ενημέρωση', `Η ταμειακή κατάσταση #${editingStatement} ενημερώθηκε επιτυχώς!`);
+                showPaymentToast('updated', editingStatement);
                 setEditingStatement(null);
             } else {
                 const response = await axios.post('http://localhost:3000/api/payments/statements', {
                     recipient_id: parseInt(selectedAssociateId),
                     application_ids: Array.from(selectedAppIds)
                 }, config);
-                showToast('success', 'Επιτυχής Δημιουργία', `Η ταμειακή κατάσταση #${response.data.statementId} δημιουργήθηκε επιτυχώς!`);
+                showPaymentToast('created', response.data.statementId, response.data.totalAmount);
             }
             setSelectedAppIds(new Set());
             fetchData();
         } catch (error) {
             console.error("Failed to create/update statement", error);
-            showToast('error', 'Σφάλμα Λειτουργίας', error.response?.data?.message || 'Παρουσιάστηκε άγνωστο σφάλμα.');
+            showErrorToast('Σφάλμα Λειτουργίας', error.response?.data?.message || 'Παρουσιάστηκε άγνωστο σφάλμα.');
         }
     };
 
@@ -155,40 +142,35 @@ const PaymentsPage = () => {
     };
 
     const handleDeleteStatement = (statementId) => {
-        showConfirmModal(
-            "Διαγραφή Ταμειακής Κατάστασης",
-            "Είστε σίγουροι ότι θέλετε να διαγράψετε αυτή την ταμειακή κατάσταση; Αυτή η ενέργεια δεν μπορεί να αναιρεθεί.",
-            "danger",
-            async () => {
-                hideConfirmModal();
-                try {
-                    const config = { headers: { Authorization: `Bearer ${token}` } };
-                    await axios.delete(`http://localhost:3000/api/payments/statements/${statementId}`, config);
-                    showToast('success', 'Επιτυχής Διαγραφή', 'Η ταμειακή κατάσταση διαγράφηκε επιτυχώς!');
-                    fetchData(); // Refresh data
-                } catch (error) {
-                    console.error("Failed to delete statement", error);
-                    showToast('error', 'Σφάλμα Διαγραφής', error.response?.data?.message || 'Σφάλμα κατά τη διαγραφή της ταμειακής κατάστασης');
-                }
+        const statement = statements.find(s => s.id === statementId);
+        showDeleteConfirm(`την ταμειακή κατάσταση #${statement?.id || statementId}`, async () => {
+            try {
+                const config = { headers: { Authorization: `Bearer ${token}` } };
+                await axios.delete(`http://localhost:3000/api/payments/statements/${statementId}`, config);
+                showPaymentToast('deleted', statementId);
+                fetchData();
+            } catch (error) {
+                console.error("Failed to delete statement", error);
+                showErrorToast('Σφάλμα Διαγραφής', error.response?.data?.message || 'Σφάλμα κατά τη διαγραφή της ταμειακής κατάστασης');
             }
-        );
+        });
     };
 
     const handleMarkAsPaid = (statementId) => {
+        const statement = statements.find(s => s.id === statementId);
         showConfirmModal(
             "Μαρκάρισμα ως Πληρωμένη",
-            "Είστε σίγουροι ότι θέλετε να μαρκάρετε αυτή την ταμειακή κατάσταση ως πληρωμένη; Αυτή η ενέργεια δεν μπορεί να αναιρεθεί.",
+            `Είστε σίγουροι ότι θέλετε να μαρκάρετε την ταμειακή κατάσταση #${statement?.id || statementId} ως πληρωμένη; Αυτή η ενέργεια δεν μπορεί να αναιρεθεί.`,
             "warning",
             async () => {
-                hideConfirmModal();
                 try {
                     const config = { headers: { Authorization: `Bearer ${token}` } };
                     await axios.patch(`http://localhost:3000/api/payments/statements/${statementId}/mark-paid`, {}, config);
-                    showToast('success', 'Επιτυχής Ενημέρωση', 'Η ταμειακή κατάσταση μαρκαρίστηκε ως πληρωμένη!');
-                    fetchData(); // Refresh data
+                    showPaymentToast('marked_paid', statementId);
+                    fetchData();
                 } catch (error) {
                     console.error("Failed to mark as paid", error);
-                    showToast('error', 'Σφάλμα Ενημέρωσης', error.response?.data?.message || 'Σφάλμα κατά το μαρκάρισμα ως πληρωμένη');
+                    showErrorToast('Σφάλμα Ενημέρωσης', error.response?.data?.message || 'Σφάλμα κατά το μαρκάρισμα ως πληρωμένη');
                 }
             }
         );
@@ -213,10 +195,10 @@ const PaymentsPage = () => {
                 formElement.scrollIntoView({ behavior: 'smooth' });
             }
 
-            showToast('info', 'Επεξεργασία Ταμειακής', 'Η ταμειακή κατάσταση φορτώθηκε για επεξεργασία');
+            showInfoToast('Επεξεργασία Ταμειακής', 'Η ταμειακή κατάσταση φορτώθηκε για επεξεργασία');
         } catch (error) {
             console.error("Failed to load statement for editing", error);
-            showToast('error', 'Σφάλμα Επεξεργασίας', error.response?.data?.message || 'Σφάλμα κατά τη φόρτωση της ταμειακής για επεξεργασία');
+            showErrorToast('Σφάλμα Επεξεργασίας', error.response?.data?.message || 'Σφάλμα κατά τη φόρτωση της ταμειακής για επεξεργασία');
         }
     };
 
@@ -1023,30 +1005,7 @@ const PaymentsPage = () => {
                 </div>
             </div>
 
-            {/* Toast Notification */}
-            {toast && (
-                <ToastNotification
-                    type={toast.type}
-                    title={toast.title}
-                    message={toast.message}
-                    duration={toast.duration}
-                    onClose={hideToast}
-                />
-            )}
 
-            {/* Confirmation Modal */}
-            {confirmModal && (
-                <ConfirmationModal
-                    isOpen={true}
-                    title={confirmModal.title}
-                    message={confirmModal.message}
-                    type={confirmModal.type}
-                    confirmText="Επιβεβαίωση"
-                    cancelText="Ακύρωση"
-                    onConfirm={confirmModal.onConfirm}
-                    onCancel={hideConfirmModal}
-                />
-            )}
         </div>
     );
 };

@@ -492,7 +492,7 @@ const NotificationsPage = () => {
                 </div>
                 <div className="stat-card">
                     <div className="stat-icon">📤</div>
-                    <div className="stat-number">Viber</div>
+                    <div className="stat-number">Email</div>
                     <div className="stat-label">Πλατφόρμα</div>
                 </div>
                 <div className="stat-card">
@@ -505,7 +505,7 @@ const NotificationsPage = () => {
             <div className="modern-card">
                 <div className="card-content">
                     <div className="card-header">
-                        <h3 className="card-title">📱 Μηνιαία Ενημέρωση Συνεργατών (Viber)</h3>
+                        <h3 className="card-title">📧 Μηνιαία Ενημέρωση Συνεργατών (Email)</h3>
                     </div>
                     
                     <p className="card-description">

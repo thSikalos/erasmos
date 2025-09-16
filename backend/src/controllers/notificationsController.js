@@ -50,8 +50,8 @@ const markAllAsRead = async (req, res) => {
     }
 };
 
-// --- PREPARE VIBER MONTHLY SUMMARY DRAFTS ---
-const prepareViberSummary = async (req, res) => {
+// --- PREPARE EMAIL MONTHLY SUMMARY DRAFTS ---
+const prepareEmailSummary = async (req, res) => {
     const teamLeaderId = req.user.id;
     const client = await pool.connect();
     try {
@@ -87,9 +87,19 @@ const prepareViberSummary = async (req, res) => {
                
                 // Insert the draft notification, assigned to the team leader
                 const insertQuery = `
-                    INSERT INTO notifications (user_id, message, status, channel)
-                    VALUES ($1, $2, 'draft', 'viber') RETURNING *`;
-                const draftRes = await client.query(insertQuery, [teamLeaderId, message]);
+                    INSERT INTO notifications (user_id, message, status, channel, notification_type, metadata)
+                    VALUES ($1, $2, 'draft', 'email', 'MONTHLY_SUMMARY', $3) RETURNING *`;
+
+                const emailMetadata = {
+                    type: 'MONTHLY_SUMMARY',
+                    member_name: member.name,
+                    member_id: member.id,
+                    total_amount: subtotal.toFixed(2),
+                    breakdown: breakdownText,
+                    vat_text: vatText,
+                    period: `${new Date().getMonth() + 1}/${new Date().getFullYear()}`
+                };
+                const draftRes = await client.query(insertQuery, [teamLeaderId, message, JSON.stringify(emailMetadata)]);
                 createdDrafts.push(draftRes.rows[0]);
             }
         }
@@ -104,11 +114,11 @@ const prepareViberSummary = async (req, res) => {
     }
 };
 
-// --- GET DRAFT VIBER NOTIFICATIONS ---
-const getDraftViberNotifications = async(req, res) => {
+// --- GET DRAFT EMAIL NOTIFICATIONS ---
+const getDraftEmailNotifications = async(req, res) => {
     const userId = req.user.id;
     try {
-        const query = "SELECT * FROM notifications WHERE user_id = $1 AND channel = 'viber' AND status = 'draft' ORDER BY created_at DESC";
+        const query = "SELECT * FROM notifications WHERE user_id = $1 AND channel = 'email' AND status = 'draft' ORDER BY created_at DESC";
         const result = await pool.query(query, [userId]);
         res.json(result.rows);
     } catch (err) {
@@ -117,26 +127,75 @@ const getDraftViberNotifications = async(req, res) => {
     }
 };
 
-// --- SEND A NOTIFICATION (SIMULATED) ---
+// --- SEND EMAIL NOTIFICATION ---
 const sendNotification = async (req, res) => {
     const { id } = req.params;
+    const NotificationService = require('../services/notificationService');
+
     try {
-        const notificationRes = await pool.query("SELECT * FROM notifications WHERE id = $1", [id]);
-        if (notificationRes.rows.length === 0) return res.status(404).json({ message: 'Notification not found' });
-       
-        const notification = notificationRes.rows[0];
-        if (notification.channel === 'viber') {
-            console.log(`---- SIMULATING VIBER SEND ----`);
-            console.log(`MESSAGE: ${notification.message}`);
-            console.log(`-------------------------------`);
+        const notificationRes = await pool.query(`
+            SELECT n.*, u.email, u.name as user_name
+            FROM notifications n
+            JOIN users u ON n.user_id = u.id
+            WHERE n.id = $1
+        `, [id]);
+
+        if (notificationRes.rows.length === 0) {
+            return res.status(404).json({ message: 'Notification not found' });
         }
-       
-        await pool.query("UPDATE notifications SET status = 'sent' WHERE id = $1", [id]);
-        res.json({ message: 'Notification marked as sent.'});
+
+        const notification = notificationRes.rows[0];
+
+        if (notification.channel === 'email') {
+            // Parse metadata to get email context
+            let metadata = {};
+            try {
+                metadata = JSON.parse(notification.metadata || '{}');
+            } catch (e) {
+                console.warn('Failed to parse notification metadata:', e);
+            }
+
+            // Generate email content based on type
+            const emailContent = NotificationService.emailService.generateEmailContent(
+                notification.notification_type || 'SYSTEM_ALERT',
+                {
+                    ...metadata,
+                    message: notification.message
+                },
+                notification.user_name
+            );
+
+            // Send email
+            const emailResult = await NotificationService.emailService.sendEmail({
+                to: notification.email,
+                subject: emailContent.subject,
+                text: emailContent.text,
+                html: emailContent.html
+            });
+
+            if (emailResult.success) {
+                await pool.query("UPDATE notifications SET status = 'sent' WHERE id = $1", [id]);
+                res.json({
+                    message: 'Email sent successfully',
+                    messageId: emailResult.messageId,
+                    recipient: notification.email
+                });
+            } else {
+                await pool.query("UPDATE notifications SET status = 'failed' WHERE id = $1", [id]);
+                res.status(500).json({
+                    message: 'Failed to send email',
+                    error: emailResult.error
+                });
+            }
+        } else {
+            // For in-app notifications, just mark as sent
+            await pool.query("UPDATE notifications SET status = 'sent' WHERE id = $1", [id]);
+            res.json({ message: 'Notification marked as sent' });
+        }
     } catch (err) {
         await pool.query("UPDATE notifications SET status = 'failed' WHERE id = $1", [id]);
-        console.error(err.message);
-        res.status(500).send('Server Error');
+        console.error('Send notification error:', err.message);
+        res.status(500).json({ message: 'Server Error', error: err.message });
     }
 };
 
@@ -144,7 +203,7 @@ module.exports = {
     getMyNotifications,
     markAsRead,
     markAllAsRead,
-    prepareViberSummary,
-    getDraftViberNotifications,
+    prepareEmailSummary,
+    getDraftEmailNotifications,
     sendNotification
 };

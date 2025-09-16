@@ -24,6 +24,8 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: erasmos-backend
+    env_file:
+      - ./backend/.env
     environment:
       NODE_ENV: development
       DB_HOST: database
@@ -32,6 +34,8 @@ services:
       DB_USER: postgres
       DB_PASSWORD: mysecretpassword
       JWT_SECRET: mySuperSecretKey123
+      SENDGRID_API_KEY: ${SENDGRID_API_KEY:-your-sendgrid-api-key-here}
+      EMAIL_FROM: ${EMAIL_FROM:-no-reply@erasmos.app}
     ports:
       - "3000:3000"
     volumes:

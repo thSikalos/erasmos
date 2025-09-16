@@ -144,7 +144,7 @@ const CustomerDetailPage = () => {
     const getMethodLabel = (method) => {
         switch(method) {
             case 'phone': return 'Τηλέφωνο';
-            case 'email': return 'Email/Viber';
+            case 'email': return 'Email';
             case 'in-person': return 'Φυσική Παρουσία';
             default: return method;
         }
@@ -1254,7 +1254,7 @@ const CustomerDetailPage = () => {
                                     className="modern-select"
                                 >
                                     <option value="phone">📞 Τηλέφωνο</option>
-                                    <option value="email">📧 Email/Viber</option>
+                                    <option value="email">📧 Email</option>
                                     <option value="in-person">🤝 Φυσική Παρουσία</option>
                                 </select>
                                 <button type="submit" className="add-note-button">

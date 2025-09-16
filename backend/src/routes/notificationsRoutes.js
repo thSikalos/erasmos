@@ -5,8 +5,8 @@ const {
     getMyNotifications,
     markAsRead,
     markAllAsRead,
-    prepareViberSummary,
-    getDraftViberNotifications,
+    prepareEmailSummary,
+    getDraftEmailNotifications,
     sendNotification
 } = require('../controllers/notificationsController');
 
@@ -17,9 +17,9 @@ router.get('/', getMyNotifications);
 router.patch('/:id/read', markAsRead);
 router.post('/mark-all-read', markAllAsRead);
 
-// Viber functionality for Team Leaders
-router.post('/prepare-summary', prepareViberSummary);
-router.get('/drafts', getDraftViberNotifications);
+// Email functionality for Team Leaders
+router.post('/prepare-summary', prepareEmailSummary);
+router.get('/drafts', getDraftEmailNotifications);
 router.post('/:id/send', sendNotification);
 
 
