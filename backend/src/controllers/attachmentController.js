@@ -124,7 +124,7 @@ const getDownloadUrl = async (req, res) => {
             // File is in cloud storage, extract S3 key from URL
             const urlParts = attachment.cloud_url.split('/');
             const bucketIndex = urlParts.findIndex(part => part.includes('s3'));
-            const s3Key = urlParts.slice(bucketIndex + 2).join('/'); // Extract everything after bucket name
+            const s3Key = urlParts.slice(bucketIndex + 1).join('/'); // Extract everything after bucket domain
 
             const signedUrl = s3.getSignedUrl('getObject', {
                 Bucket: process.env.S3_BUCKET_NAME,
