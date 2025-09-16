@@ -7,7 +7,6 @@ The Erasmos database is built on **PostgreSQL** with a comprehensive schema supp
 - **Multi-role user management** with hierarchical relationships
 - **Advanced application workflows** with approval processes  
 - **Flexible billing system** with personal vs team application rates
-- **GDPR-compliant terms management** with version control
 - **Complete audit trails** for all user actions
 
 ---
@@ -34,11 +33,6 @@ psql -h localhost -p 5432 -U postgres -d postgres < schema.sql
 
 ### **3. Apply Migrations (In Order)**
 ```bash
-# Step 12: Terms & Conditions System
-psql -h localhost -p 5432 -U postgres -d postgres < migrations/002_step12_terms.sql
-
-# Terms Versioning & PDF System  
-psql -h localhost -p 5432 -U postgres -d postgres < migrations/003_terms_versioning.sql
 
 # Step 13: Personal Applications Billing
 psql -h localhost -p 5432 -U postgres -d postgres < migrations/004_step13_personal_billing.sql
@@ -48,15 +42,6 @@ psql -h localhost -p 5432 -U postgres -d postgres < migrations/004_step13_person
 
 ## 📋 **Migration Files**
 
-### **002_step12_terms.sql**
-- Adds `user_agreements` table for terms acceptance tracking
-- Adds `has_accepted_terms` column to users table
-- Creates middleware and API support for terms enforcement
-
-### **003_terms_versioning.sql** 
-- Creates `terms_versions` table for version-controlled terms
-- Updates `user_agreements` with terms version references
-- Adds PDF generation support with complete audit trail
 
 ### **004_step13_personal_billing.sql**
 - Adds `is_personal` column to applications table
@@ -76,7 +61,7 @@ WHERE table_schema = 'public'
 ORDER BY table_name;
 
 -- Check user management setup
-SELECT id, name, email, role, has_accepted_terms FROM users LIMIT 5;
+SELECT id, name, email, role FROM users LIMIT 5;
 
 -- Verify billing configuration
 SELECT * FROM team_leader_billing_overview;
@@ -92,15 +77,12 @@ SELECT
 FROM applications 
 GROUP BY is_personal, status;
 
--- User terms compliance
-SELECT 
+-- User status overview
+SELECT
   u.name,
-  u.has_accepted_terms,
-  ua.accepted_at,
-  tv.version as terms_version
+  u.role,
+  u.email
 FROM users u
-LEFT JOIN user_agreements ua ON u.id = ua.user_id
-LEFT JOIN terms_versions tv ON ua.terms_version_id = tv.id
 WHERE u.role IN ('TeamLeader', 'Associate');
 
 -- Billing rates overview
@@ -163,7 +145,7 @@ pg_isready
 **Migration Failures**
 ```sql
 -- Check if tables already exist
-SELECT table_name FROM information_schema.tables WHERE table_name LIKE '%user_agreements%';
+SELECT table_name FROM information_schema.tables WHERE table_name LIKE '%applications%';
 
 -- Check constraint conflicts
 SELECT conname, contype FROM pg_constraint WHERE conrelid = 'users'::regclass;

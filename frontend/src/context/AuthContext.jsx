@@ -12,7 +12,6 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [sessionState, setSessionState] = useState({
-    termsChecked: false,
     redirectInProgress: false,
     lastTokenCheck: null
   });
@@ -48,7 +47,6 @@ export const AuthProvider = ({ children }) => {
     setToken(null);
     setUser(null);
     setSessionState({
-      termsChecked: false,
       redirectInProgress: false,
       lastTokenCheck: null
     });
@@ -60,7 +58,6 @@ export const AuthProvider = ({ children }) => {
       response => response,
       error => {
         if (error.response?.status === 401 && window.location.pathname !== '/login') { logout(); }
-        if (error.response?.data?.errorCode === 'TERMS_NOT_ACCEPTED' && window.location.pathname !== '/terms') { navigate('/terms'); }
         return Promise.reject(error);
       }
     );
@@ -68,17 +65,23 @@ export const AuthProvider = ({ children }) => {
     if (storedToken) {
       try {
         const decoded = jwtDecode(storedToken);
-        console.log('[AUTH] Token decoded, user:', decoded.user?.email, 'has_accepted_terms:', decoded.user?.has_accepted_terms);
-        
-        if (decoded.exp * 1000 < Date.now()) { 
+        console.log('[AUTH] Token decoded, user:', decoded.user?.email);
+
+        // Check if token contains old has_accepted_terms field - if so, force logout for new token
+        if (decoded.user && 'has_accepted_terms' in decoded.user) {
+          console.log('[AUTH] Old token format detected, forcing logout for new token');
+          logout();
+          return;
+        }
+
+        if (decoded.exp * 1000 < Date.now()) {
           console.log('[AUTH] Token expired, logging out');
-          logout(); 
+          logout();
         } else {
           setAuthToken(storedToken);
           setUser(decoded.user);
           setSessionState(prev => ({
             ...prev,
-            termsChecked: true,
             lastTokenCheck: Date.now()
           }));
           console.log('[AUTH] User authenticated successfully');
@@ -99,28 +102,19 @@ export const AuthProvider = ({ children }) => {
     localStorage.setItem('token', newToken);
     setAuthToken(newToken);
     const decodedUser = jwtDecode(newToken).user;
-    console.log('[AUTH] New user login:', decodedUser?.email, 'has_accepted_terms:', decodedUser?.has_accepted_terms);
+    console.log('[AUTH] New user login:', decodedUser?.email);
     
     setUser(decodedUser);
     setToken(newToken);
     setSessionState({
-      termsChecked: true,
       redirectInProgress: false,
       lastTokenCheck: Date.now()
     });
     
-    if (!decodedUser.has_accepted_terms) { 
-      console.log('[AUTH] User needs to accept terms, redirecting to /terms');
-      navigate('/terms'); 
-    } else { 
-      console.log('[AUTH] User has accepted terms, redirecting to /dashboard');
-      navigate('/dashboard'); 
-    }
+    console.log('[AUTH] Redirecting to /dashboard');
+    navigate('/dashboard');
   };
 
-  const userAcceptedTerms = (newToken) => {
-      login(newToken); // Απλά κάνουμε login με το νέο, ενημερωμένο token
-  };
 
   // Session timeout hook
   const sessionTimeout = useSessionTimeout(token, refreshTokenFromServer, logout);
@@ -131,7 +125,6 @@ export const AuthProvider = ({ children }) => {
     loading,
     login,
     logout,
-    userAcceptedTerms,
     sessionState,
     sessionTimeout
   };

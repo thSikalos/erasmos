@@ -871,7 +871,6 @@ CREATE TABLE public.users (
     is_vat_liable boolean DEFAULT false NOT NULL,
     phone character varying(50),
     deleted_at timestamp with time zone,
-    has_accepted_terms boolean DEFAULT false NOT NULL
 );
 
 

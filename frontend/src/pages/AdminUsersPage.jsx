@@ -87,8 +87,6 @@ const AdminUsersPage = () => {
     
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [editingUser, setEditingUser] = useState(null);
-    const [agreementDetails, setAgreementDetails] = useState(null);
-    const [showAgreementModal, setShowAgreementModal] = useState(false);
 
     const fetchData = async () => {
         if (!token) return;
@@ -150,39 +148,6 @@ const AdminUsersPage = () => {
         setIsFormOpen(true);
     };
 
-    const viewAgreement = async (userId) => {
-        try {
-            const config = { headers: { Authorization: `Bearer ${token}` } };
-            const res = await axios.get(`http://localhost:3000/api/users/${userId}/agreement`, config);
-            setAgreementDetails(res.data);
-            setShowAgreementModal(true);
-        } catch (err) {
-            setError('Failed to fetch agreement details');
-        }
-    };
-
-    const downloadAgreementPdf = async (userId, userName) => {
-        try {
-            const config = { 
-                headers: { Authorization: `Bearer ${token}` },
-                responseType: 'blob'
-            };
-            const res = await axios.get(`http://localhost:3000/api/users/${userId}/agreement/pdf`, config);
-            
-            // Create blob and download
-            const blob = new Blob([res.data], { type: 'application/pdf' });
-            const url = window.URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = `agreement-${userName.replace(/\s+/g, '_')}.pdf`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            window.URL.revokeObjectURL(url);
-        } catch (err) {
-            setError('Failed to download agreement PDF');
-        }
-    };
 
     if (loading) {
         return (
@@ -449,45 +414,6 @@ const AdminUsersPage = () => {
                     color: white;
                 }
 
-                .terms-status {
-                    display: flex;
-                    align-items: center;
-                    gap: 8px;
-                }
-
-                .terms-accepted {
-                    color: #10b981;
-                    cursor: pointer;
-                    font-weight: 600;
-                    display: flex;
-                    align-items: center;
-                    gap: 4px;
-                }
-
-                .terms-rejected {
-                    color: #ef4444;
-                    font-weight: 600;
-                    display: flex;
-                    align-items: center;
-                    gap: 4px;
-                }
-
-                .pdf-button-small {
-                    background: linear-gradient(135deg, #3b82f6, #2563eb);
-                    color: white;
-                    border: none;
-                    padding: 4px 8px;
-                    border-radius: 6px;
-                    font-size: 0.7rem;
-                    cursor: pointer;
-                    transition: all 0.3s ease;
-                    font-weight: 600;
-                }
-
-                .pdf-button-small:hover {
-                    transform: translateY(-1px);
-                    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
-                }
 
                 .action-buttons {
                     display: flex;
@@ -810,8 +736,8 @@ const AdminUsersPage = () => {
                             <div className="stat-label">Ομαδάρχες</div>
                         </div>
                         <div className="stat-card">
-                            <div className="stat-number">{users.filter(u => u.has_accepted_terms).length}</div>
-                            <div className="stat-label">Έχουν αποδεχτεί όρους</div>
+                            <div className="stat-number">{users.filter(u => u.role === 'Associate').length}</div>
+                            <div className="stat-label">Συνεργάτες</div>
                         </div>
                     </div>
 
@@ -825,7 +751,6 @@ const AdminUsersPage = () => {
                                     <th>📧 Email</th>
                                     <th>🎭 Ρόλος</th>
                                     <th>👨‍💼 Προϊστάμενος</th>
-                                    <th>📜 Όροι</th>
                                     <th>⚙️ Ενέργειες</th>
                                 </tr>
                             </thead>
@@ -842,24 +767,6 @@ const AdminUsersPage = () => {
                                                 </span>
                                             </td>
                                             <td>{parent ? parent.name : '-'}</td>
-                                            <td>
-                                                {u.has_accepted_terms ? (
-                                                    <div className="terms-status">
-                                                        <span className="terms-accepted" onClick={() => viewAgreement(u.id)}>
-                                                            ✅ Αποδεκτοί
-                                                        </span>
-                                                        <button 
-                                                            className="pdf-button-small"
-                                                            onClick={() => downloadAgreementPdf(u.id, u.name)}
-                                                            title="Κατεβάστε PDF Αποδοχής"
-                                                        >
-                                                            📄 PDF
-                                                        </button>
-                                                    </div>
-                                                ) : (
-                                                    <span className="terms-rejected">❌ Μη αποδεκτοί</span>
-                                                )}
-                                            </td>
                                             <td>
                                                 <div className="action-buttons">
                                                     <button onClick={() => openEditForm(u)} className="edit-button">
@@ -878,47 +785,6 @@ const AdminUsersPage = () => {
                     </div>
                 </main>
                 
-                {showAgreementModal && agreementDetails && (
-                    <div className="modal-backdrop-modern">
-                        <div className="modal-modern">
-                            <div className="modal-header">
-                                <h2>📜 Στοιχεία Αποδοχής Όρων</h2>
-                            </div>
-                            <div className="modal-form">
-                                <div style={{color: 'white', lineHeight: '1.6'}}>
-                                    <p><strong>👤 Χρήστης:</strong> {agreementDetails.name} ({agreementDetails.email})</p>
-                                    <p><strong>📊 Κατάσταση:</strong> {agreementDetails.has_accepted_terms ? 
-                                        <span style={{color: '#10b981'}}>✅ Έχει αποδεχτεί τους όρους</span> : 
-                                        <span style={{color: '#ef4444'}}>❌ Δεν έχει αποδεχτεί τους όρους</span>
-                                    }</p>
-                                    {agreementDetails.accepted_at && (
-                                        <>
-                                            <p><strong>📅 Ημερομηνία Αποδοχής:</strong> {new Date(agreementDetails.accepted_at).toLocaleString('el-GR')}</p>
-                                            <p><strong>📋 Έκδοση Όρων:</strong> {agreementDetails.terms_version || 'N/A'}</p>
-                                            <p><strong>🌐 IP Address:</strong> {agreementDetails.ip_address || 'N/A'}</p>
-                                            <p><strong>💻 User Agent:</strong> {agreementDetails.user_agent ? 
-                                                <span style={{fontSize: '0.8rem', wordBreak: 'break-all', opacity: '0.8'}}>{agreementDetails.user_agent}</span> : 'N/A'
-                                            }</p>
-                                        </>
-                                    )}
-                                </div>
-                                <div className="modal-actions">
-                                    {agreementDetails.has_accepted_terms && (
-                                        <button 
-                                            onClick={() => downloadAgreementPdf(agreementDetails.id, agreementDetails.name)} 
-                                            className="save-button-modern"
-                                        >
-                                            📄 Κατεβάστε PDF
-                                        </button>
-                                    )}
-                                    <button onClick={() => setShowAgreementModal(false)} className="cancel-button-modern">
-                                        ❌ Κλείσιμο
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                )}
             </div>
         </div>
     );

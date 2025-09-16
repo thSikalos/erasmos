@@ -4,13 +4,8 @@ const htmlPdf = require('html-pdf-node');
 
 // Create uploads directory if it doesn't exist
 const uploadsDir = path.join(__dirname, '../../uploads');
-const termsDir = path.join(uploadsDir, 'terms');
-
 if (!fs.existsSync(uploadsDir)) {
     fs.mkdirSync(uploadsDir, { recursive: true });
-}
-if (!fs.existsSync(termsDir)) {
-    fs.mkdirSync(termsDir, { recursive: true });
 }
 
 // Convert markdown to HTML
@@ -153,89 +148,10 @@ const markdownToHtml = (markdownContent, title, version, effectiveDate) => {
 </html>`;
 };
 
-// Generate PDF from terms data
-const generateTermsPdf = async (termsData) => {
-    try {
-        const { id, version, title, content, effective_date } = termsData;
-        
-        // Convert markdown content to HTML
-        const htmlContent = markdownToHtml(content, title, version, effective_date);
-        
-        // PDF options
-        const options = {
-            format: 'A4',
-            margin: {
-                top: '1cm',
-                right: '1cm',
-                bottom: '1cm',
-                left: '1cm'
-            },
-            printBackground: true,
-            preferCSSPageSize: true
-        };
-        
-        // Generate PDF buffer
-        const file = { content: htmlContent };
-        const pdfBuffer = await htmlPdf.generatePdf(file, options);
-        
-        // Create filename
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-        const filename = `terms_v${version}_${timestamp}.pdf`;
-        const filePath = path.join(termsDir, filename);
-        
-        // Save PDF file
-        fs.writeFileSync(filePath, pdfBuffer);
-        
-        return {
-            filename,
-            filePath,
-            fileSize: pdfBuffer.length,
-            buffer: pdfBuffer
-        };
-        
-    } catch (error) {
-        console.error('Error generating PDF:', error);
-        throw new Error('Failed to generate PDF: ' + error.message);
-    }
-};
 
-// Get existing PDF for terms version
-const getTermsPdf = (termsId) => {
-    // This would query the database for existing PDF
-    // For now, return null if no PDF exists
-    return null;
-};
 
-// Clean old PDF files (optional cleanup function)
-const cleanupOldPdfs = async (daysOld = 90) => {
-    try {
-        const files = fs.readdirSync(termsDir);
-        const cutoffDate = new Date();
-        cutoffDate.setDate(cutoffDate.getDate() - daysOld);
-        
-        let deletedCount = 0;
-        
-        files.forEach(file => {
-            const filePath = path.join(termsDir, file);
-            const stats = fs.statSync(filePath);
-            
-            if (stats.mtime < cutoffDate) {
-                fs.unlinkSync(filePath);
-                deletedCount++;
-            }
-        });
-        
-        console.log(`Cleaned up ${deletedCount} old PDF files`);
-        return deletedCount;
-        
-    } catch (error) {
-        console.error('Error cleaning up PDFs:', error);
-        return 0;
-    }
-};
+
 
 module.exports = {
-    generateTermsPdf,
-    getTermsPdf,
-    cleanupOldPdfs
+    markdownToHtml
 };

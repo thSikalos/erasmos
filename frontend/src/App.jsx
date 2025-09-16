@@ -16,7 +16,6 @@ import AdminRecycleBinPage from './pages/AdminRecycleBinPage';
 import AdminUsersPage from './pages/AdminUsersPage';
 import AdminBillingSettingsPage from './pages/AdminBillingSettingsPage';
 import AdminInvoicingPage from './pages/AdminInvoicingPage';
-import AdminTermsPage from './pages/AdminTermsPage';
 import CommissionsPage from './pages/CommissionsPage';
 import RenewalsPage from './pages/RenewalsPage';
 import CustomersPage from './pages/CustomersPage';
@@ -28,9 +27,8 @@ import ProfilePage from './pages/ProfilePage';
 import MainLayout from './components/MainLayout';
 import ProtectedRoute from './components/ProtectedRoute';
 import FinanceProtectedRoute from './components/FinanceProtectedRoute';
-import TermsGuard from './components/TermsGuard';
-import TermsPage from './pages/TermsPage';
 import './App.css';
+import './styles/Mobile.css';
 
 function App() {
   const { loading } = useContext(AuthContext);
@@ -45,7 +43,6 @@ function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route element={<ProtectedRoute />}>
-          <Route path="/terms" element={<TermsPage />} />
           <Route element={<MainLayout />}>
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/customers" element={<CustomersPage />} />
@@ -69,7 +66,6 @@ function App() {
             <Route path="/admin/users" element={<AdminUsersPage />} />
             <Route path="/admin/billing-settings" element={<AdminBillingSettingsPage />} />
             <Route path="/admin/invoicing" element={<AdminInvoicingPage />} />
-            <Route path="/admin/terms" element={<AdminTermsPage />} />
           </Route>
         </Route>
         <Route path="/" element={<Navigate to="/dashboard" />} />

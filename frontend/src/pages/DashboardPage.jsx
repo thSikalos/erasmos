@@ -5,6 +5,8 @@ import { AuthContext } from '../context/AuthContext';
 import StatCard from '../components/StatCard';
 import RemindersWidget from '../components/RemindersWidget';
 import BonusProgressWidget from '../components/BonusProgressWidget';
+import MobileTest from '../components/MobileTest';
+import ResponsiveTable from '../components/ResponsiveTable';
 import '../App.css';
 
 const DashboardPage = () => {
@@ -86,6 +88,7 @@ const DashboardPage = () => {
 
     return (
         <div className="modern-dashboard">
+            {/* <MobileTest /> */}
             <style>
                 {`
                     .modern-dashboard {
@@ -498,6 +501,29 @@ const DashboardPage = () => {
                             </tbody>
                         </table>
                     </div>
+
+                    {/* Test ResponsiveTable - Hidden
+                    <div className="applications-section">
+                        <div className="section-header">
+                            <h2 className="section-title">📱 Mobile Test Table</h2>
+                        </div>
+                        <ResponsiveTable
+                            data={[
+                                { id: 1, name: 'Δοκιμή 1', status: 'Ενεργό', amount: '€100' },
+                                { id: 2, name: 'Δοκιμή 2', status: 'Περιμένει', amount: '€200' },
+                                { id: 3, name: 'Δοκιμή 3', status: 'Ολοκληρώθηκε', amount: '€300' }
+                            ]}
+                            columns={[
+                                { key: 'id', header: 'ID' },
+                                { key: 'name', header: 'Όνομα' },
+                                { key: 'status', header: 'Κατάσταση' },
+                                { key: 'amount', header: 'Ποσό' }
+                            ]}
+                            emptyMessage="Δεν υπάρχουν δεδομένα για δοκιμή"
+                            emptyIcon="🧪"
+                        />
+                    </div>
+                    */}
 
                     <BonusProgressWidget />
                     <RemindersWidget />

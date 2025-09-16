@@ -6,7 +6,6 @@ const BRAND_CONFIG = require('./brandConfig');
 
 // PDF Templates
 const PaymentStatementTemplate = require('./pdfTemplates/paymentStatement');
-const TermsAcceptanceTemplate = require('./pdfTemplates/termsAcceptance');
 const InvoiceTemplate = require('./pdfTemplates/invoice');
 const ReportsPdfTemplate = require('./pdfTemplates/reports');
 
@@ -21,7 +20,6 @@ class DocumentGenerator {
         // Initialize templates
         this.templates = {
             paymentStatement: new PaymentStatementTemplate(this),
-            termsAcceptance: new TermsAcceptanceTemplate(this),
             invoice: new InvoiceTemplate(this),
             reportsPdf: new ReportsPdfTemplate(this),
             reportsExcel: new ReportsExcelTemplate(this),
@@ -239,8 +237,6 @@ class DocumentGenerator {
         switch (type) {
             case 'payment_statement':
                 return this.generatePaymentStatementPDF(data, issuerData, options);
-            case 'terms_acceptance':
-                return this.generateTermsAcceptancePDF(data, issuerData, options);
             case 'invoice':
                 return this.generateInvoicePDF(data, issuerData, options);
             case 'reports':
@@ -269,9 +265,6 @@ class DocumentGenerator {
         return this.templates.paymentStatement.generate(data, issuerData, options);
     }
 
-    generateTermsAcceptancePDF(data, issuerData, options) {
-        return this.templates.termsAcceptance.generate(data, issuerData, options);
-    }
 
     generateInvoicePDF(data, issuerData, options) {
         return this.templates.invoice.generate(data, issuerData, options);

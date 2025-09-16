@@ -96,7 +96,7 @@ const getBonusProgress = async (req, res) => {
                         JOIN applications a ON si.application_id = a.id
                         WHERE a.user_id = b.target_user_id
                         AND DATE_TRUNC('month', ps.created_at) = DATE_TRUNC('month', CURRENT_DATE)
-                        AND ps.payment_status = 'paid'  -- Only count paid statements for bonus
+                        AND ps.status = 'paid'  -- Only count paid statements for bonus
                         AND (
                             -- If bonus has specific companies, count only those
                             EXISTS(SELECT 1 FROM bonus_companies bc WHERE bc.bonus_id = b.id)
@@ -124,7 +124,7 @@ const getBonusProgress = async (req, res) => {
                                 WHERE a2.user_id = b.target_user_id
                                 AND a2.company_id = c.id
                                 AND DATE_TRUNC('month', ps2.created_at) = DATE_TRUNC('month', CURRENT_DATE)
-                                AND ps2.payment_status = 'paid'
+                                AND ps2.status = 'paid'
                             )
                         )
                         ELSE NULL END

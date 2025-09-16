@@ -3,15 +3,15 @@
 -- Insert required users with hashed passwords
 -- Note: These are bcrypt hashes for the specified passwords
 
-INSERT INTO users (name, email, password, role, has_accepted_terms, parent_user_id) VALUES 
--- leader@example.com with password 'leaderpass' 
-('Team Leader', 'leader@example.com', '$2a$10$YQJ.Vv8K1KwF5Zx7UJqnMe0bHzG.J7Lj3QHwF6WzD8nMqK9Pv5Lw2', 'TeamLeader', true, NULL),
+INSERT INTO users (name, email, password, role, parent_user_id) VALUES
+-- leader@example.com with password 'leaderpass'
+('Team Leader', 'leader@example.com', '$2a$10$YQJ.Vv8K1KwF5Zx7UJqnMe0bHzG.J7Lj3QHwF6WzD8nMqK9Pv5Lw2', 'TeamLeader', NULL),
 
 -- testhash@example.com with password 'mySafePassword123'
-('Test Associate', 'testhash@example.com', '$2a$10$TKhF.Zq2M3PwR8YxULjcNeVbHnK.P6Rk4VJzN9AqK7MnOpQ1Tw3Xm', 'Associate', true, 1),
+('Test Associate', 'testhash@example.com', '$2a$10$TKhF.Zq2M3PwR8YxULjcNeVbHnK.P6Rk4VJzN9AqK7MnOpQ1Tw3Xm', 'Associate', 1),
 
--- grammateas2@gmail.com with password 'grammateas12'  
-('Secretary User', 'grammateas2@gmail.com', '$2a$10$GKjP.Yv1L2QwT7ZyVKmdOeXcInL.Q5Sl3WNzO8BrM6OnPpR2Ux4Yo', 'Secretary', true, 1);
+-- grammateas2@gmail.com with password 'grammateas12'
+('Secretary User', 'grammateas2@gmail.com', '$2a$10$GKjP.Yv1L2QwT7ZyVKmdOeXcInL.Q5Sl3WNzO8BrM6OnPpR2Ux4Yo', 'Secretary', 1);
 
 -- Insert basic companies
 INSERT INTO companies (name) VALUES 

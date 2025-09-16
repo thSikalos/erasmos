@@ -664,7 +664,7 @@ const getTeamApplications = async (req, res) => {
                         json_build_object(
                             'field_id', cf.id,
                             'field_label', cf.label,
-                            'commission_amount', cf.commission_amount,
+                            'commission_amount', ufc.amount,
                             'is_paid', COALESCE(fp.is_paid_by_company, false),
                             'has_clawback', CASE WHEN cb.id IS NOT NULL THEN true ELSE false END,
                             'is_in_statement', CASE WHEN si.id IS NOT NULL THEN true ELSE false END
@@ -679,6 +679,7 @@ const getTeamApplications = async (req, res) => {
             LEFT JOIN application_values av ON a.id = av.application_id
             LEFT JOIN fields df ON av.field_id = df.id
             LEFT JOIN fields cf ON av.field_id = cf.id AND cf.is_commissionable = true
+            LEFT JOIN user_field_commissions ufc ON cf.id = ufc.field_id AND ufc.associate_id = a.user_id
             LEFT JOIN field_payments fp ON cf.id = fp.field_id AND fp.application_id = a.id
             LEFT JOIN clawbacks cb ON fp.id = cb.field_payment_id AND cb.is_settled = false
             LEFT JOIN statement_items si ON si.application_id = a.id AND si.field_id = cf.id
