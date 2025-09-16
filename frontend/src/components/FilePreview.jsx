@@ -325,10 +325,9 @@ const FilePreview = ({ attachment, onClose, onDelete }) => {
 
                 .file-preview-container {
                     position: relative;
-                    width: 90vw;
-                    max-width: 900px;
-                    height: 80vh;
-                    max-height: 700px;
+                    width: 95vw;
+                    max-width: 1400px;
+                    height: 90vh;
                     background: white;
                     border-radius: 12px;
                     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
@@ -341,9 +340,10 @@ const FilePreview = ({ attachment, onClose, onDelete }) => {
                     display: flex;
                     align-items: center;
                     justify-content: space-between;
-                    padding: 20px;
+                    padding: 15px 20px;
                     border-bottom: 1px solid #eee;
                     background-color: #f8f9fa;
+                    flex-shrink: 0;
                 }
 
                 .file-info {
@@ -512,9 +512,10 @@ const FilePreview = ({ attachment, onClose, onDelete }) => {
                 .file-preview-actions {
                     display: flex;
                     gap: 10px;
-                    padding: 20px;
+                    padding: 15px 20px;
                     border-top: 1px solid #eee;
                     background-color: #f8f9fa;
+                    flex-shrink: 0;
                 }
 
                 .action-button {
@@ -615,15 +616,24 @@ const FilePreview = ({ attachment, onClose, onDelete }) => {
                     background: #c82333;
                 }
 
+                /* Responsive design for different screen sizes */
+                @media (min-width: 1600px) {
+                    .file-preview-container {
+                        width: 90vw;
+                        max-width: 1600px;
+                        height: 92vh;
+                    }
+                }
+
                 @media (max-width: 768px) {
                     .file-preview-container {
-                        width: 95vw;
-                        height: 85vh;
+                        width: 98vw;
+                        height: 95vh;
                         border-radius: 8px;
                     }
 
                     .file-preview-header {
-                        padding: 15px;
+                        padding: 12px 15px;
                     }
 
                     .file-icon {
@@ -636,10 +646,31 @@ const FilePreview = ({ attachment, onClose, onDelete }) => {
 
                     .file-preview-actions {
                         flex-direction: column;
+                        padding: 12px 15px;
                     }
 
                     .action-button {
                         flex: none;
+                    }
+                }
+
+                @media (max-width: 480px) {
+                    .file-preview-container {
+                        width: 100vw;
+                        height: 100vh;
+                        border-radius: 0;
+                    }
+
+                    .file-info {
+                        gap: 10px;
+                    }
+
+                    .file-icon {
+                        font-size: 24px;
+                    }
+
+                    .file-name {
+                        font-size: 14px;
                     }
                 }
             `}</style>
