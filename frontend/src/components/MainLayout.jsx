@@ -2,7 +2,6 @@ import React, { useContext, useState } from 'react';
 import { Outlet, NavLink, Link } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import Header from './Header';
-import ToastNotification from './ToastNotification';
 import NotificationManager from './NotificationManager';
 import '../App.css';
 
@@ -661,22 +660,6 @@ const MainLayout = () => {
                 <Outlet />
             </main>
 
-            {/* Session Timeout Toast Notification */}
-            {sessionTimeout?.sessionWarning && (
-                <ToastNotification
-                    type="warning"
-                    title="Προειδοποίηση Συνεδρίας"
-                    message="Η συνεδρία σας πρόκειται να λήξει. Κάντε κλικ στο 'Συνέχεια' για να παραμείνετε συνδεδεμένοι."
-                    duration={0} // Don't auto-close
-                    showCountdown={true}
-                    countdownTime={sessionTimeout.sessionWarning.remainingTime}
-                    onAction={sessionTimeout.sessionWarning.onRefresh}
-                    actionLabel="🔄 Συνέχεια"
-                    autoRefresh={sessionTimeout.autoRefresh}
-                    onAutoRefreshToggle={sessionTimeout.sessionWarning.onAutoRefreshToggle}
-                    onClose={sessionTimeout.sessionWarning.onDismiss}
-                />
-            )}
 
             {/* Global Notification Manager */}
             <NotificationManager />

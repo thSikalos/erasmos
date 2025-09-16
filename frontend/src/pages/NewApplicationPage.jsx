@@ -126,7 +126,7 @@ const applicationReducer = (state, action) => {
 const NewApplicationPage = () => {
     const { token, user } = useContext(AuthContext);
     const navigate = useNavigate();
-    const { showToastLocal, showSuccessToast, showErrorToast, showInfoToast } = useNotifications();
+    const { showSuccessToast, showErrorToast, showInfoToast, showWarningToast } = useNotifications();
     const [companies, setCompanies] = useState([]);
     const [state, dispatch] = useReducer(applicationReducer, {
         ...initialState,
@@ -147,7 +147,7 @@ const NewApplicationPage = () => {
                 setCompanies(companiesRes.data);
             } catch (error) {
                 dispatch({ type: 'SET_ERROR', error: 'Αποτυχία φόρτωσης εταιρειών.' });
-                showToastLocalLocal('Αποτυχία φόρτωσης εταιρειών', 'error');
+                showErrorToast('Σφάλμα', 'Αποτυχία φόρτωσης εταιρειών');
             } finally {
                 dispatch({ type: 'SET_LOADING', loading: false });
             }
@@ -155,17 +155,6 @@ const NewApplicationPage = () => {
         fetchCompanies();
     }, [token]);
 
-    // Helper functions - using global notifications
-    const showToastLocalLocal = (message, type = 'info') => {
-        const typeMap = {
-            'success': () => showSuccessToast('Επιτυχία', message),
-            'error': () => showErrorToast('Σφάλμα', message),
-            'info': () => showInfoToast('Πληροφορία', message),
-            'warning': () => showToastLocal('warning', 'Προειδοποίηση', message)
-        };
-
-        (typeMap[type] || typeMap['info'])();
-    };
     
     // Debounced AFM check
     const checkAfmWithDelay = useCallback(async (afm) => {
@@ -179,7 +168,7 @@ const NewApplicationPage = () => {
             const res = await axios.get(`http://localhost:3000/api/customers/afm/${afm}`, config);
             dispatch({ type: 'SET_CUSTOMER_DETAILS', data: res.data });
             dispatch({ type: 'SET_CUSTOMER_STATUS', status: 'found' });
-            showToastLocal(`Ο πελάτης βρέθηκε! ${res.data.applications_count || 0} προηγούμενες αιτήσεις`, 'success');
+            showSuccessToast('Πελάτης Βρέθηκε', `Ο πελάτης βρέθηκε! ${res.data.applications_count || 0} προηγούμενες αιτήσεις`);
         } catch (err) {
             if (err.response && err.response.status === 404) {
                 dispatch({ 
@@ -187,11 +176,11 @@ const NewApplicationPage = () => {
                     data: { id: null, afm: afm, full_name: '', phone: '', address: '' }
                 });
                 dispatch({ type: 'SET_CUSTOMER_STATUS', status: 'notFound' });
-                showToastLocal('Πελάτης δεν βρέθηκε. Συμπληρώστε τα στοιχεία.', 'info');
+                showInfoToast('Πελάτης δεν βρέθηκε', 'Συμπληρώστε τα στοιχεία.');
             } else {
                 dispatch({ type: 'SET_ERROR', error: 'Σφάλμα κατά τον έλεγχο ΑΦΜ.' });
                 dispatch({ type: 'SET_CUSTOMER_STATUS', status: 'idle' });
-                showToastLocal('Σφάλμα κατά τον έλεγχο ΑΦΜ', 'error');
+                showErrorToast('Σφάλμα', 'Σφάλμα κατά τον έλεγχο ΑΦΜ');
             }
         }
     }, [token]);
@@ -230,7 +219,7 @@ const NewApplicationPage = () => {
             const res = await axios.get(`http://localhost:3000/api/customers/afm/${state.afm}`, config);
             dispatch({ type: 'SET_CUSTOMER_DETAILS', data: res.data });
             dispatch({ type: 'SET_CUSTOMER_STATUS', status: 'found' });
-            showToastLocal('Ο πελάτης βρέθηκε επιτυχώς!', 'success');
+            showSuccessToast('Πελάτης Βρέθηκε', 'Ο πελάτης βρέθηκε επιτυχώς!');
         } catch (err) {
             if (err.response && err.response.status === 404) {
                 dispatch({ 
@@ -238,11 +227,11 @@ const NewApplicationPage = () => {
                     data: { id: null, afm: state.afm, full_name: '', phone: '', address: '' }
                 });
                 dispatch({ type: 'SET_CUSTOMER_STATUS', status: 'notFound' });
-                showToastLocal('Πελάτης δεν βρέθηκε. Συμπληρώστε τα στοιχεία.', 'info');
+                showInfoToast('Πελάτης δεν βρέθηκε', 'Συμπληρώστε τα στοιχεία.');
             } else {
                 dispatch({ type: 'SET_ERROR', error: 'Σφάλμα κατά τον έλεγχο ΑΦΜ.' });
                 dispatch({ type: 'SET_CUSTOMER_STATUS', status: 'idle' });
-                showToastLocal('Σφάλμα κατά τον έλεγχο ΑΦΜ', 'error');
+                showErrorToast('Σφάλμα', 'Σφάλμα κατά τον έλεγχο ΑΦΜ');
             }
         }
     };
@@ -251,21 +240,21 @@ const NewApplicationPage = () => {
         switch (step) {
             case 1:
                 if (!state.afm) {
-                    showToastLocal('Παρακαλώ εισάγετε ΑΦΜ', 'error');
+                    showErrorToast('Σφάλμα Επικύρωσης', 'Παρακαλώ εισάγετε ΑΦΜ');
                     return false;
                 }
                 if (state.customerStatus === 'idle' || state.customerStatus === 'checking') {
-                    showToastLocal('Παρακαλώ ελέγξτε πρώτα το ΑΦΜ', 'error');
+                    showErrorToast('Σφάλμα Επικύρωσης', 'Παρακαλώ ελέγξτε πρώτα το ΑΦΜ');
                     return false;
                 }
                 if (!state.customerDetails.full_name) {
-                    showToastLocal('Παρακαλώ εισάγετε ονοματεπώνυμο', 'error');
+                    showErrorToast('Σφάλμα Επικύρωσης', 'Παρακαλώ εισάγετε ονοματεπώνυμο');
                     return false;
                 }
                 return true;
             case 2:
                 if (!state.selectedCompanyId) {
-                    showToastLocal('Παρακαλώ επιλέξτε εταιρεία', 'error');
+                    showErrorToast('Σφάλμα Επικύρωσης', 'Παρακαλώ επιλέξτε εταιρεία');
                     return false;
                 }
                 return true;
@@ -290,7 +279,7 @@ const NewApplicationPage = () => {
 
     const handleFileUpload = (fileData) => {
         dispatch({ type: 'ADD_FILE', file: fileData });
-        showToastLocal('Αρχείο ανέβηκε επιτυχώς!', 'success');
+        showSuccessToast('Αρχείο', 'Αρχείο ανέβηκε επιτυχώς!');
     };
     
     const handleFilesChange = (files) => {
@@ -299,7 +288,7 @@ const NewApplicationPage = () => {
 
     const handleFileRemove = (index) => {
         dispatch({ type: 'REMOVE_FILE', index });
-        showToastLocal('Αρχείο αφαιρέθηκε', 'info');
+        showInfoToast('Αρχείο', 'Αρχείο αφαιρέθηκε');
     };
 
     const handleSubmit = async () => {
@@ -322,7 +311,7 @@ const NewApplicationPage = () => {
             
             // Then upload files if any exist
             if (state.uploadedFiles.length > 0) {
-                showToastLocal('Ανεβάζουν τα αρχεία...', 'info');
+                showInfoToast('Φόρτωση', 'Ανεβάζουν τα αρχεία...');
                 let uploadedCount = 0;
                 
                 for (const fileInfo of state.uploadedFiles) {
@@ -351,12 +340,12 @@ const NewApplicationPage = () => {
                 }
                 
                 if (uploadedCount === state.uploadedFiles.length) {
-                    showToastLocal('Αίτηση και αρχεία δημιουργήθηκαν επιτυχώς!', 'success');
+                    showSuccessToast('Επιτυχής Δημιουργία', 'Αίτηση και αρχεία δημιουργήθηκαν επιτυχώς!');
                 } else {
-                    showToastLocal(`Αίτηση δημιουργήθηκε! ${uploadedCount}/${state.uploadedFiles.length} αρχεία ανέβηκαν.`, 'success');
+                    showWarningToast('Μερική Επιτυχία', `Αίτηση δημιουργήθηκε! ${uploadedCount}/${state.uploadedFiles.length} αρχεία ανέβηκαν.`);
                 }
             } else {
-                showToastLocal('Αίτηση δημιουργήθηκε επιτυχώς!', 'success');
+                showSuccessToast('Επιτυχής Δημιουργία', 'Αίτηση δημιουργήθηκε επιτυχώς!');
             }
             setTimeout(() => {
                 navigate('/dashboard');
@@ -364,7 +353,7 @@ const NewApplicationPage = () => {
         } catch (err) {
             const errorMessage = err.response?.data?.message || 'Αποτυχία δημιουργίας αίτησης.';
             dispatch({ type: 'SET_ERROR', error: errorMessage });
-            showToastLocal(errorMessage, 'error');
+            showErrorToast('Σφάλμα Δημιουργίας', errorMessage);
         } finally {
             dispatch({ type: 'SET_LOADING', loading: false });
         }
