@@ -1265,12 +1265,19 @@ const ApplicationDetailPage = () => {
                 <div className="card-content">
                     <div className="files-header">
                         <h3 className="card-title">📎 Επισυναπτόμενα Αρχεία ({attachments.length})</h3>
-                        <button 
-                            className="add-file-button"
-                            onClick={() => setShowFileUpload(!showFileUpload)}
-                        >
-                            {showFileUpload ? '❌ Ακύρωση' : '📎 Προσθήκη Αρχείου'}
-                        </button>
+                        {application?.status !== 'Καταχωρήθηκε' && (
+                            <button
+                                className="add-file-button"
+                                onClick={() => setShowFileUpload(!showFileUpload)}
+                            >
+                                {showFileUpload ? '❌ Ακύρωση' : '📎 Προσθήκη Αρχείου'}
+                            </button>
+                        )}
+                        {application?.status === 'Καταχωρήθηκε' && (
+                            <span className="status-message">
+                                🔒 Η αίτηση έχει καταχωρηθεί - δεν επιτρέπεται επεξεργασία αρχείων
+                            </span>
+                        )}
                     </div>
 
                     {showFileUpload && (
@@ -1286,12 +1293,14 @@ const ApplicationDetailPage = () => {
                         {attachments.length === 0 && !showFileUpload ? (
                             <div className="no-files">
                                 <p>📎 Δεν έχουν ανεβάσει αρχεία για αυτή την αίτηση</p>
-                                <button 
-                                    className="upload-first-file"
-                                    onClick={() => setShowFileUpload(true)}
-                                >
-                                    Ανέβασε το πρώτο αρχείο
-                                </button>
+                                {application?.status !== 'Καταχωρήθηκε' && (
+                                    <button
+                                        className="upload-first-file"
+                                        onClick={() => setShowFileUpload(true)}
+                                    >
+                                        Ανέβασε το πρώτο αρχείο
+                                    </button>
+                                )}
                             </div>
                         ) : (
                             <div className="files-grid">
@@ -1389,10 +1398,11 @@ const ApplicationDetailPage = () => {
             )}
 
             {selectedFile && (
-                <FilePreview 
+                <FilePreview
                     attachment={selectedFile}
                     onClose={() => setSelectedFile(null)}
                     onDelete={handleFileDelete}
+                    applicationStatus={application?.status}
                 />
             )}
         </div>

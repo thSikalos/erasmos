@@ -34,6 +34,22 @@ const uploadFile = async (req, res) => {
 
         console.log('Processing file:', file.originalname, 'Size:', file.size);
 
+        // Check application status - only allow uploads if not "Καταχωρήθηκε"
+        const statusQuery = `SELECT status FROM applications WHERE application_id = $1`;
+        const statusResult = await pool.query(statusQuery, [applicationId]);
+
+        if (statusResult.rows.length === 0) {
+            return res.status(404).json({ message: 'Application not found' });
+        }
+
+        const applicationStatus = statusResult.rows[0].status;
+        if (applicationStatus === 'Καταχωρήθηκε') {
+            return res.status(403).json({
+                message: 'Δεν επιτρέπεται η ανέβασμα αρχείων σε καταχωρημένες αιτήσεις',
+                status: applicationStatus
+            });
+        }
+
         // Generate unique filename
         const fileName = generateFileName(file.originalname);
         const s3Key = `attachments/${applicationId}/${fileName}`;
@@ -258,12 +274,28 @@ const deleteAttachment = async (req, res) => {
         // Get attachment info
         const attachmentQuery = `SELECT * FROM attachments WHERE id = $1`;
         const attachmentResult = await pool.query(attachmentQuery, [id]);
-        
+
         if (attachmentResult.rows.length === 0) {
             return res.status(404).json({ message: 'Attachment not found' });
         }
 
         const attachment = attachmentResult.rows[0];
+
+        // Check application status - only allow deletes if not "Καταχωρήθηκε"
+        const statusQuery = `SELECT status FROM applications WHERE application_id = $1`;
+        const statusResult = await pool.query(statusQuery, [attachment.application_id]);
+
+        if (statusResult.rows.length === 0) {
+            return res.status(404).json({ message: 'Application not found' });
+        }
+
+        const applicationStatus = statusResult.rows[0].status;
+        if (applicationStatus === 'Καταχωρήθηκε') {
+            return res.status(403).json({
+                message: 'Δεν επιτρέπεται η διαγραφή αρχείων από καταχωρημένες αιτήσεις',
+                status: applicationStatus
+            });
+        }
 
         // Check permissions
         if (userRole !== 'Admin' && attachment.user_id !== userId) {

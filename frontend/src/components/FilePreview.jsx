@@ -2,7 +2,7 @@ import React, { useState, useContext } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import axios from 'axios';
 
-const FilePreview = ({ attachment, onClose, onDelete }) => {
+const FilePreview = ({ attachment, onClose, onDelete, applicationStatus }) => {
     const { token } = useContext(AuthContext);
     const [isLoading, setIsLoading] = useState(false);
     const [previewUrl, setPreviewUrl] = useState(null);
@@ -269,13 +269,15 @@ const FilePreview = ({ attachment, onClose, onDelete }) => {
                         </button>
                     )}
 
-                    <button 
-                        className="action-button delete"
-                        onClick={() => setShowDeleteConfirm(true)}
-                        disabled={isLoading}
-                    >
-                        🗑️ Διαγραφή
-                    </button>
+                    {applicationStatus !== 'Καταχωρήθηκε' && (
+                        <button
+                            className="action-button delete"
+                            onClick={() => setShowDeleteConfirm(true)}
+                            disabled={isLoading}
+                        >
+                            🗑️ Διαγραφή
+                        </button>
+                    )}
                 </div>
 
                 {showDeleteConfirm && (
