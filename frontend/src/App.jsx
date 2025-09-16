@@ -23,7 +23,7 @@ import CustomersPage from './pages/CustomersPage';
 import CustomerDetailPage from './pages/CustomerDetailPage';
 import ReportingPage from './pages/ReportingPage';
 import NotificationsPage from './pages/NotificationsPage';
-import AdvancedApplicationsPage from './pages/AdvancedApplicationsPage';
+import ApplicationsPage from './pages/ApplicationsPage';
 import ProfilePage from './pages/ProfilePage';
 import MainLayout from './components/MainLayout';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -53,7 +53,7 @@ function App() {
             <Route path="/application/edit/:id" element={<EditApplicationPage />} />
             <Route path="/application/:id" element={<ApplicationDetailPage />} />
             <Route path="/renewals" element={<RenewalsPage />} />
-            <Route path="/applications" element={<AdvancedApplicationsPage />} />
+            <Route path="/applications" element={<ApplicationsPage />} />
             <Route path="/notifications" element={<NotificationsPage />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route element={<FinanceProtectedRoute />}>

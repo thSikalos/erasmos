@@ -598,7 +598,7 @@ const exportRenewals = async (req, res) => {
 const getTeamApplications = async (req, res) => {
     const userId = req.user.id;
     const userRole = req.user.role;
-    const { paid_status } = req.query; // 'paid', 'unpaid', or 'all'
+    const { paid_status, status_filter } = req.query; // 'paid', 'unpaid', or 'all' for paid_status, specific status for status_filter
 
     try {
         // Build user filter based on role
@@ -633,6 +633,13 @@ const getTeamApplications = async (req, res) => {
             paymentFilter = 'AND a.is_paid_by_company = TRUE';
         } else if (paid_status === 'unpaid') {
             paymentFilter = 'AND a.is_paid_by_company = FALSE';
+        }
+
+        // Build status filter
+        let statusFilter = '';
+        if (status_filter) {
+            statusFilter = `AND a.status = $${paramIndex++}`;
+            queryParams.push(status_filter);
         }
 
         const query = `
@@ -684,8 +691,8 @@ const getTeamApplications = async (req, res) => {
             LEFT JOIN field_payments fp ON cf.id = fp.field_id AND fp.application_id = a.id
             LEFT JOIN clawbacks cb ON fp.id = cb.field_payment_id AND cb.is_settled = false
             LEFT JOIN statement_items si ON si.application_id = a.id AND si.field_id = cf.id
-            WHERE ${userFilter} 
-                AND a.status = 'Καταχωρήθηκε' 
+            WHERE ${userFilter}
+                ${statusFilter}
                 ${paymentFilter}
             GROUP BY a.id, a.total_commission, a.is_paid_by_company, a.created_at,
                      c.full_name, c.phone, comp.name, u.name

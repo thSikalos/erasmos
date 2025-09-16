@@ -1046,3 +1046,110 @@ h3 { margin-top: 0; border-bottom: 1px solid #eee; padding-bottom: 0.5rem; }
         min-width: 40px;
     }
 }
+
+/* --- MULTIPLE APPLICATIONS TABLES STYLES --- */
+
+.multiple-applications-container {
+    display: flex;
+    flex-direction: column;
+    gap: 30px;
+    margin-top: 20px;
+}
+
+.applications-section {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 15px;
+    overflow: hidden;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+}
+
+.applications-header {
+    padding: 20px 25px;
+    font-weight: bold;
+    color: white;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.applications-header h2 {
+    margin: 0;
+    font-size: 1.3rem;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+/* Status specific colors */
+.pending-status {
+    background: linear-gradient(135deg, #ff9a56 0%, #ff6b35 100%);
+}
+
+.onhold-status {
+    background: linear-gradient(135deg, #ffd93d 0%, #ff9500 100%);
+}
+
+.registered-status {
+    background: linear-gradient(135deg, #4ade80 0%, #22c55e 100%);
+}
+
+.applications-section .applications-table-container {
+    padding: 0;
+    background: transparent;
+}
+
+.applications-section .applications-table {
+    margin: 0;
+    background: transparent;
+}
+
+.applications-section .applications-table thead th {
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    padding: 15px 12px;
+}
+
+.applications-section .applications-table tbody tr {
+    background: rgba(255, 255, 255, 0.05);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.applications-section .applications-table tbody tr:hover {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+.applications-section .applications-table tbody td {
+    padding: 15px 12px;
+    color: white;
+    border: none;
+}
+
+.applications-section .empty-state {
+    padding: 40px 25px;
+    text-align: center;
+    color: rgba(255, 255, 255, 0.8);
+    font-style: italic;
+}
+
+/* Responsive design for multiple tables */
+@media (max-width: 768px) {
+    .multiple-applications-container {
+        gap: 20px;
+    }
+
+    .applications-header {
+        padding: 15px 20px;
+    }
+
+    .applications-header h2 {
+        font-size: 1.1rem;
+    }
+
+    .applications-section .applications-table thead th,
+    .applications-section .applications-table tbody td {
+        padding: 10px 8px;
+        font-size: 0.85rem;
+    }
+}
