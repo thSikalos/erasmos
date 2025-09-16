@@ -65,8 +65,8 @@ const FilePreview = ({ attachment, onClose, onDelete }) => {
                 config
             );
 
-            if (response.data.downloadUrl) {
-                setPreviewUrl(response.data.downloadUrl);
+            if (response.data.url) {
+                setPreviewUrl(response.data.url);
             }
         } catch (error) {
             console.error('Preview error:', error);
@@ -85,10 +85,10 @@ const FilePreview = ({ attachment, onClose, onDelete }) => {
                 config
             );
 
-            if (response.data.downloadUrl) {
+            if (response.data.url) {
                 // Create temporary link to trigger download
                 const link = document.createElement('a');
-                link.href = response.data.downloadUrl;
+                link.href = response.data.url;
                 link.download = attachment.file_name;
                 document.body.appendChild(link);
                 link.click();

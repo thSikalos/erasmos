@@ -110,7 +110,7 @@ const getDownloadUrl = async (req, res) => {
         const { id } = req.params;
 
         // Get attachment info
-        const attachmentQuery = `SELECT cloud_url, file_name, file_path FROM attachments WHERE id = $1`;
+        const attachmentQuery = `SELECT cloud_url, file_name, file_path, application_id FROM attachments WHERE id = $1`;
         const attachmentResult = await pool.query(attachmentQuery, [id]);
 
         if (attachmentResult.rows.length === 0) {
@@ -121,9 +121,20 @@ const getDownloadUrl = async (req, res) => {
 
         // Check if file is stored in cloud or locally
         if (attachment.cloud_url) {
-            // File is in cloud storage, return cloud URL directly
+            // File is in cloud storage, extract S3 key from URL
+            const urlParts = attachment.cloud_url.split('/');
+            const bucketIndex = urlParts.findIndex(part => part.includes('s3'));
+            const s3Key = urlParts.slice(bucketIndex + 2).join('/'); // Extract everything after bucket name
+
+            const signedUrl = s3.getSignedUrl('getObject', {
+                Bucket: process.env.S3_BUCKET_NAME,
+                Key: s3Key,
+                Expires: 3600, // 1 hour
+                ResponseContentDisposition: `attachment; filename="${attachment.file_name}"`
+            });
+
             res.json({
-                url: attachment.cloud_url,
+                url: signedUrl,
                 filename: attachment.file_name
             });
         } else if (attachment.file_path) {
