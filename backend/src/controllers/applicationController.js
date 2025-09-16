@@ -292,18 +292,18 @@ const getApplicationById = async (req, res) => {
                 co.id as company_id, co.name as company_name, 
                 u.id as associate_id, u.name as associate_name, u.parent_user_id as associate_parent_id,
                 COALESCE(
-                    json_agg(DISTINCT 
+                    json_agg(DISTINCT
                         jsonb_build_object(
-                            'id', f.id, 
-                            'label', f.label, 
-                            'value', av.value, 
+                            'id', f.id,
+                            'label', f.label,
+                            'value', av.value,
                             'is_commissionable', f.is_commissionable,
-                            'commission_amount', f.commission_amount,
+                            'commission_amount', COALESCE(ufc.amount, 0),
                             'is_paid', COALESCE(fp.is_paid_by_company, false),
                             'has_clawback', CASE WHEN cb.id IS NOT NULL THEN true ELSE false END,
                             'is_in_statement', CASE WHEN si.id IS NOT NULL THEN true ELSE false END
                         )
-                    ) FILTER (WHERE f.id IS NOT NULL), 
+                    ) FILTER (WHERE f.id IS NOT NULL),
                     '[]'
                 ) as fields
             FROM applications app
@@ -312,6 +312,7 @@ const getApplicationById = async (req, res) => {
             JOIN users u ON app.user_id = u.id
             LEFT JOIN application_values av ON app.id = av.application_id
             LEFT JOIN fields f ON av.field_id = f.id
+            LEFT JOIN user_field_commissions ufc ON f.id = ufc.field_id AND ufc.associate_id = app.user_id
             LEFT JOIN field_payments fp ON f.id = fp.field_id AND fp.application_id = app.id
             LEFT JOIN clawbacks cb ON fp.id = cb.field_payment_id AND cb.is_settled = false
             LEFT JOIN statement_items si ON si.application_id = app.id AND si.field_id = f.id
@@ -857,9 +858,12 @@ const createFieldClawback = async (req, res) => {
             
             // Get the field payment record and field commission
             const fieldPaymentQuery = `
-                SELECT fp.id, f.commission_amount
+                SELECT fp.id, ufc.amount as commission_amount
                 FROM field_payments fp
-                JOIN fields f ON f.id = fp.field_id  
+                JOIN fields f ON f.id = fp.field_id
+                LEFT JOIN user_field_commissions ufc ON f.id = ufc.field_id AND ufc.associate_id = (
+                    SELECT user_id FROM applications WHERE id = $1
+                )
                 WHERE fp.application_id = $1 AND fp.field_id = $2 AND fp.is_paid_by_company = true
             `;
             const fieldPaymentResult = await client.query(fieldPaymentQuery, [applicationId, fieldId]);
