@@ -13,17 +13,25 @@ const {
     updateUser,
     deleteUser,
     getMyTeam,
+    forgotPassword,
+    resetPassword,
+    changePassword,
 } = require('../controllers/userController');
 
 // Public Routes
 router.post('/login', loginUser);
 router.post('/register', registerUserRequest);
+router.post('/forgot-password', forgotPassword);
+router.post('/reset-password', resetPassword);
 
 // --- All subsequent routes are protected ---
 router.use(authMiddleware);
 
 // Token Refresh Route
 router.post('/refresh-token', refreshToken);
+
+// Password Change Route (for authenticated users)
+router.post('/change-password', changePassword);
 
 
 // --- ADMIN ONLY ROUTES ---

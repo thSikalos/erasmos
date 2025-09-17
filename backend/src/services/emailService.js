@@ -132,6 +132,25 @@ class EmailService {
                     })
                 };
 
+            case 'PASSWORD_RESET':
+                return {
+                    subject: 'Επαναφορά κωδικού πρόσβασης - ERASMOS',
+                    text: `Αγαπητέ ${data.name},\n\nΛάβαμε αίτημα επαναφοράς κωδικού πρόσβασης για τον λογαριασμό σας στο σύστημα ERASMOS.\n\nΓια να επαναφέρετε τον κωδικό σας, κάντε κλικ στον παρακάτω σύνδεσμο:\n${data.resetUrl}\n\nΑυτός ο σύνδεσμος θα λήξει σε 1 ώρα για λόγους ασφαλείας.\n\nΑν δεν ζητήσατε εσείς αυτή την επαναφορά, παρακαλώ αγνοήστε αυτό το email.\n\nΜε εκτίμηση,\nΗ ομάδα ERASMOS`,
+                    html: this.createHtmlTemplate({
+                        title: 'Επαναφορά Κωδικού Πρόσβασης',
+                        content: `<p>Αγαπητέ <strong>${data.name}</strong>,</p>
+                                 <p>Λάβαμε αίτημα επαναφοράς κωδικού πρόσβασης για τον λογαριασμό σας στο σύστημα <strong>ERASMOS</strong>.</p>
+                                 <div style="background: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                                    <p style="margin: 0;"><strong>⚠️ Σημαντικό:</strong> Αυτός ο σύνδεσμος θα λήξει σε <strong>1 ώρα</strong> για λόγους ασφαλείας.</p>
+                                 </div>
+                                 <div style="text-align: center; margin: 30px 0;">
+                                    <a href="${data.resetUrl}" style="background: linear-gradient(135deg, #667eea, #764ba2); color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; display: inline-block; font-weight: 600; font-size: 16px;">🔐 Επαναφορά Κωδικού</a>
+                                 </div>
+                                 <p style="color: #666; font-size: 14px; margin-top: 30px;">Αν δεν ζητήσατε εσείς αυτή την επαναφορά, παρακαλώ αγνοήστε αυτό το email. Ο κωδικός σας παραμένει ασφαλής.</p>`,
+                        linkUrl: null // Already included in the content
+                    })
+                };
+
             case 'MONTHLY_SUMMARY':
                 return {
                     subject: 'Μηνιαία ενημέρωση αμοιβών',

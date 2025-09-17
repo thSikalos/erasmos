@@ -1,40 +1,123 @@
-import React, { useState, useContext } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
-import { AuthContext } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
+import { getApiUrl } from '../config/api';
 import '../App.css';
 
-const LoginPage = () => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const { login } = useContext(AuthContext);
-  const { showInfoToast } = useNotifications();
+const ResetPasswordPage = () => {
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { showSuccessToast, showErrorToast } = useNotifications();
 
-  const handleLogin = async (e) => {
+  const [formData, setFormData] = useState({
+    newPassword: '',
+    confirmPassword: ''
+  });
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [token, setToken] = useState('');
+  const [isValidToken, setIsValidToken] = useState(true);
+
+  useEffect(() => {
+    const tokenFromUrl = searchParams.get('token');
+    if (!tokenFromUrl) {
+      setIsValidToken(false);
+      setError('Λείπει το token επαναφοράς από το URL');
+    } else {
+      setToken(tokenFromUrl);
+    }
+  }, [searchParams]);
+
+  const handleInputChange = (e) => {
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value
+    });
+    setError('');
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
     setError('');
 
+    // Validation
+    if (formData.newPassword.length < 6) {
+      setError('Ο κωδικός πρέπει να έχει τουλάχιστον 6 χαρακτήρες');
+      setIsLoading(false);
+      return;
+    }
+
+    if (formData.newPassword !== formData.confirmPassword) {
+      setError('Οι κωδικοί δεν ταιριάζουν');
+      setIsLoading(false);
+      return;
+    }
+
     try {
-      const response = await axios.post('http://localhost:3000/api/users/login', { email, password });
-      login(response.data.token);
-      navigate('/dashboard');
+      const response = await axios.post(getApiUrl('users/reset-password'), {
+        token: token,
+        newPassword: formData.newPassword
+      });
+
+      showSuccessToast(
+        'Επιτυχία!',
+        'Ο κωδικός σας επαναφέρθηκε επιτυχώς. Μπορείτε τώρα να συνδεθείτε'
+      );
+
+      // Redirect to login page after 2 seconds
+      setTimeout(() => {
+        navigate('/login');
+      }, 2000);
+
     } catch (err) {
-      setError(err.response?.data?.message || 'Παρουσιάστηκε σφάλμα κατά τη σύνδεση');
+      const errorMessage = err.response?.data?.message || 'Παρουσιάστηκε σφάλμα. Παρακαλώ δοκιμάστε ξανά';
+      setError(errorMessage);
+      showErrorToast('Σφάλμα', errorMessage);
     } finally {
       setIsLoading(false);
     }
   };
 
+  if (!isValidToken) {
+    return (
+      <div className="modern-reset-password-container">
+        <div className="floating-shapes">
+          <div className="shape"></div>
+          <div className="shape"></div>
+          <div className="shape"></div>
+        </div>
+
+        <div className="modern-reset-password-form error-state">
+          <div className="reset-password-header">
+            <div className="error-icon">❌</div>
+            <h1 className="reset-password-title">Άκυρο Link</h1>
+            <p className="reset-password-subtitle">Το link επαναφοράς είναι άκυρο ή έχει λήξει</p>
+          </div>
+
+          <div className="error-message">
+            <p>Το link που χρησιμοποιήσατε είναι άκυρο ή έχει λήξει. Παρακαλώ ζητήστε νέο link επαναφοράς κωδικού.</p>
+          </div>
+
+          <div className="reset-password-links">
+            <Link to="/forgot-password" className="forgot-password-link">
+              🔑 Νέο Link Επαναφοράς
+            </Link>
+            <Link to="/login" className="back-to-login-link">
+              ← Επιστροφή στη Σύνδεση
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="modern-login-container">
+    <div className="modern-reset-password-container">
       <style>
         {`
-          .modern-login-container {
+          .modern-reset-password-container {
             min-height: 100vh;
             display: flex;
             justify-content: center;
@@ -44,8 +127,8 @@ const LoginPage = () => {
             overflow: hidden;
             padding: 20px;
           }
-          
-          .modern-login-container::before {
+
+          .modern-reset-password-container::before {
             content: '';
             position: absolute;
             top: 0;
@@ -55,7 +138,7 @@ const LoginPage = () => {
             background: linear-gradient(45deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%);
             pointer-events: none;
           }
-          
+
           .floating-shapes {
             position: absolute;
             width: 100%;
@@ -63,14 +146,14 @@ const LoginPage = () => {
             overflow: hidden;
             pointer-events: none;
           }
-          
+
           .shape {
             position: absolute;
             background: rgba(255, 255, 255, 0.1);
             border-radius: 50%;
             animation: float 6s ease-in-out infinite;
           }
-          
+
           .shape:nth-child(1) {
             width: 80px;
             height: 80px;
@@ -78,7 +161,7 @@ const LoginPage = () => {
             left: 10%;
             animation-delay: 0s;
           }
-          
+
           .shape:nth-child(2) {
             width: 60px;
             height: 60px;
@@ -86,7 +169,7 @@ const LoginPage = () => {
             right: 10%;
             animation-delay: 2s;
           }
-          
+
           .shape:nth-child(3) {
             width: 40px;
             height: 40px;
@@ -94,14 +177,14 @@ const LoginPage = () => {
             right: 20%;
             animation-delay: 4s;
           }
-          
+
           @keyframes float {
             0%, 100% { transform: translateY(0) rotate(0deg); }
             33% { transform: translateY(-20px) rotate(120deg); }
             66% { transform: translateY(10px) rotate(240deg); }
           }
-          
-          .modern-login-form {
+
+          .modern-reset-password-form {
             background: rgba(255, 255, 255, 0.15);
             backdrop-filter: blur(20px);
             border-radius: 25px;
@@ -114,8 +197,8 @@ const LoginPage = () => {
             overflow: hidden;
             z-index: 10;
           }
-          
-          .modern-login-form::before {
+
+          .modern-reset-password-form::before {
             content: '';
             position: absolute;
             top: -50%;
@@ -126,25 +209,27 @@ const LoginPage = () => {
             transform: rotate(45deg);
             animation: shimmer 4s ease-in-out infinite;
           }
-          
+
           @keyframes shimmer {
             0%, 100% { transform: translateX(-100%) translateY(-100%) rotate(45deg); }
             50% { transform: translateX(100%) translateY(100%) rotate(45deg); }
           }
-          
-          .login-header {
+
+          .reset-password-header {
             text-align: center;
             margin-bottom: 40px;
             position: relative;
             z-index: 2;
           }
-          
-          .app-logo-login {
-            font-size: 2.5rem;
-            margin-bottom: 10px;
+
+          .error-icon,
+          .success-icon {
+            font-size: 3rem;
+            margin-bottom: 15px;
+            display: block;
           }
-          
-          .login-title {
+
+          .reset-password-title {
             font-size: 2rem;
             font-weight: 700;
             background: linear-gradient(135deg, #667eea, #764ba2);
@@ -155,8 +240,8 @@ const LoginPage = () => {
             position: relative;
             z-index: 2;
           }
-          
-          .login-subtitle {
+
+          .reset-password-subtitle {
             color: #6b7280;
             font-size: 1rem;
             font-weight: 400;
@@ -164,17 +249,17 @@ const LoginPage = () => {
             position: relative;
             z-index: 2;
           }
-          
-          .modern-login-form form {
+
+          .modern-reset-password-form form {
             position: relative;
             z-index: 2;
           }
-          
+
           .modern-form-group {
             margin-bottom: 25px;
             position: relative;
           }
-          
+
           .modern-form-group label {
             display: block;
             margin-bottom: 8px;
@@ -184,7 +269,7 @@ const LoginPage = () => {
             position: relative;
             z-index: 2;
           }
-          
+
           .modern-input {
             width: 100%;
             padding: 15px 20px;
@@ -198,7 +283,7 @@ const LoginPage = () => {
             position: relative;
             z-index: 2;
           }
-          
+
           .modern-input:focus {
             outline: none;
             border-color: #667eea;
@@ -206,12 +291,20 @@ const LoginPage = () => {
             background: rgba(255, 255, 255, 1);
             transform: translateY(-2px);
           }
-          
+
           .modern-input::placeholder {
             color: #9ca3af;
           }
-          
-          .modern-login-button {
+
+          .password-strength {
+            margin-top: 8px;
+            font-size: 0.85rem;
+            color: #6b7280;
+            position: relative;
+            z-index: 2;
+          }
+
+          .modern-reset-password-button {
             width: 100%;
             padding: 16px 20px;
             background: linear-gradient(135deg, #667eea, #764ba2);
@@ -229,8 +322,8 @@ const LoginPage = () => {
             margin-top: 10px;
             z-index: 2;
           }
-          
-          .modern-login-button::before {
+
+          .modern-reset-password-button::before {
             content: '';
             position: absolute;
             top: 0;
@@ -240,26 +333,26 @@ const LoginPage = () => {
             background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
             transition: all 0.5s ease;
           }
-          
-          .modern-login-button:hover::before {
+
+          .modern-reset-password-button:hover::before {
             left: 100%;
           }
-          
-          .modern-login-button:hover {
+
+          .modern-reset-password-button:hover {
             transform: translateY(-3px);
             box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
           }
-          
-          .modern-login-button:active {
+
+          .modern-reset-password-button:active {
             transform: translateY(-1px);
           }
-          
-          .modern-login-button:disabled {
+
+          .modern-reset-password-button:disabled {
             opacity: 0.7;
             cursor: not-allowed;
             transform: none;
           }
-          
+
           .loading-spinner {
             display: inline-block;
             width: 20px;
@@ -270,12 +363,12 @@ const LoginPage = () => {
             animation: spin 1s linear infinite;
             margin-right: 10px;
           }
-          
+
           @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
           }
-          
+
           .modern-error-message {
             background: rgba(239, 68, 68, 0.1);
             color: #dc2626;
@@ -289,8 +382,8 @@ const LoginPage = () => {
             z-index: 2;
             backdrop-filter: blur(10px);
           }
-          
-          .login-links {
+
+          .reset-password-links {
             display: flex;
             flex-direction: column;
             gap: 12px;
@@ -300,8 +393,8 @@ const LoginPage = () => {
             z-index: 2;
           }
 
-          .forgot-password-link,
-          .new-user-link {
+          .back-to-login-link,
+          .forgot-password-link {
             color: rgba(255, 255, 255, 0.8);
             text-decoration: none;
             font-size: 0.9rem;
@@ -313,156 +406,152 @@ const LoginPage = () => {
             backdrop-filter: blur(10px);
           }
 
-          .forgot-password-link:hover,
-          .new-user-link:hover {
+          .back-to-login-link:hover,
+          .forgot-password-link:hover {
             background: rgba(255, 255, 255, 0.2);
             color: white;
             transform: translateY(-2px);
             box-shadow: 0 4px 15px rgba(255, 255, 255, 0.1);
           }
 
-          .new-user-link {
+          .forgot-password-link {
             background: rgba(102, 126, 234, 0.2);
             border: 1px solid rgba(102, 126, 234, 0.3);
             color: rgba(255, 255, 255, 0.9);
             font-weight: 600;
           }
 
-          .new-user-link:hover {
+          .forgot-password-link:hover {
             background: rgba(102, 126, 234, 0.3);
             border-color: rgba(102, 126, 234, 0.5);
             box-shadow: 0 4px 15px rgba(102, 126, 234, 0.2);
           }
 
-          .welcome-message {
-            text-align: center;
-            margin-top: 30px;
+          .error-message {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.2);
             padding: 20px;
-            background: rgba(102, 126, 234, 0.1);
             border-radius: 12px;
-            border: 1px solid rgba(102, 126, 234, 0.2);
-            color: #374151;
-            font-size: 0.9rem;
-            line-height: 1.5;
+            margin: 25px 0;
             position: relative;
             z-index: 2;
+            color: #374151;
+            line-height: 1.6;
+            text-align: center;
           }
-          
-          .feature-highlight {
-            color: #667eea;
-            font-weight: 600;
+
+          .error-state {
+            text-align: center;
           }
-          
+
           @media (max-width: 768px) {
-            .modern-login-container {
+            .modern-reset-password-container {
               padding: 15px;
             }
-            
-            .modern-login-form {
+
+            .modern-reset-password-form {
               padding: 40px 30px;
             }
-            
-            .login-title {
+
+            .reset-password-title {
               font-size: 1.8rem;
             }
-            
+
             .modern-input {
               padding: 12px 16px;
             }
-            
-            .modern-login-button {
+
+            .modern-reset-password-button {
               padding: 14px 18px;
               font-size: 1rem;
             }
           }
-          
+
           @media (max-width: 480px) {
-            .modern-login-form {
+            .modern-reset-password-form {
               padding: 30px 25px;
             }
-            
-            .login-title {
+
+            .reset-password-title {
               font-size: 1.6rem;
             }
           }
         `}
       </style>
-      
+
       <div className="floating-shapes">
         <div className="shape"></div>
         <div className="shape"></div>
         <div className="shape"></div>
       </div>
-      
-      <div className="modern-login-form">
-        <div className="login-header">
-          <div className="app-logo-login">✨</div>
-          <h1 className="login-title">Erasmos App</h1>
-          <p className="login-subtitle">Σύνδεση στην πλατφόρμα διαχείρισης</p>
+
+      <div className="modern-reset-password-form">
+        <div className="reset-password-header">
+          <div className="success-icon">🔐</div>
+          <h1 className="reset-password-title">Νέος Κωδικός</h1>
+          <p className="reset-password-subtitle">Εισάγετε τον νέο σας κωδικό πρόσβασης</p>
         </div>
-        
-        <form onSubmit={handleLogin}>
+
+        <form onSubmit={handleSubmit}>
           <div className="modern-form-group">
-            <label htmlFor="email">📧 Email</label>
-            <input 
-              id="email"
-              type="email" 
-              value={email} 
-              onChange={(e) => setEmail(e.target.value)} 
+            <label htmlFor="newPassword">🔒 Νέος Κωδικός</label>
+            <input
+              id="newPassword"
+              name="newPassword"
+              type="password"
+              value={formData.newPassword}
+              onChange={handleInputChange}
               className="modern-input"
-              placeholder="Εισάγετε το email σας"
-              required 
+              placeholder="Εισάγετε τον νέο κωδικό"
+              required
+              disabled={isLoading}
+            />
+            <div className="password-strength">
+              Ο κωδικός πρέπει να έχει τουλάχιστον 6 χαρακτήρες
+            </div>
+          </div>
+
+          <div className="modern-form-group">
+            <label htmlFor="confirmPassword">🔒 Επιβεβαίωση Κωδικού</label>
+            <input
+              id="confirmPassword"
+              name="confirmPassword"
+              type="password"
+              value={formData.confirmPassword}
+              onChange={handleInputChange}
+              className="modern-input"
+              placeholder="Επιβεβαιώστε τον νέο κωδικό"
+              required
               disabled={isLoading}
             />
           </div>
-          
-          <div className="modern-form-group">
-            <label htmlFor="password">🔒 Κωδικός Πρόσβασης</label>
-            <input 
-              id="password"
-              type="password" 
-              value={password} 
-              onChange={(e) => setPassword(e.target.value)} 
-              className="modern-input"
-              placeholder="Εισάγετε τον κωδικό σας"
-              required 
-              disabled={isLoading}
-            />
-          </div>
-          
-          <button 
-            type="submit" 
-            className="modern-login-button" 
+
+          <button
+            type="submit"
+            className="modern-reset-password-button"
             disabled={isLoading}
           >
             {isLoading ? (
               <>
                 <span className="loading-spinner"></span>
-                Σύνδεση...
+                Επαναφορά...
               </>
             ) : (
-              '🚀 Σύνδεση'
+              '✅ Επαναφορά Κωδικού'
             )}
           </button>
         </form>
 
         {error && <div className="modern-error-message">❌ {error}</div>}
 
-        <div className="login-links">
-          <Link to="/forgot-password" className="forgot-password-link">
-            🔑 Ξέχασα τον κωδικό μου
+        <div className="reset-password-links">
+          <Link to="/login" className="back-to-login-link">
+            ← Επιστροφή στη Σύνδεση
           </Link>
-          <a href="/register" className="new-user-link">
-            👤 Νέος χρήστης; πάτα εδώ!
-          </a>
-        </div>
-
-        <div className="welcome-message">
-          💼 Καλώς ήρθατε στον <span className="feature-highlight">Έρασμο</span>
         </div>
       </div>
     </div>
   );
 };
 
-export default LoginPage;
+export default ResetPasswordPage;

@@ -1,7 +1,7 @@
 // Centralized API configuration
 export const API_CONFIG = {
     // Use current backend URL
-    BASE_URL: 'http://localhost:3000',
+    BASE_URL: 'http://localhost:8080',
 
     // Timeout configuration
     TIMEOUT: 30000, // 30 seconds

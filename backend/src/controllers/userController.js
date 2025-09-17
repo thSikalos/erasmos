@@ -1,6 +1,7 @@
 const pool = require('../config/db');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 const PDFDocument = require('pdfkit');
 const path = require('path');
 const documentGenerator = require('../utils/documentGenerator');
@@ -303,6 +304,186 @@ const getUserById = async (req, res) => {
     }
 };
 
+// --- FORGOT PASSWORD ---
+const forgotPassword = async (req, res) => {
+    try {
+        const { email } = req.body;
+
+        if (!email) {
+            return res.status(400).json({ message: 'Παρακαλώ εισάγετε το email σας' });
+        }
+
+        // Check if user exists
+        const userResult = await pool.query(
+            'SELECT id, name, email FROM users WHERE email = $1 AND deleted_at IS NULL',
+            [email]
+        );
+
+        if (userResult.rows.length === 0) {
+            // Return success even if user doesn't exist for security reasons
+            return res.status(200).json({
+                message: 'Αν το email υπάρχει στο σύστημα, θα λάβετε οδηγίες επαναφοράς κωδικού'
+            });
+        }
+
+        const user = userResult.rows[0];
+
+        // Generate secure reset token
+        const resetToken = crypto.randomBytes(32).toString('hex');
+        const resetExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour from now
+
+        // Store token and expiration in database
+        await pool.query(
+            'UPDATE users SET password_reset_token = $1, password_reset_expires = $2 WHERE id = $3',
+            [resetToken, resetExpires, user.id]
+        );
+
+        // Create reset URL
+        const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/reset-password?token=${resetToken}`;
+
+        // Send email
+        try {
+            const emailService = new EmailService();
+            const emailContent = emailService.generateEmailContent('PASSWORD_RESET', {
+                name: user.name,
+                resetUrl: resetUrl
+            }, user.name);
+
+            await emailService.sendEmail({
+                to: user.email,
+                subject: emailContent.subject,
+                text: emailContent.text,
+                html: emailContent.html
+            });
+
+            console.log(`[PASSWORD_RESET] Reset email sent to: ${user.email}`);
+
+            res.status(200).json({
+                message: 'Αν το email υπάρχει στο σύστημα, θα λάβετε οδηγίες επαναφοράς κωδικού'
+            });
+
+        } catch (emailError) {
+            console.error('[PASSWORD_RESET] Failed to send email:', emailError);
+            // Clear the token if email fails
+            await pool.query(
+                'UPDATE users SET password_reset_token = NULL, password_reset_expires = NULL WHERE id = $1',
+                [user.id]
+            );
+
+            res.status(500).json({
+                message: 'Παρουσιάστηκε σφάλμα κατά την αποστολή email. Παρακαλώ δοκιμάστε ξανά'
+            });
+        }
+
+    } catch (err) {
+        console.error('[FORGOT_PASSWORD] Error:', err.message);
+        res.status(500).json({ message: 'Παρουσιάστηκε σφάλμα. Παρακαλώ δοκιμάστε ξανά' });
+    }
+};
+
+// --- RESET PASSWORD ---
+const resetPassword = async (req, res) => {
+    try {
+        const { token, newPassword } = req.body;
+
+        if (!token || !newPassword) {
+            return res.status(400).json({ message: 'Απαιτούνται όλα τα πεδία' });
+        }
+
+        if (newPassword.length < 6) {
+            return res.status(400).json({ message: 'Ο κωδικός πρέπει να έχει τουλάχιστον 6 χαρακτήρες' });
+        }
+
+        // Find user by token and check if token is not expired
+        const userResult = await pool.query(
+            'SELECT id, name, email FROM users WHERE password_reset_token = $1 AND password_reset_expires > NOW() AND deleted_at IS NULL',
+            [token]
+        );
+
+        if (userResult.rows.length === 0) {
+            return res.status(400).json({
+                message: 'Το token επαναφοράς είναι άκυρο ή έχει λήξει. Παρακαλώ ζητήστε νέο link επαναφοράς'
+            });
+        }
+
+        const user = userResult.rows[0];
+
+        // Hash new password
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+        // Update password and clear reset token
+        await pool.query(
+            'UPDATE users SET password = $1, password_reset_token = NULL, password_reset_expires = NULL WHERE id = $2',
+            [hashedPassword, user.id]
+        );
+
+        console.log(`[PASSWORD_RESET] Password successfully reset for user: ${user.email}`);
+
+        res.status(200).json({
+            message: 'Ο κωδικός σας επαναφέρθηκε επιτυχώς. Μπορείτε τώρα να συνδεθείτε με τον νέο κωδικό'
+        });
+
+    } catch (err) {
+        console.error('[RESET_PASSWORD] Error:', err.message);
+        res.status(500).json({ message: 'Παρουσιάστηκε σφάλμα. Παρακαλώ δοκιμάστε ξανά' });
+    }
+};
+
+// --- CHANGE PASSWORD (for logged-in users) ---
+const changePassword = async (req, res) => {
+    try {
+        const { currentPassword, newPassword } = req.body;
+        const userId = req.user.id;
+
+        if (!currentPassword || !newPassword) {
+            return res.status(400).json({ message: 'Απαιτούνται όλα τα πεδία' });
+        }
+
+        if (newPassword.length < 6) {
+            return res.status(400).json({ message: 'Ο νέος κωδικός πρέπει να έχει τουλάχιστον 6 χαρακτήρες' });
+        }
+
+        // Get user's current password
+        const userResult = await pool.query(
+            'SELECT id, password FROM users WHERE id = $1 AND deleted_at IS NULL',
+            [userId]
+        );
+
+        if (userResult.rows.length === 0) {
+            return res.status(404).json({ message: 'Χρήστης δεν βρέθηκε' });
+        }
+
+        const user = userResult.rows[0];
+
+        // Verify current password
+        const isCurrentPasswordValid = await bcrypt.compare(currentPassword, user.password);
+        if (!isCurrentPasswordValid) {
+            return res.status(400).json({ message: 'Ο τρέχων κωδικός είναι λανθασμένος' });
+        }
+
+        // Hash new password
+        const salt = await bcrypt.genSalt(10);
+        const hashedNewPassword = await bcrypt.hash(newPassword, salt);
+
+        // Update password
+        await pool.query(
+            'UPDATE users SET password = $1 WHERE id = $2',
+            [hashedNewPassword, userId]
+        );
+
+        console.log(`[CHANGE_PASSWORD] Password successfully changed for user ID: ${userId}`);
+
+        res.status(200).json({
+            message: 'Ο κωδικός σας άλλαξε επιτυχώς'
+        });
+
+    } catch (err) {
+        console.error('[CHANGE_PASSWORD] Error:', err.message);
+        res.status(500).json({ message: 'Παρουσιάστηκε σφάλμα. Παρακαλώ δοκιμάστε ξανά' });
+    }
+};
+
 
 module.exports = {
     loginUser,
@@ -314,4 +495,7 @@ module.exports = {
     updateUser,
     deleteUser,
     getMyTeam,
+    forgotPassword,
+    resetPassword,
+    changePassword,
 };
