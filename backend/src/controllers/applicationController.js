@@ -399,18 +399,71 @@ const markAsPaid = async (req, res) => {
 // --- MARK AS UNPAID ---
 const markAsUnpaid = async (req, res) => {
     const { id } = req.params;
+
+    const client = await pool.connect();
     try {
-        const result = await pool.query(
+        await client.query('BEGIN');
+
+        // First check if the application is in any statement
+        const statementCheckQuery = `
+            SELECT COUNT(*) as statement_count
+            FROM statement_items si
+            WHERE si.application_id = $1
+        `;
+        const statementCheckResult = await client.query(statementCheckQuery, [id]);
+        const statementCount = parseInt(statementCheckResult.rows[0].statement_count);
+
+        if (statementCount > 0) {
+            await client.query('ROLLBACK');
+            return res.status(400).json({
+                message: 'Δεν μπορείτε να αφαιρέσετε το μαρκάρισμα πληρωμής από αίτηση που είναι σε ταμειακή κατάσταση',
+                reason: 'application_in_statement',
+                statementCount: statementCount
+            });
+        }
+
+        // Also check for field-level payments in statements
+        const fieldStatementCheckQuery = `
+            SELECT COUNT(*) as field_statement_count
+            FROM field_payments fp
+            JOIN statement_items si ON (
+                si.application_id = fp.application_id
+                AND (si.field_id = fp.field_id OR si.field_id IS NULL)
+            )
+            WHERE fp.application_id = $1 AND fp.is_paid_by_company = TRUE
+        `;
+        const fieldStatementCheckResult = await client.query(fieldStatementCheckQuery, [id]);
+        const fieldStatementCount = parseInt(fieldStatementCheckResult.rows[0].field_statement_count);
+
+        if (fieldStatementCount > 0) {
+            await client.query('ROLLBACK');
+            return res.status(400).json({
+                message: 'Δεν μπορείτε να αφαιρέσετε το μαρκάρισμα πληρωμής γιατί υπάρχουν field payments σε ταμειακές καταστάσεις',
+                reason: 'field_payments_in_statement',
+                fieldStatementCount: fieldStatementCount
+            });
+        }
+
+        // If no statements found, proceed with unmarking as paid
+        const result = await client.query(
             "UPDATE applications SET is_paid_by_company = FALSE WHERE id = $1 RETURNING *",
             [id]
         );
+
         if (result.rows.length === 0) {
+            await client.query('ROLLBACK');
             return res.status(404).json({ message: 'Application not found' });
         }
+
+        await client.query('COMMIT');
         res.json(result.rows[0]);
+
     } catch (err) {
-        console.error(err.message);
-        res.status(500).send('Server Error');
+        await client.query('ROLLBACK');
+        console.error('Error in markAsUnpaid:', err.message);
+        res.status(500).json({ message: 'Server Error', error: err.message });
+    } finally {
+        client.release();
     }
 };
 
@@ -854,72 +907,108 @@ const updateFieldPaymentStatus = async (req, res) => {
 // Create field-level clawback
 const createFieldClawback = async (req, res) => {
     const { applicationId, fieldId } = req.params;
-    const { percentage, reason } = req.body;
+    const { percentage = 12, reason } = req.body;
     const userId = req.user.id;
-    
+
+    // Validate percentage (1-12)
+    if (!percentage || percentage < 1 || percentage > 12 || !Number.isInteger(Number(percentage))) {
+        return res.status(400).json({
+            message: 'Το ποσοστό clawback πρέπει να είναι ακέραιος αριθμός από 1 έως 12 δωδέκατα',
+            validRange: '1-12'
+        });
+    }
+
+    const client = await pool.connect();
     try {
-        const client = await pool.connect();
-        
-        try {
-            await client.query('BEGIN');
-            
-            // Get the field payment record and field commission
-            const fieldPaymentQuery = `
-                SELECT fp.id, ufc.amount as commission_amount
-                FROM field_payments fp
-                JOIN fields f ON f.id = fp.field_id
-                LEFT JOIN user_field_commissions ufc ON f.id = ufc.field_id AND ufc.associate_id = (
-                    SELECT user_id FROM applications WHERE id = $1
-                )
-                WHERE fp.application_id = $1 AND fp.field_id = $2 AND fp.is_paid_by_company = true
-            `;
-            const fieldPaymentResult = await client.query(fieldPaymentQuery, [applicationId, fieldId]);
-            
-            if (fieldPaymentResult.rows.length === 0) {
-                return res.status(400).json({ 
-                    message: 'Field must be paid before creating a clawback' 
-                });
-            }
-            
-            const fieldPaymentId = fieldPaymentResult.rows[0].id;
-            const commissionAmount = fieldPaymentResult.rows[0].commission_amount || 0;
-            
-            // Calculate clawback amount: (commission * percentage / 12)
-            const clawbackAmount = (commissionAmount * percentage / 12).toFixed(2);
-            
-            // Create the clawback
-            const clawbackQuery = `
-                INSERT INTO clawbacks (user_id, application_id, field_id, field_payment_id, amount, reason)
-                VALUES ($1, $2, $3, $4, $5, $6)
-                RETURNING *
-            `;
-            const clawbackResult = await client.query(clawbackQuery, [
-                userId, 
-                applicationId, 
-                fieldId, 
-                fieldPaymentId, 
-                clawbackAmount, 
-                reason
-            ]);
-            
-            await client.query('COMMIT');
-            
-            res.status(201).json({
-                success: true,
-                clawback: clawbackResult.rows[0],
-                message: 'Field clawback created successfully'
-            });
-            
-        } catch (error) {
+        await client.query('BEGIN');
+
+        // First check if field is in a statement (requirement: can only clawback fields in statements)
+        const statementCheckQuery = `
+            SELECT COUNT(*) as statement_count
+            FROM statement_items si
+            WHERE si.application_id = $1 AND si.field_id = $2
+        `;
+        const statementCheckResult = await client.query(statementCheckQuery, [applicationId, fieldId]);
+        const isInStatement = parseInt(statementCheckResult.rows[0].statement_count) > 0;
+
+        if (!isInStatement) {
             await client.query('ROLLBACK');
-            throw error;
-        } finally {
-            client.release();
+            return res.status(400).json({
+                message: 'Το clawback μπορεί να γίνει μόνο σε πεδία που είναι ήδη σε ταμειακή κατάσταση',
+                reason: 'field_not_in_statement'
+            });
         }
-        
+
+        // Check for existing unsettled clawback on this field
+        const existingClawbackQuery = `
+            SELECT id FROM clawbacks
+            WHERE application_id = $1 AND field_id = $2 AND is_settled = false
+        `;
+        const existingClawbackResult = await client.query(existingClawbackQuery, [applicationId, fieldId]);
+
+        if (existingClawbackResult.rows.length > 0) {
+            await client.query('ROLLBACK');
+            return res.status(400).json({
+                message: 'Υπάρχει ήδη ενεργό clawback για αυτό το πεδίο',
+                reason: 'duplicate_clawback',
+                existingClawbackId: existingClawbackResult.rows[0].id
+            });
+        }
+
+        // Get the field payment record and field commission
+        const fieldPaymentQuery = `
+            SELECT fp.id, cf.commission_amount
+            FROM field_payments fp
+            JOIN applications a ON a.id = fp.application_id
+            JOIN company_fields cf ON cf.field_id = fp.field_id AND cf.company_id = a.company_id
+            WHERE fp.application_id = $1 AND fp.field_id = $2 AND fp.is_paid_by_company = true
+        `;
+        const fieldPaymentResult = await client.query(fieldPaymentQuery, [applicationId, fieldId]);
+
+        if (fieldPaymentResult.rows.length === 0) {
+            await client.query('ROLLBACK');
+            return res.status(400).json({
+                message: 'Το πεδίο πρέπει να είναι πληρωμένο από την εταιρία για να δημιουργηθεί clawback',
+                reason: 'field_not_paid'
+            });
+        }
+
+        const fieldPaymentId = fieldPaymentResult.rows[0].id;
+        const commissionAmount = fieldPaymentResult.rows[0].commission_amount || 0;
+
+        // Calculate clawback amount: (commission * percentage / 12)
+        const clawbackAmount = (commissionAmount * percentage / 12).toFixed(2);
+
+        // Create the clawback with percentage
+        const clawbackQuery = `
+            INSERT INTO clawbacks (user_id, application_id, field_id, field_payment_id, amount, reason, clawback_percentage)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            RETURNING *
+        `;
+        const clawbackResult = await client.query(clawbackQuery, [
+            userId,
+            applicationId,
+            fieldId,
+            fieldPaymentId,
+            clawbackAmount,
+            reason,
+            percentage
+        ]);
+
+        await client.query('COMMIT');
+
+        res.status(201).json({
+            success: true,
+            clawback: clawbackResult.rows[0],
+            message: 'Field clawback created successfully'
+        });
+
     } catch (err) {
+        await client.query('ROLLBACK');
         console.error('Error creating field clawback:', err.message);
-        res.status(500).send('Server Error');
+        res.status(500).json({ message: 'Server Error', error: err.message });
+    } finally {
+        client.release();
     }
 };
 
