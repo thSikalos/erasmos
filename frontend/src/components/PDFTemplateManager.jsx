@@ -756,9 +756,9 @@ const PDFTemplateManager = ({ company, onClose }) => {
                 )}
             </div>
 
-            {/* Simple PDF Mapping Interface */}
+            {/* Visual PDF Mapping Interface */}
             {showMappingInterface && mappingInterfaceData && (
-                <SimplePDFViewer
+                <VisualPDFMapper
                     templateId={mappingInterfaceData.templateId}
                     availableFields={mappingInterfaceData.availableFields}
                     onMappingsSaved={handleMappingsSaved}

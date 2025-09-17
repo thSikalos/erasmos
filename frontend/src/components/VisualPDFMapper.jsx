@@ -24,6 +24,8 @@ const VisualPDFMapper = ({
     const [pdfError, setPdfError] = useState(false);
     const [savingMappings, setSavingMappings] = useState(false);
     const [scale, setScale] = useState(1.0);
+    const [jumpToPage, setJumpToPage] = useState('');
+    const [showPageOverview, setShowPageOverview] = useState(false);
 
     const pageRef = useRef(null);
 
@@ -31,6 +33,30 @@ const VisualPDFMapper = ({
         loadPDF();
         loadExistingMappings();
     }, [templateId]);
+
+    // Keyboard navigation
+    useEffect(() => {
+        const handleKeyPress = (e) => {
+            if (e.target.tagName === 'INPUT') return; // Skip if typing in input fields
+
+            switch (e.key) {
+                case 'ArrowLeft':
+                    e.preventDefault();
+                    setCurrentPage(prev => Math.max(prev - 1, 1));
+                    break;
+                case 'ArrowRight':
+                    e.preventDefault();
+                    setCurrentPage(prev => Math.min(prev + 1, numPages || 1));
+                    break;
+                case 'Escape':
+                    setSelectedField(null);
+                    break;
+            }
+        };
+
+        document.addEventListener('keydown', handleKeyPress);
+        return () => document.removeEventListener('keydown', handleKeyPress);
+    }, [numPages]);
 
     const loadPDF = async () => {
         try {
@@ -79,12 +105,21 @@ const VisualPDFMapper = ({
 
     const onDocumentLoadSuccess = ({ numPages }) => {
         setNumPages(numPages);
-        console.log(`[VisualPDFMapper] PDF loaded with ${numPages} pages`);
+        setPdfError(false); // Clear any previous errors
+        console.log(`[VisualPDFMapper] ✅ PDF loaded successfully with ${numPages} pages`);
     };
 
     const onDocumentLoadError = (error) => {
-        console.error('Error loading PDF document:', error);
+        console.error('❌ Error loading PDF document:', error);
+
+        // Check for specific version mismatch error
+        if (error.message && error.message.includes('API version') && error.message.includes('Worker version')) {
+            console.error('🔧 Version mismatch detected - react-pdf and pdfjs-dist versions are incompatible');
+        }
+
         setPdfError(true);
+        setNumPages(null);
+        setCurrentPage(1);
     };
 
     const handleFieldSelect = (field) => {
@@ -99,8 +134,34 @@ const VisualPDFMapper = ({
         if (!pageElement) return;
 
         const rect = pageElement.getBoundingClientRect();
-        const x = ((event.clientX - rect.left) / rect.width) * 100; // Percentage from left
-        const y = ((event.clientY - rect.top) / rect.height) * 100; // Percentage from top
+
+        // Calculate more precise coordinates
+        const rawX = event.clientX - rect.left;
+        const rawY = event.clientY - rect.top;
+
+        // Ensure coordinates are within bounds
+        const x = Math.max(0, Math.min(100, (rawX / rect.width) * 100));
+        const y = Math.max(0, Math.min(100, (rawY / rect.height) * 100));
+
+        // Validate field placement (avoid overlapping)
+        const fieldWidth = getDefaultWidth(selectedField.type);
+        const fieldHeight = getDefaultHeight(selectedField.type);
+
+        // Check for overlapping with existing mappings on same page
+        const overlappingMapping = mappings.find(mapping => {
+            if (mapping.page !== currentPage) return false;
+
+            const xOverlap = Math.abs(mapping.position.x - x) < (mapping.position.width + fieldWidth) / 2;
+            const yOverlap = Math.abs(mapping.position.y - y) < (mapping.position.height + fieldHeight) / 2;
+
+            return xOverlap && yOverlap;
+        });
+
+        if (overlappingMapping) {
+            if (!window.confirm(`Υπάρχει ήδη το πεδίο "${overlappingMapping.fieldLabel}" κοντά σε αυτό το σημείο. Θέλετε να συνεχίσετε;`)) {
+                return;
+            }
+        }
 
         const newMapping = {
             id: Date.now(), // Temporary ID
@@ -109,16 +170,70 @@ const VisualPDFMapper = ({
             fieldType: selectedField.type,
             page: currentPage,
             position: {
-                x: x,
-                y: y,
-                width: getDefaultWidth(selectedField.type),
-                height: getDefaultHeight(selectedField.type)
+                x: Math.round(x * 100) / 100, // Round to 2 decimal places
+                y: Math.round(y * 100) / 100,
+                width: fieldWidth,
+                height: fieldHeight
             },
-            isRequired: true
+            isRequired: true,
+            timestamp: new Date().toISOString()
         };
 
         setMappings(prev => [...prev, newMapping]);
-        console.log(`[VisualPDFMapper] Added mapping:`, newMapping);
+
+        // Visual feedback with precise coordinates
+        console.log(`[VisualPDFMapper] Added precise mapping for "${selectedField.label}" at (${newMapping.position.x}%, ${newMapping.position.y}%) on page ${currentPage}`);
+
+        // Show temporary success indicator
+        showSuccessIndicator(event.target, newMapping);
+    };
+
+    const showSuccessIndicator = (target, mapping) => {
+        const indicator = document.createElement('div');
+        indicator.style.cssText = `
+            position: absolute;
+            left: ${mapping.position.x}%;
+            top: ${mapping.position.y}%;
+            width: 30px;
+            height: 30px;
+            background: linear-gradient(135deg, #27ae60, #2ecc71);
+            border: 2px solid white;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 14px;
+            animation: mappingSuccess 2s ease-out forwards;
+            box-shadow: 0 4px 12px rgba(39, 174, 96, 0.4);
+        `;
+        indicator.textContent = '✓';
+
+        // Add keyframe animation
+        if (!document.getElementById('mapping-success-styles')) {
+            const style = document.createElement('style');
+            style.id = 'mapping-success-styles';
+            style.textContent = `
+                @keyframes mappingSuccess {
+                    0% { transform: translate(-50%, -50%) scale(0.5); opacity: 0; }
+                    30% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; }
+                    70% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+                    100% { transform: translate(-50%, -50%) scale(0.8); opacity: 0; }
+                }
+            `;
+            document.head.appendChild(style);
+        }
+
+        pageRef.current.appendChild(indicator);
+
+        setTimeout(() => {
+            if (indicator.parentNode) {
+                indicator.parentNode.removeChild(indicator);
+            }
+        }, 2000);
     };
 
     const getDefaultWidth = (fieldType) => {
@@ -156,6 +271,83 @@ const VisualPDFMapper = ({
         setMappings(prev => prev.filter(m => m.id !== mappingId));
     };
 
+    const handleJumpToPage = () => {
+        const pageNum = parseInt(jumpToPage);
+        if (pageNum >= 1 && pageNum <= numPages) {
+            setCurrentPage(pageNum);
+            setJumpToPage('');
+        } else {
+            alert(`Παρακαλώ εισάγετε έγκυρο αριθμό σελίδας (1-${numPages})`);
+        }
+    };
+
+    const getPageMappingCount = (pageNumber) => {
+        return mappings.filter(mapping => mapping.page === pageNumber).length;
+    };
+
+    const getTotalMappingsAcrossPages = () => {
+        const pageStats = {};
+        mappings.forEach(mapping => {
+            pageStats[mapping.page] = (pageStats[mapping.page] || 0) + 1;
+        });
+        return pageStats;
+    };
+
+    const validateMappings = () => {
+        const errors = [];
+        const warnings = [];
+
+        // Check for duplicate field mappings
+        const fieldCounts = {};
+        mappings.forEach(mapping => {
+            const key = `${mapping.fieldId}`;
+            fieldCounts[key] = (fieldCounts[key] || 0) + 1;
+        });
+
+        Object.entries(fieldCounts).forEach(([fieldId, count]) => {
+            if (count > 1) {
+                const field = availableFields.find(f => f.id.toString() === fieldId);
+                warnings.push(`Το πεδίο "${field?.label}" είναι mapped ${count} φορές`);
+            }
+        });
+
+        // Check for mappings outside PDF bounds
+        mappings.forEach(mapping => {
+            if (mapping.position.x < 0 || mapping.position.x > 100 ||
+                mapping.position.y < 0 || mapping.position.y > 100) {
+                errors.push(`Το πεδίο "${mapping.fieldLabel}" στη σελίδα ${mapping.page} είναι εκτός ορίων`);
+            }
+        });
+
+        // Check for page validity
+        mappings.forEach(mapping => {
+            if (mapping.page < 1 || mapping.page > numPages) {
+                errors.push(`Το πεδίο "${mapping.fieldLabel}" είναι στη μη έγκυρη σελίδα ${mapping.page}`);
+            }
+        });
+
+        return { errors, warnings };
+    };
+
+    const showValidationResults = () => {
+        const { errors, warnings } = validateMappings();
+
+        let message = '🔍 Validation Results:\n\n';
+
+        if (errors.length === 0 && warnings.length === 0) {
+            message += '✅ Όλα τα mappings είναι έγκυρα!';
+        } else {
+            if (errors.length > 0) {
+                message += '❌ Σφάλματα:\n' + errors.join('\n') + '\n\n';
+            }
+            if (warnings.length > 0) {
+                message += '⚠️ Προειδοποιήσεις:\n' + warnings.join('\n');
+            }
+        }
+
+        alert(message);
+    };
+
     const handleSaveMappings = async () => {
         try {
             setSavingMappings(true);
@@ -163,6 +355,23 @@ const VisualPDFMapper = ({
             if (mappings.length === 0) {
                 alert('Παρακαλώ δημιουργήστε τουλάχιστον ένα mapping πριν αποθηκεύσετε');
                 return;
+            }
+
+            // Run validation before saving
+            const { errors, warnings } = validateMappings();
+
+            if (errors.length > 0) {
+                alert('❌ Δεν μπορεί να γίνει αποθήκευση λόγω σφαλμάτων:\n\n' + errors.join('\n'));
+                return;
+            }
+
+            if (warnings.length > 0) {
+                const proceed = window.confirm(
+                    '⚠️ Βρέθηκαν προειδοποιήσεις:\n\n' +
+                    warnings.join('\n') +
+                    '\n\nΘέλετε να συνεχίσετε;'
+                );
+                if (!proceed) return;
             }
 
             const token = localStorage.getItem('token');
@@ -307,6 +516,16 @@ const VisualPDFMapper = ({
                         box-shadow: 0 4px 12px rgba(39, 174, 96, 0.3);
                     }
 
+                    .validate-btn {
+                        background: linear-gradient(135deg, #3498db, #2980b9);
+                        color: white;
+                    }
+
+                    .validate-btn:hover:not(:disabled) {
+                        transform: translateY(-2px);
+                        box-shadow: 0 4px 12px rgba(52, 152, 219, 0.3);
+                    }
+
                     .close-btn {
                         background: linear-gradient(135deg, #95a5a6, #7f8c8d);
                         color: white;
@@ -343,9 +562,11 @@ const VisualPDFMapper = ({
                         justify-content: space-between;
                         align-items: center;
                         margin-bottom: 15px;
-                        padding: 10px;
+                        padding: 15px;
                         background: rgba(255, 255, 255, 0.1);
                         border-radius: 8px;
+                        flex-wrap: wrap;
+                        gap: 15px;
                     }
 
                     .page-controls {
@@ -393,6 +614,72 @@ const VisualPDFMapper = ({
 
                     .zoom-btn:hover {
                         background: rgba(52, 152, 219, 0.5);
+                    }
+
+                    .page-display {
+                        margin: 0 10px;
+                        font-weight: 600;
+                    }
+
+                    .page-mapping-count {
+                        color: #3498db;
+                        font-size: 0.9rem;
+                        margin-left: 5px;
+                    }
+
+                    .jump-to-page {
+                        display: flex;
+                        align-items: center;
+                        gap: 8px;
+                    }
+
+                    .jump-input {
+                        width: 80px;
+                        padding: 6px 10px;
+                        border: 1px solid rgba(255, 255, 255, 0.3);
+                        border-radius: 4px;
+                        background: rgba(255, 255, 255, 0.1);
+                        color: white;
+                        font-size: 0.9rem;
+                    }
+
+                    .jump-input::placeholder {
+                        color: rgba(255, 255, 255, 0.5);
+                        font-size: 0.8rem;
+                    }
+
+                    .jump-input:focus {
+                        outline: none;
+                        border-color: #3498db;
+                        background: rgba(255, 255, 255, 0.15);
+                    }
+
+                    .jump-btn, .overview-btn {
+                        background: rgba(52, 152, 219, 0.3);
+                        color: #3498db;
+                        border: none;
+                        border-radius: 4px;
+                        padding: 6px 12px;
+                        cursor: pointer;
+                        font-weight: 600;
+                        font-size: 0.9rem;
+                        transition: all 0.3s ease;
+                    }
+
+                    .jump-btn:hover:not(:disabled), .overview-btn:hover {
+                        background: rgba(52, 152, 219, 0.5);
+                        transform: translateY(-1px);
+                    }
+
+                    .jump-btn:disabled {
+                        opacity: 0.5;
+                        cursor: not-allowed;
+                        transform: none;
+                    }
+
+                    .page-overview-toggle {
+                        display: flex;
+                        align-items: center;
                     }
 
                     .pdf-container {
@@ -489,6 +776,69 @@ const VisualPDFMapper = ({
                         font-size: 0.8rem;
                     }
 
+                    .mappings-filter {
+                        margin-left: auto;
+                    }
+
+                    .page-filter-select {
+                        background: rgba(255, 255, 255, 0.1);
+                        color: white;
+                        border: 1px solid rgba(255, 255, 255, 0.3);
+                        border-radius: 4px;
+                        padding: 4px 8px;
+                        font-size: 0.8rem;
+                        cursor: pointer;
+                    }
+
+                    .page-filter-select:focus {
+                        outline: none;
+                        border-color: #3498db;
+                    }
+
+                    .mapping-item.current-page {
+                        border-left: 3px solid #3498db;
+                        background: rgba(52, 152, 219, 0.1);
+                    }
+
+                    .other-pages-summary {
+                        margin-top: 15px;
+                        padding-top: 15px;
+                        border-top: 1px solid rgba(255, 255, 255, 0.2);
+                    }
+
+                    .summary-header {
+                        color: rgba(255, 255, 255, 0.8);
+                        font-size: 0.9rem;
+                        font-weight: 600;
+                        margin-bottom: 10px;
+                    }
+
+                    .page-summary-item {
+                        background: rgba(255, 255, 255, 0.05);
+                        border: 1px solid rgba(255, 255, 255, 0.1);
+                        border-radius: 6px;
+                        padding: 8px 12px;
+                        margin-bottom: 6px;
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        cursor: pointer;
+                        transition: all 0.3s ease;
+                        font-size: 0.9rem;
+                        color: rgba(255, 255, 255, 0.8);
+                    }
+
+                    .page-summary-item:hover {
+                        background: rgba(52, 152, 219, 0.1);
+                        border-color: #3498db;
+                        color: white;
+                    }
+
+                    .goto-indicator {
+                        color: #3498db;
+                        font-weight: 600;
+                    }
+
                     .remove-mapping-btn {
                         background: rgba(231, 76, 60, 0.3);
                         color: #e74c3c;
@@ -539,6 +889,100 @@ const VisualPDFMapper = ({
                         100% { transform: rotate(360deg); }
                     }
 
+                    .page-overview-panel {
+                        background: rgba(255, 255, 255, 0.05);
+                        border-radius: 12px;
+                        padding: 15px;
+                        margin-top: 15px;
+                        border: 1px solid rgba(255, 255, 255, 0.1);
+                        max-height: 300px;
+                        overflow-y: auto;
+                    }
+
+                    .overview-header {
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        margin-bottom: 15px;
+                        padding-bottom: 10px;
+                        border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+                    }
+
+                    .overview-header h4 {
+                        color: white;
+                        margin: 0;
+                        font-size: 1.1rem;
+                    }
+
+                    .close-overview-btn {
+                        background: rgba(231, 76, 60, 0.3);
+                        color: #e74c3c;
+                        border: none;
+                        border-radius: 4px;
+                        padding: 4px 8px;
+                        cursor: pointer;
+                        font-weight: 600;
+                    }
+
+                    .close-overview-btn:hover {
+                        background: #e74c3c;
+                        color: white;
+                    }
+
+                    .page-thumbnails {
+                        display: grid;
+                        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+                        gap: 10px;
+                    }
+
+                    .page-thumbnail {
+                        background: rgba(255, 255, 255, 0.1);
+                        border: 2px solid rgba(255, 255, 255, 0.2);
+                        border-radius: 8px;
+                        padding: 8px;
+                        cursor: pointer;
+                        transition: all 0.3s ease;
+                        text-align: center;
+                    }
+
+                    .page-thumbnail:hover {
+                        border-color: #3498db;
+                        background: rgba(52, 152, 219, 0.1);
+                        transform: translateY(-2px);
+                    }
+
+                    .page-thumbnail.current {
+                        border-color: #3498db;
+                        background: rgba(52, 152, 219, 0.2);
+                        box-shadow: 0 4px 12px rgba(52, 152, 219, 0.3);
+                    }
+
+                    .page-thumbnail canvas {
+                        border-radius: 4px;
+                        background: white;
+                        margin-bottom: 8px;
+                    }
+
+                    .thumbnail-info {
+                        color: white;
+                        font-size: 0.8rem;
+                    }
+
+                    .page-number {
+                        display: block;
+                        font-weight: 600;
+                        margin-bottom: 4px;
+                    }
+
+                    .mapping-badge {
+                        background: #3498db;
+                        color: white;
+                        padding: 2px 6px;
+                        border-radius: 4px;
+                        font-size: 0.7rem;
+                        font-weight: 600;
+                    }
+
                     @media (max-width: 1200px) {
                         .mapper-content {
                             grid-template-columns: 1fr;
@@ -548,6 +992,15 @@ const VisualPDFMapper = ({
                         .fields-section {
                             order: -1;
                         }
+
+                        .pdf-controls {
+                            flex-direction: column;
+                            gap: 10px;
+                        }
+
+                        .page-thumbnails {
+                            grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+                        }
                     }
                 `}
             </style>
@@ -555,6 +1008,14 @@ const VisualPDFMapper = ({
             <div className="mapper-header">
                 <h2>🎯 Visual PDF Field Mapping</h2>
                 <div className="header-actions">
+                    <button
+                        className="action-btn validate-btn"
+                        onClick={showValidationResults}
+                        disabled={mappings.length === 0}
+                        title="Validate mappings quality"
+                    >
+                        🔍 Validate
+                    </button>
                     <button
                         className="action-btn save-btn"
                         onClick={handleSaveMappings}
@@ -576,16 +1037,56 @@ const VisualPDFMapper = ({
                                 className="page-btn"
                                 onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                                 disabled={currentPage <= 1}
+                                title="Previous page (←)"
                             >
                                 ←
                             </button>
-                            <span>Σελίδα {currentPage} από {numPages}</span>
+                            <span className="page-display">
+                                Σελίδα {currentPage} από {numPages}
+                                {getPageMappingCount(currentPage) > 0 && (
+                                    <span className="page-mapping-count">
+                                        ({getPageMappingCount(currentPage)} mappings)
+                                    </span>
+                                )}
+                            </span>
                             <button
                                 className="page-btn"
                                 onClick={() => setCurrentPage(prev => Math.min(prev + 1, numPages))}
                                 disabled={currentPage >= numPages}
+                                title="Next page (→)"
                             >
                                 →
+                            </button>
+                        </div>
+
+                        <div className="jump-to-page">
+                            <input
+                                type="number"
+                                min="1"
+                                max={numPages}
+                                value={jumpToPage}
+                                onChange={(e) => setJumpToPage(e.target.value)}
+                                placeholder="Jump to..."
+                                className="jump-input"
+                                onKeyPress={(e) => e.key === 'Enter' && handleJumpToPage()}
+                            />
+                            <button
+                                className="jump-btn"
+                                onClick={handleJumpToPage}
+                                disabled={!jumpToPage}
+                                title="Go to page"
+                            >
+                                Go
+                            </button>
+                        </div>
+
+                        <div className="page-overview-toggle">
+                            <button
+                                className="overview-btn"
+                                onClick={() => setShowPageOverview(!showPageOverview)}
+                                title="Toggle page overview"
+                            >
+                                📋 Overview
                             </button>
                         </div>
 
@@ -593,6 +1094,7 @@ const VisualPDFMapper = ({
                             <button
                                 className="zoom-btn"
                                 onClick={() => setScale(prev => Math.max(prev - 0.2, 0.5))}
+                                title="Zoom out"
                             >
                                 −
                             </button>
@@ -600,6 +1102,7 @@ const VisualPDFMapper = ({
                             <button
                                 className="zoom-btn"
                                 onClick={() => setScale(prev => Math.min(prev + 0.2, 2.0))}
+                                title="Zoom in"
                             >
                                 +
                             </button>
@@ -621,6 +1124,53 @@ const VisualPDFMapper = ({
                         </Document>
                         {renderFieldIndicators()}
                     </div>
+
+                    {/* Page Overview Panel */}
+                    {showPageOverview && numPages > 1 && (
+                        <div className="page-overview-panel">
+                            <div className="overview-header">
+                                <h4>📄 Page Overview ({numPages} pages)</h4>
+                                <button
+                                    className="close-overview-btn"
+                                    onClick={() => setShowPageOverview(false)}
+                                >
+                                    ✕
+                                </button>
+                            </div>
+                            <div className="page-thumbnails">
+                                {Array.from({ length: numPages }, (_, index) => {
+                                    const pageNum = index + 1;
+                                    const mappingCount = getPageMappingCount(pageNum);
+                                    const isCurrentPage = pageNum === currentPage;
+
+                                    return (
+                                        <div
+                                            key={pageNum}
+                                            className={`page-thumbnail ${isCurrentPage ? 'current' : ''}`}
+                                            onClick={() => setCurrentPage(pageNum)}
+                                        >
+                                            <Document file={pdfBlob}>
+                                                <Page
+                                                    pageNumber={pageNum}
+                                                    scale={0.2}
+                                                    renderTextLayer={false}
+                                                    renderAnnotationLayer={false}
+                                                />
+                                            </Document>
+                                            <div className="thumbnail-info">
+                                                <span className="page-number">Σελίδα {pageNum}</span>
+                                                {mappingCount > 0 && (
+                                                    <span className="mapping-badge">
+                                                        {mappingCount} mappings
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 <div className="fields-section">
@@ -657,14 +1207,36 @@ const VisualPDFMapper = ({
                     <div className="mappings-list">
                         <div className="section-header">
                             ✅ Mappings ({mappings.length})
+                            {numPages > 1 && (
+                                <div className="mappings-filter">
+                                    <select
+                                        value={currentPage}
+                                        onChange={(e) => setCurrentPage(parseInt(e.target.value))}
+                                        className="page-filter-select"
+                                    >
+                                        {Array.from({ length: numPages }, (_, index) => {
+                                            const pageNum = index + 1;
+                                            const count = getPageMappingCount(pageNum);
+                                            return (
+                                                <option key={pageNum} value={pageNum}>
+                                                    Σελίδα {pageNum} ({count})
+                                                </option>
+                                            );
+                                        })}
+                                    </select>
+                                </div>
+                            )}
                         </div>
 
-                        {mappings.map(mapping => (
-                            <div key={mapping.id} className="mapping-item">
+                        {/* Current Page Mappings */}
+                        {mappings
+                            .filter(mapping => mapping.page === currentPage)
+                            .map(mapping => (
+                            <div key={mapping.id} className="mapping-item current-page">
                                 <div className="mapping-info">
                                     <div className="mapping-field">{mapping.fieldLabel}</div>
                                     <div className="mapping-position">
-                                        Σελίδα {mapping.page} • ({Math.round(mapping.position.x)}%, {Math.round(mapping.position.y)}%)
+                                        ({Math.round(mapping.position.x)}%, {Math.round(mapping.position.y)}%)
                                     </div>
                                 </div>
                                 <button
@@ -677,6 +1249,25 @@ const VisualPDFMapper = ({
                             </div>
                         ))}
 
+                        {/* Other Pages Summary */}
+                        {numPages > 1 && mappings.filter(m => m.page !== currentPage).length > 0 && (
+                            <div className="other-pages-summary">
+                                <div className="summary-header">📋 Άλλες σελίδες</div>
+                                {Object.entries(getTotalMappingsAcrossPages())
+                                    .filter(([page, count]) => parseInt(page) !== currentPage && count > 0)
+                                    .map(([page, count]) => (
+                                    <div
+                                        key={page}
+                                        className="page-summary-item"
+                                        onClick={() => setCurrentPage(parseInt(page))}
+                                    >
+                                        <span>Σελίδα {page}: {count} mappings</span>
+                                        <span className="goto-indicator">→</span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
                         {mappings.length === 0 && (
                             <div style={{
                                 color: 'rgba(255, 255, 255, 0.6)',
@@ -687,17 +1278,30 @@ const VisualPDFMapper = ({
                                 Δεν υπάρχουν mappings ακόμη
                             </div>
                         )}
+
+                        {mappings.filter(m => m.page === currentPage).length === 0 && mappings.length > 0 && (
+                            <div style={{
+                                color: 'rgba(255, 255, 255, 0.6)',
+                                textAlign: 'center',
+                                padding: '20px',
+                                fontStyle: 'italic'
+                            }}>
+                                Δεν υπάρχουν mappings στη σελίδα {currentPage}
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
 
             <div className="instructions">
-                <strong>💡 Οδηγίες:</strong><br />
-                • Επίλεξε ένα πεδίο από τη δεξιά στήλη (θα γίνει μπλε)<br />
-                • Κάνε κλικ στο PDF στο σημείο που θέλεις να τοποθετηθεί το πεδίο<br />
-                • Μπορείς να τοποθετήσεις το ίδιο πεδίο σε πολλά σημεία<br />
-                • Κάνε κλικ πάνω σε ένα mapping για να το αφαιρέσεις<br />
-                • Χρησιμοποίησε τα κουμπιά zoom και σελίδας για καλύτερη ακρίβεια
+                <strong>💡 Οδηγίες για Multi-page PDF Mapping:</strong><br />
+                • <strong>Πλοήγηση:</strong> Χρησιμοποίησε ← → ή τα κουμπιά για αλλαγή σελίδας<br />
+                • <strong>Jump to Page:</strong> Γράψε αριθμό σελίδας και πάτησε "Go" ή Enter<br />
+                • <strong>Overview:</strong> Πάτησε "📋 Overview" για προβολή όλων των σελίδων<br />
+                • <strong>Mapping:</strong> Επίλεξε πεδίο → κλικ στο PDF → αποθηκεύεται στη σωστή σελίδα<br />
+                • <strong>Keyboard:</strong> ← → για σελίδες, Escape για ακύρωση επιλογής<br />
+                • <strong>Zoom:</strong> + - κουμπιά για καλύτερη ακρίβεια mapping<br />
+                • <strong>Validation:</strong> Οι mappings εμφανίζονται μόνο στη σωστή σελίδα
             </div>
         </div>
     );
