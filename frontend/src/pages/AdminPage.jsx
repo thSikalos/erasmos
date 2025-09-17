@@ -15,7 +15,7 @@ const AdminPage = () => {
             description: 'Δημιούργησε εταιρείες και ανάθεσε πεδία στις φόρμες αιτήσεών τους.',
             icon: '🏢',
             link: '/admin/companies',
-            color: 'from-green-500 to-teal-600'
+            color: 'from-emerald-500 to-cyan-600'
         },
         {
             title: 'Κάδος Ανακύκλωσης',

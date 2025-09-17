@@ -68,12 +68,7 @@ export const AuthProvider = ({ children }) => {
         const decoded = jwtDecode(storedToken);
         console.log('[AUTH] Token decoded, user:', decoded.user?.email);
 
-        // Check if token contains old has_accepted_terms field - if so, force logout for new token
-        if (decoded.user && 'has_accepted_terms' in decoded.user) {
-          console.log('[AUTH] Old token format detected, forcing logout for new token');
-          logout();
-          return;
-        }
+        // Removed old token format check to fix login loop issue
 
         if (decoded.exp * 1000 < Date.now()) {
           console.log('[AUTH] Token expired, logging out');
@@ -96,7 +91,7 @@ export const AuthProvider = ({ children }) => {
     }
     setLoading(false);
     return () => { axios.interceptors.response.eject(interceptor); };
-  }, []); // Remove navigate dependency
+  }, [logout]); // Add logout dependency to prevent stale closures
 
   const login = useCallback((newToken) => {
     console.log('[AUTH] Login initiated with new token');

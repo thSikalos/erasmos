@@ -7,7 +7,7 @@ import { apiUrl } from '../utils/api';
 import '../App.css';
 
 const AdminFieldsPage = () => {
-    const { token } = useContext(AuthContext);
+    const { token, user } = useContext(AuthContext);
     const { showDeleteConfirm, showSuccessToast, showErrorToast } = useNotifications();
     const [fields, setFields] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -20,11 +20,51 @@ const AdminFieldsPage = () => {
     const [isCommissionable, setIsCommissionable] = useState(false);
     const [showInTable, setShowInTable] = useState(false);
 
+    // Dropdown options state
+    const [fieldOptions, setFieldOptions] = useState([]);
+    const [newOptionValue, setNewOptionValue] = useState('');
+    const [newOptionLabel, setNewOptionLabel] = useState('');
+
+    // Company selection state (for admin users)
+    const [companies, setCompanies] = useState([]);
+    const [selectedCompanyId, setSelectedCompanyId] = useState(null);
+
+    // Temporary ID counter for new options (negative numbers)
+    const [tempIdCounter, setTempIdCounter] = useState(-1);
+
+    const fetchCompanies = async () => {
+        if (!token || !user || user.role !== 'Admin') return;
+        try {
+            const config = { headers: { Authorization: `Bearer ${token}` } };
+            const res = await axios.get(apiUrl('/api/companies'), config);
+            setCompanies(res.data);
+            // Auto-select first company if none selected
+            if (res.data.length > 0 && !selectedCompanyId) {
+                setSelectedCompanyId(res.data[0].id);
+            }
+        } catch (err) {
+            console.error('Failed to fetch companies:', err);
+        }
+    };
+
     const fetchData = async () => {
         if (!token) return;
         try {
             const config = { headers: { Authorization: `Bearer ${token}` } };
             const res = await axios.get(apiUrl('/api/fields'), config);
+            console.log('Fields data received:', res.data);
+            // Log dropdown fields specifically
+            res.data.forEach(field => {
+                if (field.type === 'dropdown' && field.options) {
+                    console.log(`Dropdown field "${field.label}" options:`, field.options);
+                    field.options.forEach(opt => {
+                        console.log(`Option ID type: ${typeof opt.id}, value: ${opt.id}`);
+                        // Debug the disabled condition
+                        const isDisabled = typeof opt.id === 'number' && opt.id < 0;
+                        console.log(`Option ${opt.id} disabled: ${isDisabled} (isNegativeNumber=${typeof opt.id === 'number' && opt.id < 0})`);
+                    });
+                }
+            });
             setFields(res.data);
         } catch (err) {
             setError('Failed to fetch fields');
@@ -33,7 +73,10 @@ const AdminFieldsPage = () => {
         }
     };
 
-    useEffect(() => { fetchData(); }, [token]);
+    useEffect(() => {
+        fetchData();
+        fetchCompanies();
+    }, [token, user]);
 
     const resetForm = () => {
         setIsEditing(false);
@@ -42,6 +85,54 @@ const AdminFieldsPage = () => {
         setType('text');
         setIsCommissionable(false);
         setShowInTable(false);
+        setFieldOptions([]);
+        setNewOptionValue('');
+        setNewOptionLabel('');
+        setTempIdCounter(-1); // Reset temporary ID counter
+    };
+
+    // Dropdown options management
+    const addFieldOption = () => {
+        if (!newOptionValue.trim() || !newOptionLabel.trim()) {
+            showErrorToast('Σφάλμα', 'Παρακαλώ συμπλήρωσε και τα δύο πεδία');
+            return;
+        }
+
+        // Check for duplicate values
+        if (fieldOptions.some(opt => opt.value === newOptionValue.trim())) {
+            showErrorToast('Σφάλμα', 'Αυτή η τιμή υπάρχει ήδη');
+            return;
+        }
+
+        const newOption = {
+            id: tempIdCounter, // Negative ID for temporary options
+            value: newOptionValue.trim(),
+            label: newOptionLabel.trim(),
+            order: fieldOptions.length
+        };
+
+        setFieldOptions([...fieldOptions, newOption]);
+        setTempIdCounter(tempIdCounter - 1); // Decrement for next temporary option
+        setNewOptionValue('');
+        setNewOptionLabel('');
+    };
+
+    const removeFieldOption = (optionId) => {
+        setFieldOptions(fieldOptions.filter(opt => opt.id !== optionId));
+    };
+
+    const moveOptionUp = (index) => {
+        if (index === 0) return;
+        const newOptions = [...fieldOptions];
+        [newOptions[index], newOptions[index - 1]] = [newOptions[index - 1], newOptions[index]];
+        setFieldOptions(newOptions);
+    };
+
+    const moveOptionDown = (index) => {
+        if (index === fieldOptions.length - 1) return;
+        const newOptions = [...fieldOptions];
+        [newOptions[index], newOptions[index + 1]] = [newOptions[index + 1], newOptions[index]];
+        setFieldOptions(newOptions);
     };
 
     const handleEditClick = (field) => {
@@ -51,6 +142,18 @@ const AdminFieldsPage = () => {
         setType(field.type);
         setIsCommissionable(field.is_commissionable);
         setShowInTable(field.show_in_applications_table || false);
+
+        // Load options for dropdown fields
+        if (field.type === 'dropdown' && field.options) {
+            setFieldOptions(field.options.map(option => ({
+                id: option.id,
+                value: option.value,
+                label: option.label,
+                order: option.order
+            })));
+        } else {
+            setFieldOptions([]);
+        }
     };
 
     const handleDeleteClick = async (fieldId) => {
@@ -73,13 +176,29 @@ const AdminFieldsPage = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError('');
+
+        // Validate dropdown fields have options
+        if (type === 'dropdown' && fieldOptions.length === 0) {
+            showErrorToast('Σφάλμα', 'Τα dropdown πεδία χρειάζονται τουλάχιστον μία επιλογή');
+            return;
+        }
+
         const config = { headers: { Authorization: `Bearer ${token}` } };
-        const fieldData = { 
-            label, 
-            type, 
+        const fieldData = {
+            label,
+            type,
             is_commissionable: isCommissionable,
-            show_in_applications_table: showInTable 
+            show_in_applications_table: showInTable
         };
+
+        // Add options for dropdown fields
+        if (type === 'dropdown') {
+            fieldData.options = fieldOptions.map((option, index) => ({
+                value: option.value,
+                label: option.label,
+                order: index
+            }));
+        }
 
         try {
             if (isEditing) {
@@ -92,6 +211,125 @@ const AdminFieldsPage = () => {
         } catch (err) {
             setError(err.response?.data?.message || 'An error occurred');
         }
+    };
+
+    const handlePDFUpload = async (option) => {
+        // Check if option has valid ID (not temporary negative ID)
+        if (typeof option.id === 'number' && option.id < 0) {
+            showErrorToast('Σφάλμα', 'Παρακαλώ αποθηκεύστε το πεδίο πρώτα πριν ανεβάσετε PDF template');
+            return;
+        }
+
+        // Create a file input element dynamically
+        const fileInput = document.createElement('input');
+        fileInput.type = 'file';
+        fileInput.accept = '.pdf';
+        fileInput.style.display = 'none';
+
+        fileInput.onchange = async (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            if (file.type !== 'application/pdf') {
+                showErrorToast('Σφάλμα', 'Παρακαλώ επιλέξτε ένα αρχείο PDF');
+                return;
+            }
+
+            // Check file size (limit to 10MB)
+            const maxSize = 10 * 1024 * 1024; // 10MB
+            if (file.size > maxSize) {
+                showErrorToast('Σφάλμα', 'Το αρχείο PDF είναι πολύ μεγάλο. Μέγιστο μέγεθος: 10MB');
+                return;
+            }
+
+            try {
+                // Show loading state
+                const loadingToast = showErrorToast('Φόρτωση...', `Ανέβασμα PDF template για "${option.label}"...`);
+
+                const formData = new FormData();
+                formData.append('pdf', file);
+                formData.append('fieldOptionId', option.id);
+                formData.append('templateName', `${option.label} Template`);
+
+                // Add company ID for admin users
+                if (user?.role === 'Admin') {
+                    if (selectedCompanyId) {
+                        formData.append('companyId', selectedCompanyId);
+                        console.log('PDF Upload: Adding companyId:', selectedCompanyId);
+                    } else {
+                        console.warn('PDF Upload: No company selected for admin user');
+                        showErrorToast('Σφάλμα', 'Παρακαλώ επιλέξτε εταιρία πρώτα');
+                        return;
+                    }
+                }
+
+                console.log('PDF Upload: Sending request with fieldOptionId:', option.id);
+                console.log('PDF Upload: File details:', {
+                    name: file.name,
+                    size: file.size,
+                    type: file.type
+                });
+
+                const config = {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                        'Content-Type': 'multipart/form-data'
+                    },
+                    timeout: 60000 // 60 second timeout
+                };
+
+                const response = await axios.post(apiUrl('/api/pdf-templates/upload'), formData, config);
+
+                console.log('PDF Upload: Success response:', response.data);
+                showSuccessToast('Επιτυχία', `Το PDF template για "${option.label}" ανεβάστηκε επιτυχώς!`);
+
+                // Optionally refresh the field data to show updated status
+                fetchData();
+
+            } catch (err) {
+                console.error('PDF Upload: Error occurred:', err);
+
+                let errorMessage = 'Απέτυχε η ανάρτηση του PDF';
+                let errorDetails = '';
+
+                if (err.response) {
+                    // Server responded with error status
+                    errorMessage = err.response.data?.message || errorMessage;
+                    errorDetails = err.response.data?.details || '';
+
+                    console.error('PDF Upload: Server error:', err.response.status, err.response.data);
+
+                    if (err.response.status === 413) {
+                        errorMessage = 'Το αρχείο είναι πολύ μεγάλο';
+                    } else if (err.response.status === 400) {
+                        errorMessage = err.response.data?.message || 'Μη έγκυρα δεδομένα';
+                    } else if (err.response.status === 500) {
+                        errorMessage = 'Σφάλμα του διακομιστή. Παρακαλώ δοκιμάστε ξανά.';
+                    }
+                } else if (err.request) {
+                    // Request was made but no response received
+                    console.error('PDF Upload: Network error:', err.request);
+                    errorMessage = 'Σφάλμα δικτύου. Ελέγξτε τη σύνδεσή σας.';
+                } else {
+                    // Something else happened
+                    console.error('PDF Upload: Unknown error:', err.message);
+                    errorMessage = err.message || errorMessage;
+                }
+
+                // Show detailed error in development
+                if (process.env.NODE_ENV === 'development' && errorDetails) {
+                    console.error('PDF Upload: Error details:', errorDetails);
+                    errorMessage += '\n\nΠερισσότερες πληροφορίες στο console.';
+                }
+
+                showErrorToast('Σφάλμα PDF Upload', errorMessage);
+            }
+        };
+
+        // Trigger the file input
+        document.body.appendChild(fileInput);
+        fileInput.click();
+        document.body.removeChild(fileInput);
     };
 
     return (
@@ -323,6 +561,186 @@ const AdminFieldsPage = () => {
                     transform: translateY(-2px);
                 }
 
+                /* Dropdown Options Manager Styles */
+                .dropdown-options-manager {
+                    background: rgba(142, 68, 173, 0.1);
+                    border: 1px solid rgba(142, 68, 173, 0.3);
+                    border-radius: 12px;
+                    padding: 20px;
+                    margin: 20px 0;
+                }
+
+                .dropdown-options-manager h3 {
+                    color: #8e44ad;
+                    margin: 0 0 15px 0;
+                    font-size: 1.1rem;
+                }
+
+                .add-option-form {
+                    margin-bottom: 20px;
+                }
+
+                .option-inputs {
+                    display: flex;
+                    gap: 10px;
+                    align-items: center;
+                    flex-wrap: wrap;
+                }
+
+                .option-inputs input {
+                    flex: 1;
+                    min-width: 200px;
+                    padding: 8px 12px;
+                    border: 1px solid rgba(255, 255, 255, 0.2);
+                    border-radius: 8px;
+                    background: rgba(255, 255, 255, 0.1);
+                    color: white;
+                    font-size: 0.9rem;
+                }
+
+                .option-inputs input::placeholder {
+                    color: rgba(255, 255, 255, 0.6);
+                }
+
+                .add-option-btn {
+                    background: linear-gradient(135deg, #27ae60, #2ecc71);
+                    color: white;
+                    border: none;
+                    border-radius: 8px;
+                    padding: 8px 16px;
+                    cursor: pointer;
+                    font-weight: 600;
+                    transition: all 0.3s ease;
+                    white-space: nowrap;
+                }
+
+                .add-option-btn:hover {
+                    transform: translateY(-2px);
+                    box-shadow: 0 4px 15px rgba(39, 174, 96, 0.3);
+                }
+
+                .options-list {
+                    space-y: 8px;
+                }
+
+                .option-item {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    background: rgba(255, 255, 255, 0.1);
+                    border: 1px solid rgba(255, 255, 255, 0.2);
+                    border-radius: 8px;
+                    padding: 12px;
+                    margin-bottom: 8px;
+                }
+
+                .option-info {
+                    color: white;
+                    flex: 1;
+                }
+
+                .option-info strong {
+                    color: #8e44ad;
+                }
+
+                .option-actions {
+                    display: flex;
+                    gap: 8px;
+                }
+
+                .move-btn, .remove-btn, .pdf-upload-btn {
+                    border: none;
+                    border-radius: 6px;
+                    padding: 6px 10px;
+                    cursor: pointer;
+                    font-size: 0.8rem;
+                    transition: all 0.3s ease;
+                }
+
+                .move-btn {
+                    background: rgba(52, 152, 219, 0.3);
+                    color: #3498db;
+                }
+
+                .move-btn:hover:not(:disabled) {
+                    background: #3498db;
+                    color: white;
+                }
+
+                .move-btn:disabled {
+                    opacity: 0.4;
+                    cursor: not-allowed;
+                }
+
+                .remove-btn {
+                    background: rgba(231, 76, 60, 0.3);
+                    color: #e74c3c;
+                }
+
+                .remove-btn:hover {
+                    background: #e74c3c;
+                    color: white;
+                }
+
+                .pdf-upload-btn {
+                    background: rgba(155, 89, 182, 0.3);
+                    color: #9b59b6;
+                }
+
+                .pdf-upload-btn:hover:not(:disabled) {
+                    background: #9b59b6;
+                    color: white;
+                }
+
+                .pdf-upload-btn:disabled {
+                    background: rgba(155, 89, 182, 0.1);
+                    color: rgba(155, 89, 182, 0.4);
+                    cursor: not-allowed;
+                    opacity: 0.5;
+                }
+
+                .no-options-message {
+                    background: rgba(243, 156, 18, 0.1);
+                    border: 1px solid rgba(243, 156, 18, 0.3);
+                    border-radius: 8px;
+                    padding: 12px;
+                    color: #f39c12;
+                    text-align: center;
+                    font-weight: 600;
+                }
+
+                .options-count-badge {
+                    background: rgba(142, 68, 173, 0.3);
+                    color: #8e44ad;
+                    padding: 4px 8px;
+                    border-radius: 6px;
+                    font-size: 0.7rem;
+                    font-weight: 600;
+                }
+
+                .dropdown-options-preview {
+                    display: flex;
+                    gap: 8px;
+                    flex-wrap: wrap;
+                    margin-top: 8px;
+                    padding-left: 20px;
+                }
+
+                .option-preview {
+                    background: rgba(255, 255, 255, 0.1);
+                    color: rgba(255, 255, 255, 0.8);
+                    padding: 2px 8px;
+                    border-radius: 4px;
+                    font-size: 0.8rem;
+                    border: 1px solid rgba(255, 255, 255, 0.2);
+                }
+
+                .more-options {
+                    color: rgba(255, 255, 255, 0.6);
+                    font-style: italic;
+                    font-size: 0.8rem;
+                }
+
                 .error-message-modern {
                     background: rgba(239, 68, 68, 0.2);
                     border: 1px solid rgba(239, 68, 68, 0.3);
@@ -487,11 +905,30 @@ const AdminFieldsPage = () => {
                     100% { transform: rotate(360deg); }
                 }
 
+                @media (max-width: 1024px) {
+                    .main-content {
+                        grid-template-columns: 1fr;
+                        gap: 1.5rem;
+                    }
+                }
+
                 @media (max-width: 768px) {
                     .header-content {
                         flex-direction: column;
                         gap: 1rem;
                         text-align: center;
+                    }
+
+                    .header-content > div {
+                        flex-direction: column;
+                        gap: 0.5rem;
+                        width: 100%;
+                    }
+
+                    .header-content select {
+                        width: 100% !important;
+                        max-width: 200px;
+                        margin: 0 auto;
                     }
 
                     .header-title {
@@ -512,11 +949,100 @@ const AdminFieldsPage = () => {
                         flex-direction: column;
                         gap: 1rem;
                         align-items: flex-start;
+                        padding: 1rem;
+                    }
+
+                    .field-info {
+                        flex-direction: column;
+                        align-items: flex-start;
+                        gap: 0.5rem;
+                        width: 100%;
+                    }
+
+                    .dropdown-options-preview {
+                        margin-top: 0.5rem;
+                        padding-left: 0;
                     }
 
                     .action-buttons {
                         width: 100%;
-                        justify-content: flex-end;
+                        justify-content: flex-start;
+                        gap: 0.5rem;
+                        flex-wrap: wrap;
+                    }
+
+                    .edit-button,
+                    .delete-button {
+                        flex: 1;
+                        min-width: 80px;
+                        text-align: center;
+                        font-size: 0.9rem;
+                        padding: 10px 16px;
+                    }
+
+                    /* Dropdown options management mobile styles */
+                    .option-inputs {
+                        flex-direction: column;
+                        gap: 0.5rem;
+                    }
+
+                    .option-inputs input {
+                        min-width: auto;
+                        width: 100%;
+                    }
+
+                    .add-option-btn {
+                        width: 100%;
+                        margin-top: 0.5rem;
+                    }
+
+                    .option-item {
+                        flex-direction: column;
+                        gap: 0.5rem;
+                        align-items: flex-start;
+                    }
+
+                    .option-actions {
+                        width: 100%;
+                        justify-content: flex-start;
+                        flex-wrap: wrap;
+                        gap: 0.5rem;
+                    }
+
+                    .move-btn, .remove-btn, .pdf-upload-btn {
+                        flex: 1;
+                        min-width: 60px;
+                    }
+                }
+
+                @media (max-width: 480px) {
+                    .admin-fields-container {
+                        padding: 0;
+                    }
+
+                    .modern-header {
+                        padding: 1rem 0;
+                    }
+
+                    .header-content {
+                        padding: 0 1rem;
+                    }
+
+                    .main-content {
+                        padding: 0.5rem;
+                    }
+
+                    .form-card,
+                    .fields-list {
+                        padding: 1rem;
+                        margin: 0.5rem;
+                        border-radius: 15px;
+                    }
+
+                    .edit-button,
+                    .delete-button {
+                        font-size: 0.8rem;
+                        padding: 8px 12px;
                     }
                 }
             `}</style>
@@ -525,9 +1051,32 @@ const AdminFieldsPage = () => {
                 <header className="modern-header">
                     <div className="header-content">
                         <h1 className="header-title">📝 Βιβλιοθήκη Πεδίων</h1>
-                        <Link to="/admin" className="back-link">
-                            ← Πίσω στο Admin Panel
-                        </Link>
+                        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                            {user?.role === 'Admin' && companies.length > 0 && (
+                                <select
+                                    value={selectedCompanyId || ''}
+                                    onChange={(e) => setSelectedCompanyId(parseInt(e.target.value))}
+                                    style={{
+                                        padding: '8px 12px',
+                                        borderRadius: '8px',
+                                        border: '1px solid rgba(255,255,255,0.3)',
+                                        background: 'rgba(255,255,255,0.1)',
+                                        color: 'white',
+                                        fontSize: '0.9rem'
+                                    }}
+                                >
+                                    <option value="">Επιλέξτε Εταιρία</option>
+                                    {companies.map(company => (
+                                        <option key={company.id} value={company.id} style={{color: '#333'}}>
+                                            {company.name}
+                                        </option>
+                                    ))}
+                                </select>
+                            )}
+                            <Link to="/admin" className="back-link">
+                                ← Πίσω στο Admin Panel
+                            </Link>
+                        </div>
                     </div>
                 </header>
 
@@ -554,6 +1103,7 @@ const AdminFieldsPage = () => {
                                     <option value="number">🔢 Αριθμός</option>
                                     <option value="date">📅 Ημερομηνία</option>
                                     <option value="checkbox">☑️ Checkbox</option>
+                                    <option value="dropdown">📋 Dropdown/Select</option>
                                 </select>
                             </div>
                             <div className="checkbox-group-modern">
@@ -566,14 +1116,95 @@ const AdminFieldsPage = () => {
                                 <label htmlFor="is_commissionable">💰 Δέχεται Αμοιβή;</label>
                             </div>
                             <div className="checkbox-group-modern">
-                                <input 
-                                    type="checkbox" 
-                                    id="show_in_applications_table" 
-                                    checked={showInTable} 
-                                    onChange={e => setShowInTable(e.target.checked)} 
+                                <input
+                                    type="checkbox"
+                                    id="show_in_applications_table"
+                                    checked={showInTable}
+                                    onChange={e => setShowInTable(e.target.checked)}
                                 />
                                 <label htmlFor="show_in_applications_table">📋 Εμφάνιση στον Πίνακα Αιτήσεων;</label>
                             </div>
+
+                            {/* Dropdown Options Manager */}
+                            {type === 'dropdown' && (
+                                <div className="dropdown-options-manager">
+                                    <h3>📋 Επιλογές Dropdown</h3>
+
+                                    {/* Add new option */}
+                                    <div className="add-option-form">
+                                        <div className="option-inputs">
+                                            <input
+                                                type="text"
+                                                placeholder="Τιμή (π.χ. program_type_1)"
+                                                value={newOptionValue}
+                                                onChange={e => setNewOptionValue(e.target.value)}
+                                            />
+                                            <input
+                                                type="text"
+                                                placeholder="Ετικέτα (π.χ. Τύπος Προγράμματος)"
+                                                value={newOptionLabel}
+                                                onChange={e => setNewOptionLabel(e.target.value)}
+                                            />
+                                            <button type="button" onClick={addFieldOption} className="add-option-btn">
+                                                ➕ Προσθήκη
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* Options list */}
+                                    {fieldOptions.length > 0 && (
+                                        <div className="options-list">
+                                            {fieldOptions.map((option, index) => (
+                                                <div key={option.id} className="option-item">
+                                                    <span className="option-info">
+                                                        <strong>{option.label}</strong> ({option.value})
+                                                    </span>
+                                                    <div className="option-actions">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => moveOptionUp(index)}
+                                                            disabled={index === 0}
+                                                            className="move-btn"
+                                                        >
+                                                            ⬆️
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => moveOptionDown(index)}
+                                                            disabled={index === fieldOptions.length - 1}
+                                                            className="move-btn"
+                                                        >
+                                                            ⬇️
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handlePDFUpload(option)}
+                                                            className="pdf-upload-btn"
+                                                            title={typeof option.id === 'number' && option.id < 0 ? 'Αποθηκεύστε το πεδίο πρώτα' : `Upload PDF για ${option.label}`}
+                                                            disabled={typeof option.id === 'number' && option.id < 0}
+                                                        >
+                                                            📁
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => removeFieldOption(option.id)}
+                                                            className="remove-btn"
+                                                        >
+                                                            🗑️
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    {fieldOptions.length === 0 && (
+                                        <div className="no-options-message">
+                                            ⚠️ Τα dropdown πεδία χρειάζονται τουλάχιστον μία επιλογή
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                             <div className="form-actions-modern">
                                 <button type="submit" className="save-button">
                                     {isEditing ? '💾 Αποθήκευση Αλλαγών' : '➕ Δημιουργία Πεδίου'}
@@ -611,7 +1242,43 @@ const AdminFieldsPage = () => {
                                         {field.is_commissionable && (
                                             <span className="commission-badge">💰 Αμοιβή</span>
                                         )}
+                                        {field.type === 'dropdown' && field.options && (
+                                            <span className="options-count-badge">
+                                                📋 {field.options.length} επιλογές
+                                            </span>
+                                        )}
                                     </div>
+                                    {field.type === 'dropdown' && field.options && field.options.length > 0 && (
+                                        <div className="dropdown-options-preview">
+                                            {field.options.slice(0, 3).map(option => (
+                                                <span key={option.id} className="option-preview">
+                                                    {option.label}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handlePDFUpload(option)}
+                                                        className="pdf-upload-btn"
+                                                        title={typeof option.id === 'number' && option.id < 0 ? 'Αποθηκεύστε το πεδίο πρώτα' : `Upload PDF για ${option.label}`}
+                                                        disabled={typeof option.id === 'number' && option.id < 0}
+                                                        style={{
+                                                            marginLeft: '8px',
+                                                            padding: '2px 6px',
+                                                            fontSize: '0.8rem',
+                                                            border: 'none',
+                                                            borderRadius: '4px',
+                                                            cursor: typeof option.id === 'number' && option.id < 0 ? 'not-allowed' : 'pointer'
+                                                        }}
+                                                    >
+                                                        📁
+                                                    </button>
+                                                </span>
+                                            ))}
+                                            {field.options.length > 3 && (
+                                                <span className="more-options">
+                                                    +{field.options.length - 3} ακόμα
+                                                </span>
+                                            )}
+                                        </div>
+                                    )}
                                     <div className="action-buttons">
                                         <button onClick={() => handleEditClick(field)} className="edit-button">
                                             ✏️ Edit

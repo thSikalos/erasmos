@@ -4,6 +4,9 @@ import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
 import FileUpload from '../components/FileUpload';
+import PDFReadinessIndicator from '../components/PDFReadinessIndicator';
+import SignedPDFUpload from '../components/SignedPDFUpload';
+import PDFErrorBoundary from '../components/PDFErrorBoundary';
 import { apiUrl } from '../utils/api';
 import '../App.css';
 
@@ -68,7 +71,12 @@ const initialState = {
     
     // Files
     uploadedFiles: [],
-    
+
+    // PDF state
+    pdfGenerated: false,
+    generatedPDFPath: null,
+    signedPDF: null,
+
     // UI state
     currentStep: 1,
     loading: false,
@@ -119,6 +127,10 @@ const applicationReducer = (state, action) => {
             return { ...state, modalOpen: action.open };
         case 'SET_SELECTED_APPLICATION':
             return { ...state, selectedApplication: action.app };
+        case 'SET_PDF_GENERATED':
+            return { ...state, pdfGenerated: action.generated, generatedPDFPath: action.path };
+        case 'SET_SIGNED_PDF':
+            return { ...state, signedPDF: action.pdf };
         default:
             return state;
     }
@@ -290,6 +302,58 @@ const NewApplicationPage = () => {
     const handleFileRemove = (index) => {
         dispatch({ type: 'REMOVE_FILE', index });
         showInfoToast('Αρχείο', 'Αρχείο αφαιρέθηκε');
+    };
+
+    const handlePDFGenerate = async (template) => {
+        try {
+            dispatch({ type: 'SET_LOADING', loading: true });
+
+            const token = localStorage.getItem('token');
+            const config = { headers: { Authorization: `Bearer ${token}` } };
+
+            const response = await axios.post(
+                apiUrl(`/api/applications/generate-pdf`),
+                {
+                    templateId: template.id,
+                    fieldValues: state.fieldValues,
+                    customerDetails: state.customerDetails,
+                    companyId: state.selectedCompanyId,
+                    contractEndDate: state.contractEndDate
+                },
+                config
+            );
+
+            if (response.data.success) {
+                dispatch({
+                    type: 'SET_PDF_GENERATED',
+                    generated: true,
+                    path: response.data.pdfPath
+                });
+
+                showSuccessToast('PDF', 'PDF δημιουργήθηκε επιτυχώς!');
+
+                // Auto-download the generated PDF
+                if (response.data.downloadUrl) {
+                    window.open(apiUrl(response.data.downloadUrl), '_blank');
+                }
+            }
+        } catch (error) {
+            console.error('Error generating PDF:', error);
+            const errorMessage = error.response?.data?.message || 'Σφάλμα κατά τη δημιουργία του PDF';
+            showErrorToast('Σφάλμα', errorMessage);
+        } finally {
+            dispatch({ type: 'SET_LOADING', loading: false });
+        }
+    };
+
+    const handleSignedPDFUpload = (data) => {
+        if (data.signedPDFRemoved) {
+            dispatch({ type: 'SET_SIGNED_PDF', pdf: null });
+            showInfoToast('PDF', 'Υπογεγραμμένο PDF αφαιρέθηκε');
+        } else {
+            dispatch({ type: 'SET_SIGNED_PDF', pdf: data });
+            showSuccessToast('PDF', 'Υπογεγραμμένο PDF ανέβηκε επιτυχώς!');
+        }
     };
 
     const handleSubmit = async () => {
@@ -577,6 +641,19 @@ const NewApplicationPage = () => {
                                                         <span className="checkbox-custom"></span>
                                                         {field.label}
                                                     </label>
+                                                ) : field.type === 'dropdown' ? (
+                                                    <select
+                                                        value={state.fieldValues[field.id] || ''}
+                                                        onChange={e => handleFieldChange(field.id, e.target.value)}
+                                                        className="form-select"
+                                                    >
+                                                        <option value="">-- Επιλέξτε --</option>
+                                                        {field.options && field.options.map(option => (
+                                                            <option key={option.id} value={option.value}>
+                                                                {option.label}
+                                                            </option>
+                                                        ))}
+                                                    </select>
                                                 ) : (
                                                     <input
                                                         type={field.type}
@@ -707,6 +784,29 @@ const NewApplicationPage = () => {
                                     </div>
                                 )}
                             </div>
+
+                            {/* PDF Generation and Upload */}
+                            {state.currentStep === 3 && (
+                                <PDFErrorBoundary fallbackMessage="Σφάλμα στη λειτουργία PDF. Παρακαλώ ανανεώστε τη σελίδα.">
+                                    <div className="pdf-section">
+                                        <PDFReadinessIndicator
+                                        companyId={state.selectedCompanyId}
+                                        applicationData={state.fieldValues}
+                                        selectedDropdownValues={state.fieldValues}
+                                        onPDFGenerate={handlePDFGenerate}
+                                        showGenerateButton={true}
+                                    />
+
+                                    <SignedPDFUpload
+                                        applicationId={null} // Will be set after application is saved
+                                        currentSignedPDF={state.signedPDF}
+                                        onUploadSuccess={handleSignedPDFUpload}
+                                        onUploadError={(error) => showErrorToast('Σφάλμα', error)}
+                                        disabled={!state.pdfGenerated}
+                                    />
+                                    </div>
+                                </PDFErrorBoundary>
+                            )}
                         </div>
                     )}
                 </div>

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
+import PDFTemplateManager from '../components/PDFTemplateManager';
 import { apiUrl } from '../utils/api';
 import '../App.css';
 
@@ -18,6 +19,10 @@ const AdminCompaniesPage = () => {
     const [currentCompanyId, setCurrentCompanyId] = useState(null);
     const [companyName, setCompanyName] = useState('');
     const [selectedFieldIds, setSelectedFieldIds] = useState(new Set());
+
+    // PDF Template Manager states
+    const [showPDFManager, setShowPDFManager] = useState(false);
+    const [selectedCompanyForPDF, setSelectedCompanyForPDF] = useState(null);
 
     const fetchData = async () => {
         if (!token) return;
@@ -502,6 +507,23 @@ const AdminCompaniesPage = () => {
                     box-shadow: 0 8px 25px rgba(239, 68, 68, 0.3);
                 }
 
+                .pdf-button {
+                    background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+                    color: white;
+                    border: none;
+                    padding: 8px 16px;
+                    border-radius: 8px;
+                    font-weight: 600;
+                    cursor: pointer;
+                    transition: all 0.3s ease;
+                    font-size: 0.8rem;
+                }
+
+                .pdf-button:hover {
+                    transform: translateY(-2px);
+                    box-shadow: 0 8px 25px rgba(139, 92, 246, 0.3);
+                }
+
                 .loading-container {
                     display: flex;
                     justify-content: center;
@@ -678,6 +700,15 @@ const AdminCompaniesPage = () => {
                                         <button onClick={() => handleEditClick(company)} className="edit-button">
                                             ✏️ Edit
                                         </button>
+                                        <button
+                                            onClick={() => {
+                                                setSelectedCompanyForPDF(company);
+                                                setShowPDFManager(true);
+                                            }}
+                                            className="pdf-button"
+                                        >
+                                            📄 PDF Templates
+                                        </button>
                                         <button onClick={() => handleDeleteClick(company.id)} className="delete-button">
                                             🗑️ Delete
                                         </button>
@@ -687,6 +718,17 @@ const AdminCompaniesPage = () => {
                         )}
                     </div>
                 </main>
+
+                {/* PDF Template Manager Modal */}
+                {showPDFManager && selectedCompanyForPDF && (
+                    <PDFTemplateManager
+                        company={selectedCompanyForPDF}
+                        onClose={() => {
+                            setShowPDFManager(false);
+                            setSelectedCompanyForPDF(null);
+                        }}
+                    />
+                )}
             </div>
         </div>
     );

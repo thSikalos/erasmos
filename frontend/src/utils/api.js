@@ -1,5 +1,18 @@
-// API configuration utility
-export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+// API configuration utility with dynamic port support
+const DEFAULT_BACKEND_PORT = 3000;
+const DEFAULT_HOST = 'localhost';
+
+// Primary API URL from environment
+let apiBaseUrl = import.meta.env.VITE_API_URL;
+
+// Fallback to constructed URL if not provided
+if (!apiBaseUrl) {
+    const port = import.meta.env.VITE_BACKEND_PORT || DEFAULT_BACKEND_PORT;
+    const host = import.meta.env.VITE_HOST || DEFAULT_HOST;
+    apiBaseUrl = `http://${host}:${port}`;
+}
+
+export const API_BASE_URL = apiBaseUrl;
 
 // Helper function to build API URLs
 export const apiUrl = (endpoint) => {
