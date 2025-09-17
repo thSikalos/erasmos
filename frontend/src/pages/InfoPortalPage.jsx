@@ -16,7 +16,10 @@ const InfoPortalPage = () => {
     useEffect(() => {
         const fetchCompaniesWithSections = async () => {
             try {
-                const response = await axios.get('/api/infoportal/companies');
+                const token = localStorage.getItem('token');
+                const config = { headers: { Authorization: `Bearer ${token}` } };
+                const response = await axios.get('http://localhost:3000/api/infoportal/companies', config);
+
                 const companiesData = Array.isArray(response.data) ? response.data : [];
                 setCompanies(companiesData);
 
@@ -32,13 +35,13 @@ const InfoPortalPage = () => {
                 }
                 setLoading(false);
             } catch (err) {
-                console.error('Error fetching companies:', err);
+                console.error('Error loading InfoPortal data:', err);
                 if (err.response?.status === 401) {
                     setError('Δεν έχετε δικαίωμα πρόσβασης. Παρακαλώ συνδεθείτε ξανά.');
                 } else if (err.response?.status === 500) {
                     setError('Σφάλμα διακομιστή. Παρακαλώ δοκιμάστε ξανά αργότερα.');
                 } else {
-                    setError('Σφάλμα φόρτωσης δεδομένων. Ελέγξτε τη σύνδεσή σας.');
+                    setError(`Σφάλμα φόρτωσης δεδομένων. Status: ${err.response?.status || 'N/A'}, Message: ${err.message}`);
                 }
                 setLoading(false);
             }
@@ -160,8 +163,31 @@ const InfoPortalPage = () => {
     if (error) {
         return (
             <div className="infoportal-error">
-                <h3>Σφάλμα</h3>
+                <h3>🚫 Σφάλμα Φόρτωσης InfoPortal</h3>
                 <p>{error}</p>
+                <button
+                    onClick={() => window.location.reload()}
+                    style={{
+                        marginTop: '10px',
+                        padding: '10px 20px',
+                        backgroundColor: '#667eea',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '8px',
+                        cursor: 'pointer'
+                    }}
+                >
+                    🔄 Δοκιμάστε ξανά
+                </button>
+                <details style={{ marginTop: '20px', fontSize: '12px', opacity: 0.7 }}>
+                    <summary>Debug Info</summary>
+                    <pre>
+                        {`Endpoint: /api/infoportal/companies
+Time: ${new Date().toLocaleString()}
+User: ${user?.email || 'N/A'}
+Role: ${user?.role || 'N/A'}`}
+                    </pre>
+                </details>
             </div>
         );
     }
@@ -502,6 +528,30 @@ const InfoPortalPage = () => {
                                 {isEditMode ? '📝 Τέλος Επεξεργασίας' : '✏️ Επεξεργασία'}
                             </button>
                         </div>
+                    )}
+
+                    {/* Debug Panel - only show in development */}
+                    {process.env.NODE_ENV === 'development' && (
+                        <details style={{
+                            marginTop: '10px',
+                            fontSize: '12px',
+                            background: 'rgba(0,0,0,0.1)',
+                            padding: '10px',
+                            borderRadius: '8px'
+                        }}>
+                            <summary style={{ cursor: 'pointer', color: 'white' }}>🐛 Debug Info</summary>
+                            <pre style={{ color: 'white', marginTop: '10px' }}>
+                                {JSON.stringify({
+                                    companiesCount: Array.isArray(companies) ? companies.length : 'Not Array',
+                                    companiesType: typeof companies,
+                                    activeCompanyId,
+                                    activeSectionId,
+                                    loading,
+                                    error: !!error,
+                                    userRole: user?.role
+                                }, null, 2)}
+                            </pre>
+                        </details>
                     )}
                 </div>
             </div>

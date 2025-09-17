@@ -39,10 +39,12 @@ const InfoPortalEditor = ({
 
         setLoading(true);
         try {
-            const response = await axios.put(`/api/infoportal/sections/${activeSection.id}`, {
+            const token = localStorage.getItem('token');
+            const config = { headers: { Authorization: `Bearer ${token}` } };
+            const response = await axios.put(`http://localhost:3000/api/infoportal/sections/${activeSection.id}`, {
                 title: editingTitle,
                 content: editingContent
-            });
+            }, config);
 
             if (response.data && onSectionUpdate) {
                 onSectionUpdate(response.data);
@@ -65,7 +67,9 @@ const InfoPortalEditor = ({
 
         setLoading(true);
         try {
-            const response = await axios.post(`/api/infoportal/companies/${activeCompany.company_id}/sections`, newSectionData);
+            const token = localStorage.getItem('token');
+            const config = { headers: { Authorization: `Bearer ${token}` } };
+            const response = await axios.post(`http://localhost:3000/api/infoportal/companies/${activeCompany.company_id}/sections`, newSectionData, config);
 
             if (response.data && onSectionCreate) {
                 onSectionCreate(response.data);
@@ -90,7 +94,9 @@ const InfoPortalEditor = ({
 
         setLoading(true);
         try {
-            await axios.delete(`/api/infoportal/sections/${activeSection.id}`);
+            const token = localStorage.getItem('token');
+            const config = { headers: { Authorization: `Bearer ${token}` } };
+            await axios.delete(`http://localhost:3000/api/infoportal/sections/${activeSection.id}`, config);
             if (onSectionDelete) {
                 onSectionDelete(activeSection.id);
             }

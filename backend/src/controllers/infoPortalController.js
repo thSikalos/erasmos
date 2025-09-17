@@ -3,6 +3,7 @@ const pool = require('../config/db');
 // --- GET ALL COMPANIES WITH THEIR INFO SECTIONS ---
 const getAllCompaniesWithSections = async (req, res) => {
     try {
+
         const query = `
             SELECT
                 c.id as company_id,
@@ -30,10 +31,11 @@ const getAllCompaniesWithSections = async (req, res) => {
         `;
 
         const result = await pool.query(query);
+
         res.json(result.rows);
     } catch (err) {
         console.error('Error fetching companies with sections:', err.message);
-        res.status(500).json({ error: 'Server Error' });
+        res.status(500).json({ error: 'Server Error', details: err.message });
     }
 };
 
