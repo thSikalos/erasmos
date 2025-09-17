@@ -489,12 +489,12 @@ class MappingEngine {
         try {
             const mappingsResult = await pool.query(`
                 SELECT
-                    pfm.*,
+                    pvm.*,
                     f.label as field_label,
                     f.type as field_type
-                FROM pdf_field_mappings pfm
-                JOIN fields f ON pfm.target_field_id = f.id
-                WHERE pfm.pdf_template_id = $1 AND pfm.is_required = true
+                FROM pdf_visual_mappings pvm
+                JOIN fields f ON pvm.field_id = f.id
+                WHERE pvm.template_id = $1 AND pvm.is_required = true
             `, [templateId]);
 
             const requiredMappings = mappingsResult.rows;
@@ -502,19 +502,19 @@ class MappingEngine {
             const availableFields = [];
 
             for (const mapping of requiredMappings) {
-                const fieldValue = applicationData[mapping.target_field_id];
+                const fieldValue = applicationData[mapping.field_id];
                 const isEmpty = !fieldValue || fieldValue.toString().trim() === '';
 
                 if (isEmpty) {
                     missingFields.push({
-                        fieldId: mapping.target_field_id,
+                        fieldId: mapping.field_id,
                         fieldLabel: mapping.field_label,
-                        placeholder: mapping.placeholder,
+                        placeholder: `[${mapping.field_label?.toUpperCase() || 'FIELD'}_${mapping.field_id}]`,
                         required: true
                     });
                 } else {
                     availableFields.push({
-                        fieldId: mapping.target_field_id,
+                        fieldId: mapping.field_id,
                         fieldLabel: mapping.field_label,
                         value: fieldValue
                     });

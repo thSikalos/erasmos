@@ -25,15 +25,6 @@ const PDFReadinessIndicator = ({
         }
     }, [companyId, applicationData, selectedDropdownValues]);
 
-    // Debug logging - can be enabled for troubleshooting
-    // useEffect(() => {
-    //     console.log('[PDF Debug] Current pdfStatus:', {
-    //         isReady: pdfStatus.isReady,
-    //         missingFieldsCount: pdfStatus.missingFields?.length || 0,
-    //         selectedTemplate: !!pdfStatus.selectedTemplate,
-    //         showGenerateButton: showGenerateButton
-    //     });
-    // }, [pdfStatus, showGenerateButton]);
 
     const checkPDFReadiness = async () => {
         try {
@@ -127,7 +118,7 @@ const PDFReadinessIndicator = ({
     };
 
     const handleGeneratePDF = async () => {
-        if (!pdfStatus.isReady || !pdfStatus.selectedTemplate) {
+        if (!pdfStatus.selectedTemplate) {
             return;
         }
 
@@ -140,7 +131,13 @@ const PDFReadinessIndicator = ({
 
         } catch (error) {
             console.error('Error generating PDF:', error);
-            alert('Σφάλμα κατά τη δημιουργία του PDF');
+
+            // Better error handling with field-specific messages
+            if (error.response?.data?.missingFields) {
+                alert(`Δεν μπορεί να δημιουργηθεί PDF. Λείπουν: ${error.response.data.missingFields.join(', ')}`);
+            } else {
+                alert('Σφάλμα κατά τη δημιουργία του PDF');
+            }
         } finally {
             setGeneratingPDF(false);
         }
@@ -442,20 +439,16 @@ const PDFReadinessIndicator = ({
                 )}
             </div>
 
-            {!pdfStatus.loading && !pdfStatus.error && !pdfStatus.noMatchingTemplate && (
+            {!pdfStatus.loading && !pdfStatus.error && !pdfStatus.noMatchingTemplate && pdfStatus.isReady && (
                 <div className="pdf-details">
                     {pdfStatus.selectedTemplate && (
                         <div className="template-info">
                             <h4>📋 Template: {pdfStatus.selectedTemplate.template_name}</h4>
-
-                            {/* Εμφάνιση details μόνο αν είναι έτοιμο ή σχεδόν έτοιμο */}
-                            {pdfStatus.missingFields.length === 0 && (
-                                <div className="template-details">
-                                    <span>🔗 {pdfStatus.selectedTemplate.option_value}</span>
-                                    <span>🎯 {pdfStatus.selectedTemplate.placeholders_detected} placeholders</span>
-                                    <span>📊 {pdfStatus.selectedTemplate.analysis_status}</span>
-                                </div>
-                            )}
+                            <div className="template-details">
+                                <span>🔗 {pdfStatus.selectedTemplate.option_value}</span>
+                                <span>🎯 {pdfStatus.selectedTemplate.placeholders_detected} placeholders</span>
+                                <span>📊 {pdfStatus.selectedTemplate.analysis_status}</span>
+                            </div>
                         </div>
                     )}
 

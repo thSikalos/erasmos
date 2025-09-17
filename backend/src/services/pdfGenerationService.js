@@ -120,18 +120,34 @@ class PDFGenerationService {
     async getMappings(templateId) {
         const query = `
             SELECT
-                pfm.*,
+                pvm.*,
                 f.label as field_label,
                 f.type as field_type
-            FROM pdf_field_mappings pfm
-            LEFT JOIN fields f ON pfm.target_field_id = f.id
-            WHERE pfm.pdf_template_id = $1
-            AND pfm.mapping_status = 'mapped'
-            ORDER BY pfm.placeholder
+            FROM pdf_visual_mappings pvm
+            LEFT JOIN fields f ON pvm.field_id = f.id
+            WHERE pvm.template_id = $1
+            ORDER BY pvm.page_number, pvm.position_y, pvm.position_x
         `;
 
         const result = await pool.query(query, [templateId]);
-        return result.rows;
+
+        // Transform visual mappings to compatible format
+        return result.rows.map(row => ({
+            id: row.id,
+            pdf_template_id: row.template_id,
+            target_field_id: row.field_id,
+            field_type: row.field_type,
+            field_label: row.field_label,
+            is_required: row.is_required,
+            // Visual mapping specific data
+            page_number: row.page_number,
+            position_x: row.position_x,
+            position_y: row.position_y,
+            width: row.width,
+            height: row.height,
+            // Create a placeholder-like identifier for compatibility
+            placeholder: `[${row.field_label?.toUpperCase() || 'FIELD'}_${row.field_id}]`
+        }));
     }
 
     /**
@@ -170,10 +186,8 @@ class PDFGenerationService {
             font = await pdfDoc.embedFont(StandardFonts.Helvetica);
         }
 
-        // Get the first page (most templates will be single page)
+        // Get all pages for multi-page support
         const pages = pdfDoc.getPages();
-        const firstPage = pages[0];
-        const { width, height } = firstPage.getSize();
 
         // Process each mapping
         for (const mapping of mappings) {
@@ -181,9 +195,25 @@ class PDFGenerationService {
                 const value = this.getValueForMapping(mapping, applicationData, customerDetails);
 
                 if (value !== null && value !== undefined && value !== '') {
+                    // Get the appropriate page (visual mappings have page_number)
+                    const pageIndex = (mapping.page_number || 1) - 1; // Convert to 0-based index
+                    const targetPage = pages[pageIndex] || pages[0]; // Fallback to first page
+                    const { width, height } = targetPage.getSize();
+
+                    // Convert visual mapping data to coordinates format expected by fillPlaceholder
+                    const mappingWithCoordinates = {
+                        ...mapping,
+                        coordinates: {
+                            x: (mapping.position_x / 100) * width, // Convert percentage to pixels
+                            y: (mapping.position_y / 100) * height, // Convert percentage to pixels
+                            width: (mapping.width / 100) * width,
+                            height: (mapping.height / 100) * height
+                        }
+                    };
+
                     await this.fillPlaceholder(
-                        firstPage,
-                        mapping,
+                        targetPage,
+                        mappingWithCoordinates,
                         value,
                         font,
                         { width, height }

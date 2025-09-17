@@ -1144,7 +1144,8 @@ const generateApplicationPDF = async (req, res) => {
         }
 
     } catch (error) {
-        console.error('Error generating application PDF:', error);
+        console.error('Error generating PDF:', error);
+
         res.status(500).json({
             success: false,
             message: 'Failed to generate PDF',
