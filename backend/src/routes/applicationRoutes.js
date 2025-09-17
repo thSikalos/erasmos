@@ -1,8 +1,11 @@
 const express = require('express');
 const router = express.Router();
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs').promises;
 const authMiddleware = require('../middleware/authMiddleware');
-const { 
-    createApplication, 
+const {
+    createApplication,
     getApplications,
     getApplicationById,
     updateApplicationStatus,
@@ -18,8 +21,45 @@ const {
     updateFieldPaymentStatus,
     createFieldClawback,
     getApplicationFieldPayments,
-    getDisplayableFields
+    getDisplayableFields,
+    // PDF Generation routes
+    generateApplicationPDF,
+    checkPDFReadiness,
+    uploadSignedPDF
 } = require('../controllers/applicationController');
+
+// Configure multer for signed PDF uploads
+const signedPDFStorage = multer.diskStorage({
+    destination: async (req, file, cb) => {
+        const uploadDir = path.join(__dirname, '../../uploads/signed_pdfs');
+        try {
+            await fs.mkdir(uploadDir, { recursive: true });
+            cb(null, uploadDir);
+        } catch (error) {
+            cb(error);
+        }
+    },
+    filename: (req, file, cb) => {
+        const applicationId = req.params.id;
+        const timestamp = Date.now();
+        const sanitizedName = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
+        cb(null, `app_${applicationId}_signed_${timestamp}_${sanitizedName}`);
+    }
+});
+
+const signedPDFUpload = multer({
+    storage: signedPDFStorage,
+    fileFilter: (req, file, cb) => {
+        if (file.mimetype === 'application/pdf') {
+            cb(null, true);
+        } else {
+            cb(new Error('Only PDF files are allowed'), false);
+        }
+    },
+    limits: {
+        fileSize: 10 * 1024 * 1024 // 10MB limit
+    }
+});
 
 router.use(authMiddleware);
 
@@ -41,6 +81,11 @@ router.post('/:applicationId/fields/:fieldId/clawback', createFieldClawback);
 
 // Displayable fields for table configuration
 router.get('/displayable-fields', getDisplayableFields);
+
+// PDF Generation routes
+router.post('/generate-pdf', generateApplicationPDF);
+router.get('/:id/pdf-readiness', checkPDFReadiness);
+router.post('/:id/upload-signed', signedPDFUpload.single('signedPDF'), uploadSignedPDF);
 
 router.get('/:id', getApplicationById);
 router.put('/:id', updateApplication);

@@ -3,6 +3,8 @@ const ExcelJS = require('exceljs');
 const { getEffectiveUserId } = require('../utils/userUtils');
 const documentGenerator = require('../utils/documentGenerator');
 const NotificationService = require('../services/notificationService');
+const pdfGenerationService = require('../services/pdfGenerationService');
+const mappingEngine = require('../services/mappingEngine');
 
 const createApplication = async (req, res) => {
   const { company_id, field_values, contract_end_date, customerDetails, is_personal } = req.body;
@@ -1074,6 +1076,227 @@ const getDisplayableFields = async (req, res) => {
     }
 };
 
+// --- PDF GENERATION FOR APPLICATIONS ---
+
+/**
+ * Generate PDF for application using template and field mappings
+ */
+const generateApplicationPDF = async (req, res) => {
+    const { templateId, fieldValues, customerDetails, companyId, contractEndDate } = req.body;
+    const { id: userId } = req.user;
+
+    try {
+        // Validate that template exists and user has access
+        const templateCheck = await pool.query(`
+            SELECT pt.*, c.name as company_name
+            FROM pdf_templates pt
+            JOIN companies c ON pt.company_id = c.id
+            WHERE pt.id = $1
+        `, [templateId]);
+
+        if (templateCheck.rows.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'PDF template not found'
+            });
+        }
+
+        const template = templateCheck.rows[0];
+
+        // Validate required fields are filled
+        const validation = await mappingEngine.validateMappingCompleteness(
+            templateId,
+            fieldValues
+        );
+
+        if (!validation.isComplete) {
+            return res.status(400).json({
+                success: false,
+                message: 'Not all required fields are filled',
+                missingFields: validation.missingFields,
+                requiredCount: validation.totalRequired,
+                missingCount: validation.missingCount
+            });
+        }
+
+        // Generate the PDF
+        const result = await pdfGenerationService.generateFilledPDF(
+            templateId,
+            fieldValues,
+            customerDetails,
+            {
+                companyId,
+                contractEndDate,
+                generatedBy: userId
+            }
+        );
+
+        if (result.success) {
+            res.json({
+                success: true,
+                message: 'PDF generated successfully',
+                downloadUrl: result.downloadUrl,
+                filename: result.filename,
+                metadata: result.metadata
+            });
+        } else {
+            throw new Error('PDF generation failed');
+        }
+
+    } catch (error) {
+        console.error('Error generating application PDF:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to generate PDF',
+            error: error.message
+        });
+    }
+};
+
+/**
+ * Check if application is ready for PDF generation
+ */
+const checkPDFReadiness = async (req, res) => {
+    const { id: applicationId } = req.params;
+
+    try {
+        // Get application data
+        const appResult = await pool.query(`
+            SELECT a.*, c.name as company_name
+            FROM applications a
+            JOIN companies c ON a.company_id = c.id
+            WHERE a.id = $1
+        `, [applicationId]);
+
+        if (appResult.rows.length === 0) {
+            return res.status(404).json({ message: 'Application not found' });
+        }
+
+        const application = appResult.rows[0];
+
+        // Get application field values
+        const valuesResult = await pool.query(`
+            SELECT av.field_id, av.value
+            FROM application_values av
+            WHERE av.application_id = $1
+        `, [applicationId]);
+
+        const fieldValues = {};
+        valuesResult.rows.forEach(row => {
+            fieldValues[row.field_id] = row.value;
+        });
+
+        // Find matching templates for this application
+        const templatesResult = await pool.query(`
+            SELECT pt.*
+            FROM pdf_templates pt
+            WHERE pt.company_id = $1
+            AND pt.analysis_status = 'mapped'
+        `, [application.company_id]);
+
+        const templates = templatesResult.rows;
+
+        if (templates.length === 0) {
+            return res.json({
+                isReady: false,
+                reason: 'no_templates',
+                message: 'No PDF templates available for this company'
+            });
+        }
+
+        // For now, use the first available template
+        // In production, you might want more sophisticated template selection
+        const selectedTemplate = templates[0];
+
+        // Check if all required fields are filled
+        const validation = await mappingEngine.validateMappingCompleteness(
+            selectedTemplate.id,
+            fieldValues
+        );
+
+        res.json({
+            isReady: validation.isComplete,
+            selectedTemplate: selectedTemplate,
+            validation: validation,
+            availableTemplates: templates
+        });
+
+    } catch (error) {
+        console.error('Error checking PDF readiness:', error);
+        res.status(500).json({
+            message: 'Failed to check PDF readiness',
+            error: error.message
+        });
+    }
+};
+
+/**
+ * Upload signed PDF for application
+ */
+const uploadSignedPDF = async (req, res) => {
+    const { id: applicationId } = req.params;
+    const { id: userId } = req.user;
+
+    if (!req.file) {
+        return res.status(400).json({
+            success: false,
+            message: 'PDF file is required'
+        });
+    }
+
+    try {
+        // Verify application exists and user has permission
+        const appResult = await pool.query(`
+            SELECT a.*, u.role, u.parent_user_id
+            FROM applications a
+            JOIN users u ON a.user_id = u.id
+            WHERE a.id = $1
+        `, [applicationId]);
+
+        if (appResult.rows.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'Application not found'
+            });
+        }
+
+        const application = appResult.rows[0];
+
+        // Check if user has permission to upload for this application
+        if (application.user_id !== userId &&
+            !(req.user.role === 'TeamLeader' && application.parent_user_id === userId) &&
+            req.user.role !== 'Admin') {
+            return res.status(403).json({
+                success: false,
+                message: 'Not authorized to upload PDF for this application'
+            });
+        }
+
+        // Update application with signed PDF path
+        await pool.query(`
+            UPDATE applications
+            SET signed_pdf_path = $1, status = 'Προς Καταχώρηση'
+            WHERE id = $2
+        `, [req.file.path, applicationId]);
+
+        res.json({
+            success: true,
+            message: 'Signed PDF uploaded successfully',
+            fileName: req.file.filename,
+            uploadedAt: new Date(),
+            fileSize: req.file.size
+        });
+
+    } catch (error) {
+        console.error('Error uploading signed PDF:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to upload signed PDF',
+            error: error.message
+        });
+    }
+};
+
 module.exports = {
     createApplication,
     getApplications,
@@ -1091,5 +1314,9 @@ module.exports = {
     updateFieldPaymentStatus,
     createFieldClawback,
     getApplicationFieldPayments,
-    getDisplayableFields
+    getDisplayableFields,
+    // PDF Generation functions
+    generateApplicationPDF,
+    checkPDFReadiness,
+    uploadSignedPDF
 };

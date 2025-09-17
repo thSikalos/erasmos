@@ -140,7 +140,7 @@ const loginUser = async (req, res) => {
         const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) { return res.status(400).json({ message: 'Invalid credentials' }); }
         
-        const payload = { user: { id: user.id, role: user.role, email: user.email, parent_user_id: user.parent_user_id } };
+        const payload = { user: { id: user.id, role: user.role, email: user.email, name: user.name, parent_user_id: user.parent_user_id } };
         
         jwt.sign(payload, 'mySuperSecretKey123', { expiresIn: '1h' }, (err, token) => {
             if (err) { console.error('JWT SIGNING ERROR:', err); return res.status(500).send('Server Error during token generation'); }
@@ -259,6 +259,7 @@ const refreshToken = async (req, res) => {
                 id: user.id,
                 role: user.role,
                 email: user.email,
+                name: user.name,
                 parent_user_id: user.parent_user_id,
             }
         };

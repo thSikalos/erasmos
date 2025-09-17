@@ -19,18 +19,23 @@ INSERT INTO companies (name) VALUES
 ('Εταιρεία Β'),  
 ('Εταιρεία Γ');
 
--- Insert basic fields
+-- Insert basic fields (OPTIONAL - Remove if you want to start with empty fields)
+-- Uncomment the lines below if you want sample fields to be created on initial setup
+/*
 INSERT INTO fields (label, type, is_commissionable) VALUES
 ('Ασφάλιστρο', 'number', true),
 ('Διάρκεια Συμβολαίου', 'number', false),
 ('Τύπος Κάλυψης', 'text', false),
 ('Παραπομπή', 'checkbox', true);
+*/
 
--- Link companies with fields  
+-- Link companies with fields (DEPENDS ON FIELDS ABOVE - Comment out if fields are not created)
+/*
 INSERT INTO company_fields (company_id, field_id) VALUES
 (1, 1), (1, 2), (1, 3),
 (2, 1), (2, 4),
 (3, 1), (3, 2), (3, 4);
+*/
 
 -- Insert user commissions
 INSERT INTO user_commissions (associate_id, company_id, amount) VALUES

@@ -20,6 +20,8 @@ const remindersRoutes = require('./routes/remindersRoutes');
 const attachmentRoutes = require('./routes/attachmentRoutes');
 const adminBillingRoutes = require('./routes/adminBillingRoutes'); // <-- ΝΕΟ
 const infoPortalRoutes = require('./routes/infoPortalRoutes');
+const pdfTemplateRoutes = require('./routes/pdfTemplateRoutes');
+const { pdfErrorHandler, pdfTimeout } = require('./middleware/pdfErrorHandler');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -61,6 +63,7 @@ app.use('/api/reminders', remindersRoutes);
 app.use('/api/attachments', attachmentRoutes);
 app.use('/api/admin-billing', adminBillingRoutes); // <-- ΝΕΟ
 app.use('/api/infoportal', infoPortalRoutes);
+app.use('/api/pdf-templates', pdfTimeout(60000), pdfTemplateRoutes);
 app.use('/api/ai', aiRoutes);
 
 // Global error handler
@@ -73,6 +76,11 @@ process.on('unhandledRejection', (reason, promise) => {
     console.error('Unhandled Rejection at:', promise);
     console.error('Reason:', reason);
 });
+
+// PDF-specific error handler (must come before general error handler)
+app.use('/api/pdf-templates', pdfErrorHandler);
+app.use('/api/applications/generate-pdf', pdfErrorHandler);
+app.use('/api/applications/:id/upload-signed', pdfErrorHandler);
 
 // Express error handler
 app.use((error, req, res, next) => {
