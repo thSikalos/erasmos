@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import InfoPortalEditor from '../components/InfoPortalEditor';
+import { apiUrl } from '../utils/api';
 import axios from 'axios';
 
 const InfoPortalPage = () => {
@@ -18,7 +19,7 @@ const InfoPortalPage = () => {
             try {
                 const token = localStorage.getItem('token');
                 const config = { headers: { Authorization: `Bearer ${token}` } };
-                const response = await axios.get('http://localhost:3000/api/infoportal/companies', config);
+                const response = await axios.get(apiUrl('/api/infoportal/companies'), config);
 
                 const companiesData = Array.isArray(response.data) ? response.data : [];
                 setCompanies(companiesData);

@@ -2,6 +2,7 @@ import React, { useContext, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
+import { apiUrl } from '../utils/api';
 import StatCard from '../components/StatCard';
 import RemindersWidget from '../components/RemindersWidget';
 import BonusProgressWidget from '../components/BonusProgressWidget';
@@ -23,8 +24,8 @@ const DashboardPage = () => {
             try {
                 const config = { headers: { 'Authorization': `Bearer ${token}` } };
                 const [appsRes, statsRes] = await Promise.all([
-                    axios.get('http://localhost:3000/api/applications?limit=5', config),
-                    axios.get('http://localhost:3000/api/reports/dashboard', config)
+                    axios.get(apiUrl('/api/applications?limit=5'), config),
+                    axios.get(apiUrl('/api/reports/dashboard'), config)
                 ]);
                 setApplications(appsRes.data);
                 setStats(statsRes.data);

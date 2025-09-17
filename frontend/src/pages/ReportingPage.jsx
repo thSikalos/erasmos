@@ -2,6 +2,7 @@ import React, { useState, useEffect, useContext } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
+import { apiUrl } from '../utils/api';
 import ChartComponent from '../components/ChartComponent';
 
 const ReportingPage = () => {
@@ -25,8 +26,8 @@ const ReportingPage = () => {
             try {
                 const config = { headers: { Authorization: `Bearer ${token}` } };
                 const [teamRes, companiesRes] = await Promise.all([
-                    axios.get(user.role === 'Admin' || user.role === 'TeamLeader' ? 'http://localhost:3000/api/users' : 'http://localhost:3000/api/users/my-team', config),
-                    axios.get('http://localhost:3000/api/companies', config)
+                    axios.get(user.role === 'Admin' || user.role === 'TeamLeader' ? apiUrl('/api/users') : apiUrl('/api/users/my-team'), config),
+                    axios.get(apiUrl('/api/companies'), config)
                 ]);
                 setTeam(teamRes.data.filter(u => u.role === 'Associate'));
                 setCompanies(companiesRes.data);
@@ -49,8 +50,8 @@ const ReportingPage = () => {
                 params: filters
             };
             const [detailsRes, chartsRes] = await Promise.all([
-                axios.get('http://localhost:3000/api/reports/detailed', config),
-                axios.get('http://localhost:3000/api/reports/charts', config)
+                axios.get(apiUrl('/api/reports/detailed'), config),
+                axios.get(apiUrl('/api/reports/charts'), config)
             ]);
             setStats(detailsRes.data.summary);
             setDetails(detailsRes.data.details);
@@ -67,7 +68,7 @@ const ReportingPage = () => {
             token: token,
             ...filters
         }).toString();
-        const url = `http://localhost:3000/api/reports/detailed/export?${queryParams}`;
+        const url = apiUrl(`/api/reports/detailed/export?${queryParams}`);
         window.open(url, '_blank');
     };
 
@@ -76,7 +77,7 @@ const ReportingPage = () => {
             token: token,
             ...filters
         }).toString();
-        const url = `http://localhost:3000/api/reports/detailed/export/pdf?${queryParams}`;
+        const url = apiUrl(`/api/reports/detailed/export/pdf?${queryParams}`);
         window.open(url, '_blank');
     };
 

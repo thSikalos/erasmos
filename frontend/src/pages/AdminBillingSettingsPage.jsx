@@ -2,6 +2,7 @@ import React, { useState, useEffect, useContext } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
+import { apiUrl } from '../utils/api';
 import '../App.css';
 
 const AdminBillingSettingsPage = () => {
@@ -30,8 +31,8 @@ const AdminBillingSettingsPage = () => {
             try {
                 const config = { headers: { Authorization: `Bearer ${token}` } };
                 const [settingsRes, usersRes] = await Promise.all([
-                    axios.get('http://localhost:3000/api/admin-billing/settings', config),
-                    axios.get('http://localhost:3000/api/users', config)
+                    axios.get(apiUrl('/api/admin-billing/settings'), config),
+                    axios.get(apiUrl('/api/users'), config)
                 ]);
                 
                 // General settings
@@ -94,7 +95,7 @@ const AdminBillingSettingsPage = () => {
                 custom_charges: customCharges,
                 personal_billing: personalBilling
             };
-            await axios.post('http://localhost:3000/api/admin-billing/settings', payload, config);
+            await axios.post(apiUrl('/api/admin-billing/settings'), payload, config);
             setMessage('🎉 Οι ρυθμίσεις αποθηκεύτηκαν με επιτυχία!');
             setTimeout(() => setMessage(''), 3000);
         } catch (err) {

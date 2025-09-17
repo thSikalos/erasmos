@@ -2,6 +2,7 @@ import React, { useState, useEffect, useContext } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
+import { apiUrl } from '../utils/api';
 
 const EditApplicationPage = () => {
     const { id } = useParams();
@@ -24,8 +25,8 @@ const EditApplicationPage = () => {
             try {
                 const config = { headers: { Authorization: `Bearer ${token}` } };
                 const [appRes, companiesRes] = await Promise.all([
-                    axios.get(`http://localhost:3000/api/applications/${id}`, config),
-                    axios.get('http://localhost:3000/api/companies', config)
+                    axios.get(apiUrl(`/api/applications/${id}`), config),
+                    axios.get(apiUrl('/api/companies'), config)
                 ]);
                
                 const appData = appRes.data;
@@ -66,7 +67,7 @@ const EditApplicationPage = () => {
                 contract_end_date: contractEndDate || null,
                 comment: comment
             };
-            await axios.put(`http://localhost:3000/api/applications/${id}`, applicationData, config);
+            await axios.put(apiUrl(`/api/applications/${id}`), applicationData, config);
             navigate(`/application/${id}`);
         } catch (err) {
             setError(err.response?.data?.message || 'Could not update application.');

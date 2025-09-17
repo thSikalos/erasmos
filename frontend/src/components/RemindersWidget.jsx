@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useContext } from 'react';
 import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
+import { apiUrl } from '../utils/api';
 
 const RemindersWidget = () => {
     const { token, user } = useContext(AuthContext);
@@ -16,16 +17,16 @@ const RemindersWidget = () => {
             const config = { headers: { Authorization: `Bearer ${token}` } };
            
             // Παίρνουμε τις υπενθυμίσεις
-            const remindersRes = await axios.get('http://localhost:3000/api/reminders', config);
+            const remindersRes = await axios.get(apiUrl('/api/reminders'), config);
             setReminders(remindersRes.data);
             // Παίρνουμε την ομάδα ΚΑΙ τον ομαδάρχη (αν υπάρχει)
             const usersToAssign = [];
             if (user.role === 'TeamLeader' || user.role === 'Admin') {
-                const teamRes = await axios.get('http://localhost:3000/api/users/my-team', config);
+                const teamRes = await axios.get(apiUrl('/api/users/my-team'), config);
                 usersToAssign.push(...teamRes.data);
             }
             if (user.parent_user_id) {
-                const leaderRes = await axios.get(`http://localhost:3000/api/users/${user.parent_user_id}`, config);
+                const leaderRes = await axios.get(apiUrl(`/api/users/${user.parent_user_id}`), config);
                 usersToAssign.push(leaderRes.data);
             }
             setTeamAndLeader(usersToAssign);
@@ -43,7 +44,7 @@ const RemindersWidget = () => {
         try {
             const config = { headers: { Authorization: `Bearer ${token}` } };
             const body = { assignee_id: parseInt(assigneeId), title, due_date: dueDate };
-            await axios.post('http://localhost:3000/api/reminders', body, config);
+            await axios.post(apiUrl('/api/reminders'), body, config);
             setTitle('');
             setAssigneeId(user.id);
             setDueDate('');
@@ -56,7 +57,7 @@ const RemindersWidget = () => {
     const handleComplete = async (id) => {
         try {
             const config = { headers: { Authorization: `Bearer ${token}` } };
-            await axios.patch(`http://localhost:3000/api/reminders/${id}/complete`, {}, config);
+            await axios.patch(apiUrl(`/api/reminders/${id}/complete`), {}, config);
             fetchData();
         } catch (err) {
             console.error("Failed to complete reminder", err);

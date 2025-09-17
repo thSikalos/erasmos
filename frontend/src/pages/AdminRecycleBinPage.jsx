@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
+import { apiUrl } from '../utils/api';
 import '../App.css';
 
 const AdminRecycleBinPage = () => {
@@ -16,7 +17,7 @@ const AdminRecycleBinPage = () => {
         setLoading(true);
         try {
             const config = { headers: { Authorization: `Bearer ${token}` } };
-            const res = await axios.get('http://localhost:3000/api/customers/deleted', config);
+            const res = await axios.get(apiUrl('/api/customers/deleted'), config);
             setDeletedCustomers(res.data);
         } catch (err) {
             console.error("Failed to fetch deleted customers", err);
@@ -30,7 +31,7 @@ const AdminRecycleBinPage = () => {
     const handleRestore = async (id) => {
         try {
             const config = { headers: { Authorization: `Bearer ${token}` } };
-            await axios.patch(`http://localhost:3000/api/customers/${id}/restore`, {}, config);
+            await axios.patch(apiUrl(`/api/customers/${id}/restore`), {}, config);
             fetchData();
         } catch (err) {
             console.error("Failed to restore customer", err);
@@ -42,7 +43,7 @@ const AdminRecycleBinPage = () => {
         if (confirmation === afm) {
             try {
                 const config = { headers: { Authorization: `Bearer ${token}` } };
-                await axios.delete(`http://localhost:3000/api/customers/${id}/permanent`, config);
+                await axios.delete(apiUrl(`/api/customers/${id}/permanent`), config);
                 fetchData();
             } catch (err) {
                 console.error("Failed to permanently delete customer", err);

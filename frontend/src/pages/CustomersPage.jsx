@@ -2,6 +2,7 @@ import React, { useState, useEffect, useContext } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
+import { apiUrl } from '../utils/api';
 import SmartPagination from '../components/SmartPagination';
 import { useSearchWithPagination } from '../hooks/usePagination';
 import '../App.css';
@@ -41,7 +42,7 @@ const CustomersPage = () => {
                 const config = {
                     headers: { Authorization: `Bearer ${token}` }
                 };
-                const res = await axios.get('http://localhost:3000/api/customers', config);
+                const res = await axios.get(apiUrl('/api/customers'), config);
                 setCustomers(res.data);
             } catch (err) {
                 console.error('Failed to fetch customers', err);

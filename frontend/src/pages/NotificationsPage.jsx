@@ -2,6 +2,7 @@ import React, { useState, useEffect, useContext } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
+import { apiUrl } from '../utils/api';
 
 const NotificationsPage = () => {
     const { token } = useContext(AuthContext);
@@ -15,7 +16,7 @@ const NotificationsPage = () => {
         setLoading(true);
         try {
             const config = { headers: { Authorization: `Bearer ${token}` } };
-            const res = await axios.get('http://localhost:3000/api/notifications/drafts', config);
+            const res = await axios.get(apiUrl('/api/notifications/drafts'), config);
             setDrafts(res.data);
         } catch (err) {
             console.error("Failed to fetch drafts", err);
@@ -31,7 +32,7 @@ const NotificationsPage = () => {
         setMessage('Προετοιμασία μηνυμάτων, παρακαλώ περιμένετε...');
         try {
             const config = { headers: { Authorization: `Bearer ${token}` } };
-            await axios.post('http://localhost:3000/api/notifications/prepare-summary', {}, config);
+            await axios.post(apiUrl('/api/notifications/prepare-summary'), {}, config);
             setMessage('Τα προσχέδια μηνυμάτων ετοιμάστηκαν με επιτυχία!');
             fetchDrafts();
         } catch (err) {
@@ -44,7 +45,7 @@ const NotificationsPage = () => {
     const handleSend = async (id) => {
         try {
             const config = { headers: { Authorization: `Bearer ${token}` } };
-            await axios.post(`http://localhost:3000/api/notifications/${id}/send`, {}, config);
+            await axios.post(apiUrl(`/api/notifications/${id}/send`), {}, config);
             fetchDrafts();
         } catch (err) {
             console.error("Failed to send", err);

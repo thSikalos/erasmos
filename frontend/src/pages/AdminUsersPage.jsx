@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
+import { apiUrl } from '../utils/api';
 import '../App.css';
 
 const UserForm = ({ user, onSave, onCancel, teamLeaders }) => {
@@ -93,7 +94,7 @@ const AdminUsersPage = () => {
         setLoading(true);
         try {
             const config = { headers: { Authorization: `Bearer ${token}` } };
-            const res = await axios.get('http://localhost:3000/api/users', config);
+            const res = await axios.get(apiUrl('/api/users'), config);
             setUsers(res.data);
             setTeamLeaders(res.data.filter(u => u.role === 'TeamLeader' || u.role === 'Admin'));
         } catch (err) {
@@ -110,9 +111,9 @@ const AdminUsersPage = () => {
         try {
             const config = { headers: { Authorization: `Bearer ${token}` } };
             if (userData.id) { // Update
-                await axios.put(`http://localhost:3000/api/users/${userData.id}`, userData, config);
+                await axios.put(apiUrl(`/api/users/${userData.id}`), userData, config);
             } else { // Create
-                await axios.post('http://localhost:3000/api/users', userData, config);
+                await axios.post(apiUrl('/api/users'), userData, config);
             }
             setIsFormOpen(false);
             setEditingUser(null);
@@ -127,7 +128,7 @@ const AdminUsersPage = () => {
         showDeleteConfirm(`τον χρήστη "${user?.name || 'Unknown'}" (θα μεταφερθεί στον κάδο ανακύκλωσης)`, async () => {
             try {
                 const config = { headers: { Authorization: `Bearer ${token}` } };
-                await axios.delete(`http://localhost:3000/api/users/${userId}`, config);
+                await axios.delete(apiUrl(`/api/users/${userId}`), config);
                 showSuccessToast('Επιτυχία', 'Ο χρήστης μεταφέρθηκε στον κάδο ανακύκλωσης!');
                 fetchData();
             } catch (err) {

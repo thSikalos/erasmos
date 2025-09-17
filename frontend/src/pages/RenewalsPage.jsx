@@ -2,6 +2,7 @@ import React, { useState, useEffect, useContext } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
+import { apiUrl } from '../utils/api';
 import '../App.css';
 
 const RenewalsPage = () => {
@@ -29,7 +30,7 @@ const RenewalsPage = () => {
                     params: params
                 };
                 console.log('Renewals request params:', params);
-                const res = await axios.get('http://localhost:3000/api/applications/renewals', config);
+                const res = await axios.get(apiUrl('/api/applications/renewals'), config);
                 setRenewals(res.data);
             } catch (err) {
                 console.error("Failed to fetch renewals", err);
@@ -50,7 +51,7 @@ const RenewalsPage = () => {
         }
         
         const queryParams = new URLSearchParams(params).toString();
-        const url = `http://localhost:3000/api/applications/renewals/export?${queryParams}`;
+        const url = apiUrl(`/api/applications/renewals/export?${queryParams}`);
         window.open(url, '_blank');
     };
 

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useContext } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
+import { apiUrl } from '../utils/api';
 import '../App.css';
 
 const BonusesPage = () => {
@@ -22,7 +23,7 @@ const BonusesPage = () => {
             if (!token) return;
             try {
                 const config = { headers: { Authorization: `Bearer ${token}` } };
-                const res = await axios.get('http://localhost:3000/api/users/my-team', config);
+                const res = await axios.get(apiUrl('/api/users/my-team'), config);
                 setTeam(res.data);
             } catch (err) {
                 console.error("Failed to fetch team", err);
@@ -46,7 +47,7 @@ const BonusesPage = () => {
                 application_count_target: parseInt(targetCount),
                 bonus_amount_per_application: parseFloat(bonusAmount)
             };
-            await axios.post('http://localhost:3000/api/bonuses', bonusData, config);
+            await axios.post(apiUrl('/api/bonuses'), bonusData, config);
             
             setSuccessMessage('🎉 Το bonus δημιουργήθηκε με επιτυχία!');
             setName('');

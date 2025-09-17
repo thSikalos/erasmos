@@ -1,5 +1,6 @@
 import React, { useState, useRef, useCallback, useContext } from 'react';
 import { AuthContext } from '../context/AuthContext';
+import { apiUrl } from '../utils/api';
 import axios from 'axios';
 
 const FileUpload = ({ applicationId, onUploadSuccess, disabled = false, preUploadMode = false, onFilesChange }) => {
@@ -20,7 +21,7 @@ const FileUpload = ({ applicationId, onUploadSuccess, disabled = false, preUploa
         const loadCategories = async () => {
             try {
                 const config = { headers: { Authorization: `Bearer ${token}` } };
-                const response = await axios.get('http://localhost:3000/api/attachments/config/categories', config);
+                const response = await axios.get(apiUrl('/api/attachments/config/categories'), config);
                 if (response.data.length > 0) {
                     setCategories(response.data.map(cat => cat.name));
                 }
@@ -131,7 +132,7 @@ const FileUpload = ({ applicationId, onUploadSuccess, disabled = false, preUploa
             };
 
             const response = await axios.post(
-                `http://localhost:3000/api/attachments/${applicationId}/upload`,
+                apiUrl(`/api/attachments/${applicationId}/upload`),
                 formData,
                 config
             );

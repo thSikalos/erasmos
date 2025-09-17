@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useContext } from 'react';
 import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
+import { apiUrl } from '../utils/api';
 
 const BonusProgressWidget = () => {
     const { token } = useContext(AuthContext);
@@ -15,7 +16,7 @@ const BonusProgressWidget = () => {
             setError('');
             try {
                 const config = { headers: { 'Authorization': `Bearer ${token}` } };
-                const response = await axios.get('http://localhost:3000/api/bonuses/my-progress', config);
+                const response = await axios.get(apiUrl('/api/bonuses/my-progress'), config);
                 setBonusProgress(response.data);
             } catch (err) {
                 console.error('Failed to fetch bonus progress:', err);

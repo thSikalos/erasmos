@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
+import { apiUrl } from '../utils/api';
 
 const CommissionsPage = () => {
     const { token, user } = useContext(AuthContext);
@@ -32,11 +33,11 @@ const CommissionsPage = () => {
             try {
                 const config = { headers: { Authorization: `Bearer ${token}` } };
                 const [teamRes, companiesRes, fieldsRes, commissionsRes, bonusesRes] = await Promise.all([
-                    axios.get(user.role === 'Admin' ? 'http://localhost:3000/api/users' : 'http://localhost:3000/api/users/my-team', config),
-                    axios.get('http://localhost:3000/api/companies', config),
-                    axios.get('http://localhost:3000/api/fields', config),
-                    axios.get('http://localhost:3000/api/commissions', config),
-                    axios.get('http://localhost:3000/api/bonuses/all', config)
+                    axios.get(user.role === 'Admin' ? apiUrl('/api/users') : apiUrl('/api/users/my-team'), config),
+                    axios.get(apiUrl('/api/companies'), config),
+                    axios.get(apiUrl('/api/fields'), config),
+                    axios.get(apiUrl('/api/commissions'), config),
+                    axios.get(apiUrl('/api/bonuses/all'), config)
                 ]);
 
                 setTeam(teamRes.data.filter(u => u.role === 'Associate'));
@@ -82,7 +83,7 @@ const CommissionsPage = () => {
         try {
             const config = { headers: { Authorization: `Bearer ${token}` } };
             const payload = { associate_id: associateId, amount: parseFloat(amount) };
-            let url = 'http://localhost:3000/api/commissions/';
+            let url = apiUrl('/api/commissions/');
 
             if (type === 'company') {
                 payload.company_id = entityId;
@@ -135,7 +136,7 @@ const CommissionsPage = () => {
                 company_ids: bonusFormData.selectedCompanies
             };
 
-            await axios.post('http://localhost:3000/api/bonuses', bonusData, config);
+            await axios.post(apiUrl('/api/bonuses'), bonusData, config);
             setSuccessMessage('🎉 Το bonus δημιουργήθηκε με επιτυχία!');
 
             // Reset form
@@ -148,7 +149,7 @@ const CommissionsPage = () => {
             });
 
             // Refresh bonuses data
-            const bonusesRes = await axios.get('http://localhost:3000/api/bonuses/all', config);
+            const bonusesRes = await axios.get(apiUrl('/api/bonuses/all'), config);
             const bonusesMap = {};
             bonusesRes.data.forEach(bonus => {
                 if (!bonusesMap[bonus.target_user_id]) {

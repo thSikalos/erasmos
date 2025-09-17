@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
+import { apiUrl } from '../utils/api';
 import '../App.css';
 
 const RegisterPage = () => {
@@ -28,7 +29,7 @@ const RegisterPage = () => {
 
     try {
       // Call the backend API
-      const response = await axios.post('http://localhost:3000/api/users/register', formData);
+      const response = await axios.post(apiUrl('/api/users/register'), formData);
 
       console.log('Registration successful:', response.data);
       setIsSubmitted(true);

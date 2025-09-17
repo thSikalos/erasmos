@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { apiUrl } from '../utils/api';
 
 const InfoPortalEditor = ({
     activeCompany,
@@ -41,7 +42,7 @@ const InfoPortalEditor = ({
         try {
             const token = localStorage.getItem('token');
             const config = { headers: { Authorization: `Bearer ${token}` } };
-            const response = await axios.put(`http://localhost:3000/api/infoportal/sections/${activeSection.id}`, {
+            const response = await axios.put(apiUrl(`/api/infoportal/sections/${activeSection.id}`), {
                 title: editingTitle,
                 content: editingContent
             }, config);
@@ -69,7 +70,7 @@ const InfoPortalEditor = ({
         try {
             const token = localStorage.getItem('token');
             const config = { headers: { Authorization: `Bearer ${token}` } };
-            const response = await axios.post(`http://localhost:3000/api/infoportal/companies/${activeCompany.company_id}/sections`, newSectionData, config);
+            const response = await axios.post(apiUrl(`/api/infoportal/companies/${activeCompany.company_id}/sections`), newSectionData, config);
 
             if (response.data && onSectionCreate) {
                 onSectionCreate(response.data);
@@ -96,7 +97,7 @@ const InfoPortalEditor = ({
         try {
             const token = localStorage.getItem('token');
             const config = { headers: { Authorization: `Bearer ${token}` } };
-            await axios.delete(`http://localhost:3000/api/infoportal/sections/${activeSection.id}`, config);
+            await axios.delete(apiUrl(`/api/infoportal/sections/${activeSection.id}`), config);
             if (onSectionDelete) {
                 onSectionDelete(activeSection.id);
             }

@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
+import { apiUrl } from '../utils/api';
 import '../App.css';
 
 const LoginPage = () => {
@@ -20,7 +21,7 @@ const LoginPage = () => {
     setError('');
 
     try {
-      const response = await axios.post('http://localhost:3000/api/users/login', { email, password });
+      const response = await axios.post(apiUrl('/api/users/login'), { email, password });
       login(response.data.token);
       navigate('/dashboard');
     } catch (err) {

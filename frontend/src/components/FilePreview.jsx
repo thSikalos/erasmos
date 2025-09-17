@@ -1,5 +1,6 @@
 import React, { useState, useContext } from 'react';
 import { AuthContext } from '../context/AuthContext';
+import { apiUrl } from '../utils/api';
 import axios from 'axios';
 
 const FilePreview = ({ attachment, onClose, onDelete, applicationStatus }) => {
@@ -61,7 +62,7 @@ const FilePreview = ({ attachment, onClose, onDelete, applicationStatus }) => {
         try {
             const config = { headers: { Authorization: `Bearer ${token}` } };
             const response = await axios.get(
-                `http://localhost:3000/api/attachments/preview/${attachment.id}`,
+                apiUrl(`/api/attachments/preview/${attachment.id}`),
                 config
             );
 
@@ -81,7 +82,7 @@ const FilePreview = ({ attachment, onClose, onDelete, applicationStatus }) => {
             setIsLoading(true);
             const config = { headers: { Authorization: `Bearer ${token}` } };
             const response = await axios.get(
-                `http://localhost:3000/api/attachments/download/${attachment.id}`,
+                apiUrl(`/api/attachments/download/${attachment.id}`),
                 config
             );
 
@@ -107,7 +108,7 @@ const FilePreview = ({ attachment, onClose, onDelete, applicationStatus }) => {
             setIsLoading(true);
             const config = { headers: { Authorization: `Bearer ${token}` } };
             await axios.delete(
-                `http://localhost:3000/api/attachments/${attachment.id}`,
+                apiUrl(`/api/attachments/${attachment.id}`),
                 config
             );
 

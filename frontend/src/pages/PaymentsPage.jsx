@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
+import { apiUrl } from '../utils/api';
 
 const PaymentsPage = () => {
     const { token, user } = useContext(AuthContext);
@@ -31,10 +32,10 @@ const PaymentsPage = () => {
         try {
             const config = { headers: { Authorization: `Bearer ${token}` } };
             const [teamRes, appsRes, statementsRes, fieldsRes] = await Promise.all([
-                axios.get(user.role === 'Admin' ? 'http://localhost:3000/api/users' : 'http://localhost:3000/api/users/my-team', config),
-                axios.get('http://localhost:3000/api/applications', config),
-                axios.get('http://localhost:3000/api/payments/statements', config),
-                axios.get('http://localhost:3000/api/fields', config),
+                axios.get(user.role === 'Admin' ? apiUrl('/api/users') : apiUrl('/api/users/my-team'), config),
+                axios.get(apiUrl('/api/applications'), config),
+                axios.get(apiUrl('/api/payments/statements'), config),
+                axios.get(apiUrl('/api/fields'), config),
             ]);
             setTeam(teamRes.data.filter(u => u.role === 'Associate'));
             setApplications(appsRes.data);
@@ -89,13 +90,13 @@ const PaymentsPage = () => {
         try {
             const config = { headers: { Authorization: `Bearer ${token}` } };
             if (editingStatement) {
-                await axios.put(`http://localhost:3000/api/payments/statements/${editingStatement}`, {
+                await axios.put(apiUrl(`/api/payments/statements/${editingStatement}`), {
                     application_ids: Array.from(selectedAppIds)
                 }, config);
                 showPaymentToast('updated', editingStatement);
                 setEditingStatement(null);
             } else {
-                const response = await axios.post('http://localhost:3000/api/payments/statements', {
+                const response = await axios.post(apiUrl('/api/payments/statements'), {
                     recipient_id: parseInt(selectedAssociateId),
                     application_ids: Array.from(selectedAppIds)
                 }, config);
@@ -110,12 +111,12 @@ const PaymentsPage = () => {
     };
 
     const handleDownloadPdf = (statementId) => {
-        const url = `http://localhost:3000/api/payments/statements/${statementId}/pdf?token=${token}`;
+        const url = apiUrl(`/api/payments/statements/${statementId}/pdf?token=${token}`);
         window.open(url, '_blank');
     };
 
     const handleDownloadExcel = (statementId) => {
-        const url = `http://localhost:3000/api/payments/statements/${statementId}/excel?token=${token}`;
+        const url = apiUrl(`/api/payments/statements/${statementId}/excel?token=${token}`);
         window.open(url, '_blank');
     };
 
@@ -146,7 +147,7 @@ const PaymentsPage = () => {
         showDeleteConfirm(`την ταμειακή κατάσταση #${statement?.id || statementId}`, async () => {
             try {
                 const config = { headers: { Authorization: `Bearer ${token}` } };
-                await axios.delete(`http://localhost:3000/api/payments/statements/${statementId}`, config);
+                await axios.delete(apiUrl(`/api/payments/statements/${statementId}`), config);
                 showPaymentToast('deleted', statementId);
                 fetchData();
             } catch (error) {
@@ -165,7 +166,7 @@ const PaymentsPage = () => {
             async () => {
                 try {
                     const config = { headers: { Authorization: `Bearer ${token}` } };
-                    await axios.patch(`http://localhost:3000/api/payments/statements/${statementId}/mark-paid`, {}, config);
+                    await axios.patch(apiUrl(`/api/payments/statements/${statementId}/mark-paid`), {}, config);
                     showPaymentToast('marked_paid', statementId);
                     fetchData();
                 } catch (error) {
@@ -179,7 +180,7 @@ const PaymentsPage = () => {
     const handleEditStatement = async (statementId) => {
         try {
             const config = { headers: { Authorization: `Bearer ${token}` } };
-            const response = await axios.get(`http://localhost:3000/api/payments/statements/${statementId}`, config);
+            const response = await axios.get(apiUrl(`/api/payments/statements/${statementId}`), config);
             const statement = response.data;
 
             // Set the editing state

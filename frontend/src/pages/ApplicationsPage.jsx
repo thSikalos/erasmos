@@ -3,6 +3,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
+import ClawbackModal from '../components/ClawbackModal';
+import { apiUrl } from '../utils/api';
 
 const ApplicationsPage = () => {
     const { token, user } = useContext(AuthContext);
@@ -17,6 +19,16 @@ const ApplicationsPage = () => {
     const [successMessage, setSuccessMessage] = useState('');
     const [error, setError] = useState('');
     const [expandedRows, setExpandedRows] = useState(new Set());
+
+    // Clawback modal state
+    const [clawbackModalOpen, setClawbackModalOpen] = useState(false);
+    const [clawbackData, setClawbackData] = useState({
+        applicationId: null,
+        fieldId: null,
+        fieldLabel: '',
+        commissionAmount: 0
+    });
+    const [clawbackLoading, setClawbackLoading] = useState(false);
 
     // Search function for applications
     const searchFunction = (app, searchTerm) => {
@@ -58,10 +70,10 @@ const ApplicationsPage = () => {
         try {
             const config = { headers: { Authorization: `Bearer ${token}` } };
             const [pendingResponse, onHoldResponse, registeredResponse, fieldsResponse] = await Promise.all([
-                axios.get(`http://localhost:3000/api/applications/team-applications?paid_status=all&status_filter=${encodeURIComponent('Προς Καταχώρηση')}`, config),
-                axios.get(`http://localhost:3000/api/applications/team-applications?paid_status=all&status_filter=${encodeURIComponent('Εκκρεμότητα')}`, config),
-                axios.get(`http://localhost:3000/api/applications/team-applications?paid_status=all&status_filter=${encodeURIComponent('Καταχωρήθηκε')}`, config),
-                axios.get('http://localhost:3000/api/applications/displayable-fields', config)
+                axios.get(apiUrl(`/api/applications/team-applications?paid_status=all&status_filter=${encodeURIComponent('Προς Καταχώρηση')}`), config),
+                axios.get(apiUrl(`/api/applications/team-applications?paid_status=all&status_filter=${encodeURIComponent('Εκκρεμότητα')}`), config),
+                axios.get(apiUrl(`/api/applications/team-applications?paid_status=all&status_filter=${encodeURIComponent('Καταχωρήθηκε')}`), config),
+                axios.get(apiUrl('/api/applications/displayable-fields'), config)
             ]);
 
             setPendingApplications(pendingResponse.data);
@@ -100,7 +112,7 @@ const ApplicationsPage = () => {
         try {
             const config = { headers: { Authorization: `Bearer ${token}` } };
             await axios.patch(
-                `http://localhost:3000/api/applications/${applicationId}/fields/${fieldId}/payment`,
+                apiUrl(`/api/applications/${applicationId}/fields/${fieldId}/payment`),
                 { isPaid },
                 config
             );
@@ -115,32 +127,69 @@ const ApplicationsPage = () => {
         }
     };
 
-    // Handle field clawback creation
+    // Handle field clawback creation - Open modal
     const handleFieldClawback = async (applicationId, fieldId) => {
-        const percentage = prompt('Εισάγετε το ποσοστό clawback σε δωδεκατημόρια (1-12):', '12');
-        if (!percentage || isNaN(percentage) || percentage < 1 || percentage > 12) {
-            if (percentage !== null) showErrorToast('Σφάλμα', 'Παρακαλώ εισάγετε έναν αριθμό από 1 έως 12.');
-            return;
+        // Find the field data to populate modal
+        const application = applications.find(app => app.id === applicationId);
+        if (!application) return;
+
+        let fieldData = null;
+        let fieldLabel = 'Unknown Field';
+        let commissionAmount = 0;
+
+        // Search in commissionable_fields for field info
+        if (application.commissionable_fields) {
+            fieldData = application.commissionable_fields.find(f => f.field_id === fieldId);
+            if (fieldData) {
+                fieldLabel = fieldData.field_label;
+                commissionAmount = fieldData.commission_amount || 0;
+            }
         }
-        
-        const reason = prompt('Εισάγετε τον λόγο για το clawback:');
-        if (!reason) return;
+
+        setClawbackData({
+            applicationId,
+            fieldId,
+            fieldLabel,
+            commissionAmount
+        });
+        setClawbackModalOpen(true);
+    };
+
+    // Handle clawback modal confirm
+    const handleClawbackConfirm = async ({ percentage, reason }) => {
+        setClawbackLoading(true);
 
         try {
             const config = { headers: { Authorization: `Bearer ${token}` } };
             await axios.post(
-                `http://localhost:3000/api/applications/${applicationId}/fields/${fieldId}/clawback`,
-                { percentage: parseFloat(percentage), reason },
+                apiUrl(`/api/applications/${clawbackData.applicationId}/fields/${clawbackData.fieldId}/clawback`),
+                { percentage, reason },
                 config
             );
-            
+
             setSuccessMessage('Clawback δημιουργήθηκε επιτυχώς!');
             setTimeout(() => setSuccessMessage(''), 3000);
+            setClawbackModalOpen(false);
             fetchApplications(); // Refresh data
         } catch (error) {
             console.error("Failed to create field clawback", error);
-            setError(error.response?.data?.message || 'Σφάλμα κατά τη δημιουργία του clawback');
-            setTimeout(() => setError(''), 3000);
+            const errorMessage = error.response?.data?.message || 'Σφάλμα κατά τη δημιουργία του clawback';
+            showErrorToast('Σφάλμα Clawback', errorMessage);
+        } finally {
+            setClawbackLoading(false);
+        }
+    };
+
+    // Handle clawback modal close
+    const handleClawbackClose = () => {
+        if (!clawbackLoading) {
+            setClawbackModalOpen(false);
+            setClawbackData({
+                applicationId: null,
+                fieldId: null,
+                fieldLabel: '',
+                commissionAmount: 0
+            });
         }
     };
 
@@ -149,7 +198,7 @@ const ApplicationsPage = () => {
         try {
             const config = { headers: { Authorization: `Bearer ${token}` } };
             const endpoint = currentStatus ? 'unpaid' : 'paid';
-            await axios.patch(`http://localhost:3000/api/applications/${applicationId}/${endpoint}`, {}, config);
+            await axios.patch(apiUrl(`/api/applications/${applicationId}/${endpoint}`), {}, config);
             
             setSuccessMessage('Κατάσταση πληρωμής ενημερώθηκε επιτυχώς!');
             setTimeout(() => setSuccessMessage(''), 3000);
@@ -969,6 +1018,18 @@ const ApplicationsPage = () => {
                     <li>Τα clawbacks μπορούν να δημιουργηθούν μόνο για πληρωμένα πεδία που είναι σε statements</li>
                 </ul>
             </div>
+
+            {/* Clawback Modal */}
+            <ClawbackModal
+                isOpen={clawbackModalOpen}
+                onClose={handleClawbackClose}
+                onConfirm={handleClawbackConfirm}
+                applicationId={clawbackData.applicationId}
+                fieldId={clawbackData.fieldId}
+                fieldLabel={clawbackData.fieldLabel}
+                commissionAmount={clawbackData.commissionAmount}
+                loading={clawbackLoading}
+            />
         </div>
     );
 };

@@ -4,6 +4,7 @@ import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
 import FileUpload from '../components/FileUpload';
+import { apiUrl } from '../utils/api';
 import '../App.css';
 
 // Step indicators component
@@ -143,7 +144,7 @@ const NewApplicationPage = () => {
             try {
                 dispatch({ type: 'SET_LOADING', loading: true });
                 const config = { headers: { Authorization: `Bearer ${token}` } };
-                const companiesRes = await axios.get('http://localhost:3000/api/companies', config);
+                const companiesRes = await axios.get(apiUrl('/api/companies'), config);
                 setCompanies(companiesRes.data);
             } catch (error) {
                 dispatch({ type: 'SET_ERROR', error: 'Αποτυχία φόρτωσης εταιρειών.' });
@@ -165,7 +166,7 @@ const NewApplicationPage = () => {
         
         try {
             const config = { headers: { Authorization: `Bearer ${token}` } };
-            const res = await axios.get(`http://localhost:3000/api/customers/afm/${afm}`, config);
+            const res = await axios.get(apiUrl(`/api/customers/afm/${afm}`), config);
             dispatch({ type: 'SET_CUSTOMER_DETAILS', data: res.data });
             dispatch({ type: 'SET_CUSTOMER_STATUS', status: 'found' });
             showSuccessToast('Πελάτης Βρέθηκε', `Ο πελάτης βρέθηκε! ${res.data.applications_count || 0} προηγούμενες αιτήσεις`);
@@ -216,7 +217,7 @@ const NewApplicationPage = () => {
         
         try {
             const config = { headers: { Authorization: `Bearer ${token}` } };
-            const res = await axios.get(`http://localhost:3000/api/customers/afm/${state.afm}`, config);
+            const res = await axios.get(apiUrl(`/api/customers/afm/${state.afm}`), config);
             dispatch({ type: 'SET_CUSTOMER_DETAILS', data: res.data });
             dispatch({ type: 'SET_CUSTOMER_STATUS', status: 'found' });
             showSuccessToast('Πελάτης Βρέθηκε', 'Ο πελάτης βρέθηκε επιτυχώς!');
@@ -306,7 +307,7 @@ const NewApplicationPage = () => {
             };
             
             // First create the application
-            const response = await axios.post('http://localhost:3000/api/applications', applicationData, config);
+            const response = await axios.post(apiUrl('/api/applications'), applicationData, config);
             const applicationId = response.data.applicationId;
             
             // Then upload files if any exist
@@ -328,7 +329,7 @@ const NewApplicationPage = () => {
                         };
                         
                         await axios.post(
-                            `http://localhost:3000/api/attachments/${applicationId}/upload`,
+                            apiUrl(`/api/attachments/${applicationId}/upload`),
                             formData,
                             fileConfig
                         );

@@ -5,6 +5,8 @@ import { AuthContext } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
 import FileUpload from '../components/FileUpload';
 import FilePreview from '../components/FilePreview';
+import ClawbackModal from '../components/ClawbackModal';
+import { apiUrl } from '../utils/api';
 
 const ApplicationDetailPage = () => {
     const { id } = useParams();
@@ -32,9 +34,9 @@ const ApplicationDetailPage = () => {
         try {
             const config = { headers: { Authorization: `Bearer ${token}` } };
             const [appRes, commentsRes, attachmentsRes] = await Promise.all([
-                axios.get(`http://localhost:3000/api/applications/${id}`, config),
-                axios.get(`http://localhost:3000/api/applications/${id}/comments`, config),
-                axios.get(`http://localhost:3000/api/attachments/${id}`, config)
+                axios.get(apiUrl(`/api/applications/${id}`), config),
+                axios.get(apiUrl(`/api/applications/${id}/comments`), config),
+                axios.get(apiUrl(`/api/attachments/${id}`), config)
             ]);
             setApplication(appRes.data);
             setComments(commentsRes.data);
@@ -68,7 +70,7 @@ const ApplicationDetailPage = () => {
         try {
             const config = { headers: { Authorization: `Bearer ${token}` } };
             const body = { status, reason };
-            await axios.patch(`http://localhost:3000/api/applications/${id}/status`, body, config);
+            await axios.patch(apiUrl(`/api/applications/${id}/status`), body, config);
             fetchData();
         } catch (err) {
             setError("Could not update status.");
@@ -80,7 +82,7 @@ const ApplicationDetailPage = () => {
         try {
             const config = { headers: { Authorization: `Bearer ${token}` } };
             const endpoint = application.is_paid_by_company ? 'unpaid' : 'paid';
-            await axios.patch(`http://localhost:3000/api/applications/${id}/${endpoint}`, {}, config);
+            await axios.patch(apiUrl(`/api/applications/${id}/${endpoint}`), {}, config);
             fetchData(); // Refresh data
         } catch (error) {
             console.error("Failed to update payment status", error);
@@ -92,7 +94,7 @@ const ApplicationDetailPage = () => {
         try {
             const config = { headers: { Authorization: `Bearer ${token}` } };
             await axios.patch(
-                `http://localhost:3000/api/applications/${id}/fields/${fieldId}/payment`,
+                apiUrl(`/api/applications/${id}/fields/${fieldId}/payment`),
                 { isPaid },
                 config
             );
@@ -116,7 +118,7 @@ const ApplicationDetailPage = () => {
         try {
             const config = { headers: { Authorization: `Bearer ${token}` } };
             await axios.post(
-                `http://localhost:3000/api/applications/${id}/fields/${fieldId}/clawback`,
+                apiUrl(`/api/applications/${id}/fields/${fieldId}/clawback`),
                 { percentage: parseFloat(percentage), reason },
                 config
             );
@@ -132,7 +134,7 @@ const ApplicationDetailPage = () => {
         if (!newComment.trim()) return;
         try {
             const config = { headers: { Authorization: `Bearer ${token}` } };
-            await axios.post(`http://localhost:3000/api/applications/${id}/comments`, { comment: newComment }, config);
+            await axios.post(apiUrl(`/api/applications/${id}/comments`), { comment: newComment }, config);
             setNewComment('');
             fetchData();
         } catch (err) {

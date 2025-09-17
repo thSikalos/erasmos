@@ -4,6 +4,7 @@ import { jwtDecode } from 'jwt-decode';
 import { useNavigate } from 'react-router-dom';
 import setAuthToken from '../utils/setAuthToken';
 import useSessionTimeout from '../hooks/useSessionTimeout';
+import { apiUrl } from '../utils/api';
 
 export const AuthContext = createContext(null);
 
@@ -20,7 +21,7 @@ export const AuthProvider = ({ children }) => {
   const refreshTokenFromServer = useCallback(async () => {
     try {
       const config = { headers: { Authorization: `Bearer ${token}` } };
-      const response = await axios.post('http://localhost:3000/api/users/refresh-token', {}, config);
+      const response = await axios.post(apiUrl('/api/users/refresh-token'), {}, config);
       const newToken = response.data.token;
 
       // Update localStorage and state

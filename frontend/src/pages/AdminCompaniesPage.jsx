@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
+import { apiUrl } from '../utils/api';
 import '../App.css';
 
 const AdminCompaniesPage = () => {
@@ -24,8 +25,8 @@ const AdminCompaniesPage = () => {
         try {
             const config = { headers: { Authorization: `Bearer ${token}` } };
             const [companiesRes, fieldsRes] = await Promise.all([
-                axios.get('http://localhost:3000/api/companies', config),
-                axios.get('http://localhost:3000/api/fields', config)
+                axios.get(apiUrl('/api/companies'), config),
+                axios.get(apiUrl('/api/fields'), config)
             ]);
             setCompanies(companiesRes.data);
             setFields(fieldsRes.data);
@@ -58,7 +59,7 @@ const AdminCompaniesPage = () => {
             setError('');
             try {
                 const config = { headers: { Authorization: `Bearer ${token}` } };
-                await axios.delete(`http://localhost:3000/api/companies/${companyId}`, config);
+                await axios.delete(apiUrl(`/api/companies/${companyId}`), config);
                 showSuccessToast('Επιτυχία', 'Η εταιρεία διαγράφηκε επιτυχώς!');
                 fetchData();
             } catch (err) {
@@ -83,9 +84,9 @@ const AdminCompaniesPage = () => {
         const companyData = { name: companyName, field_ids: Array.from(selectedFieldIds) };
         try {
             if (isEditing) {
-                await axios.put(`http://localhost:3000/api/companies/${currentCompanyId}`, companyData, config);
+                await axios.put(apiUrl(`/api/companies/${currentCompanyId}`), companyData, config);
             } else {
-                await axios.post('http://localhost:3000/api/companies', companyData, config);
+                await axios.post(apiUrl('/api/companies'), companyData, config);
             }
             resetForm();
             fetchData();

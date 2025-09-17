@@ -2,6 +2,7 @@ import React, { useState, useEffect, useContext } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
+import { apiUrl } from '../utils/api';
 
 const AdminInvoicingPage = () => {
     const { token } = useContext(AuthContext);
@@ -20,8 +21,8 @@ const AdminInvoicingPage = () => {
         try {
             const config = { headers: { Authorization: `Bearer ${token}` } };
             const [leadersRes, invoicesRes] = await Promise.all([
-                axios.get('http://localhost:3000/api/users', config),
-                axios.get('http://localhost:3000/api/admin-billing/invoices', config)
+                axios.get(apiUrl('/api/users'), config),
+                axios.get(apiUrl('/api/admin-billing/invoices'), config)
             ]);
             setTeamLeaders(leadersRes.data.filter(u => u.role === 'TeamLeader' || u.role === 'Admin'));
             setInvoices(invoicesRes.data);
@@ -40,7 +41,7 @@ const AdminInvoicingPage = () => {
         try {
             const config = { headers: { Authorization: `Bearer ${token}` } };
             const body = { team_leader_id: parseInt(selectedTlId), startDate, endDate };
-            const res = await axios.post('http://localhost:3000/api/admin-billing/invoices', body, config);
+            const res = await axios.post(apiUrl('/api/admin-billing/invoices'), body, config);
             setMessage('Η ταμειακή κατάσταση δημιουργήθηκε με επιτυχία!');
             setGeneratedInvoice(res.data);
             fetchData(); // Refresh invoices after generating a new one
@@ -50,12 +51,12 @@ const AdminInvoicingPage = () => {
     };
 
     const handleDownloadPdf = (invoiceId) => {
-        const url = `http://localhost:3000/api/admin-billing/invoices/${invoiceId}/pdf?token=${token}`;
+        const url = `${apiUrl('/api/admin-billing/invoices/')}${invoiceId}/pdf?token=${token}`;
         window.open(url, '_blank');
     };
 
     const handleDownloadExcel = (invoiceId) => {
-        const url = `http://localhost:3000/api/admin-billing/invoices/${invoiceId}/excel?token=${token}`;
+        const url = `${apiUrl('/api/admin-billing/invoices/')}${invoiceId}/excel?token=${token}`;
         window.open(url, '_blank');
     };
 

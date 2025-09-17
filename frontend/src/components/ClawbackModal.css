@@ -1,0 +1,247 @@
+/* Clawback Modal Styles */
+.clawback-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.6);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    backdrop-filter: blur(2px);
+}
+
+.clawback-modal {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+    width: 500px;
+    max-width: 90vw;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+.clawback-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 24px;
+    border-bottom: 1px solid #e0e0e0;
+    background-color: #f8f9fa;
+    border-radius: 12px 12px 0 0;
+}
+
+.clawback-modal-header h3 {
+    margin: 0;
+    color: #333;
+    font-size: 1.3em;
+    font-weight: 600;
+}
+
+.clawback-modal-close {
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    color: #666;
+    padding: 0;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: all 0.2s ease;
+}
+
+.clawback-modal-close:hover:not(:disabled) {
+    background-color: #f0f0f0;
+    color: #333;
+}
+
+.clawback-modal-close:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.clawback-modal-form {
+    padding: 24px;
+}
+
+.clawback-field-info {
+    background-color: #f8f9fa;
+    padding: 16px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    border-left: 4px solid #007bff;
+}
+
+.clawback-field-info p {
+    margin: 8px 0;
+    color: #495057;
+}
+
+.clawback-field-info p:first-child {
+    margin-top: 0;
+}
+
+.clawback-field-info p:last-child {
+    margin-bottom: 0;
+}
+
+.clawback-form-group {
+    margin-bottom: 20px;
+}
+
+.clawback-form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+    color: #333;
+    font-size: 14px;
+}
+
+.clawback-form-group select,
+.clawback-form-group textarea {
+    width: 100%;
+    padding: 12px;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    font-size: 14px;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    font-family: inherit;
+}
+
+.clawback-form-group select:focus,
+.clawback-form-group textarea:focus {
+    outline: none;
+    border-color: #007bff;
+    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+}
+
+.clawback-form-group select:disabled,
+.clawback-form-group textarea:disabled {
+    background-color: #f8f9fa;
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+
+.clawback-form-group select {
+    cursor: pointer;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6,9 12,15 18,9'%3e%3c/polyline%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    background-size: 16px;
+    padding-right: 40px;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+}
+
+.clawback-amount-preview {
+    background-color: #fff3cd;
+    border: 1px solid #ffc107;
+    padding: 16px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+.clawback-amount-preview p {
+    margin: 0 0 8px 0;
+    font-size: 16px;
+    color: #856404;
+}
+
+.clawback-amount-preview small {
+    color: #6c5b00;
+    font-style: italic;
+}
+
+.clawback-modal-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+    margin-top: 24px;
+    padding-top: 20px;
+    border-top: 1px solid #e0e0e0;
+}
+
+.clawback-modal-cancel,
+.clawback-modal-confirm {
+    padding: 12px 24px;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    min-width: 120px;
+}
+
+.clawback-modal-cancel {
+    background-color: #6c757d;
+    color: white;
+}
+
+.clawback-modal-cancel:hover:not(:disabled) {
+    background-color: #5a6268;
+    transform: translateY(-1px);
+}
+
+.clawback-modal-confirm {
+    background-color: #dc3545;
+    color: white;
+}
+
+.clawback-modal-confirm:hover:not(:disabled) {
+    background-color: #c82333;
+    transform: translateY(-1px);
+}
+
+.clawback-modal-cancel:disabled,
+.clawback-modal-confirm:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .clawback-modal {
+        width: 95vw;
+        margin: 20px;
+    }
+
+    .clawback-modal-header,
+    .clawback-modal-form {
+        padding: 16px;
+    }
+
+    .clawback-modal-actions {
+        flex-direction: column-reverse;
+    }
+
+    .clawback-modal-cancel,
+    .clawback-modal-confirm {
+        width: 100%;
+    }
+}
+
+/* Animation for modal appearance */
+@keyframes clawback-modal-appear {
+    from {
+        opacity: 0;
+        transform: scale(0.8);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+.clawback-modal {
+    animation: clawback-modal-appear 0.3s ease-out;
+}

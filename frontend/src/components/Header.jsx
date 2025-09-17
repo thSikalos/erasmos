@@ -2,6 +2,7 @@ import React, { useContext, useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
+import { apiUrl } from '../utils/api';
 
 const Header = () => {
     const { user, logout, token } = useContext(AuthContext);
@@ -17,7 +18,7 @@ const Header = () => {
 
         try {
             const config = { headers: { Authorization: `Bearer ${token}` } };
-            const res = await axios.get('http://localhost:3000/api/notifications', config);
+            const res = await axios.get(apiUrl('/api/notifications'), config);
 
             // Check if there are new notifications
             const hasNewNotifications = !lastFetch ||
@@ -71,7 +72,7 @@ const Header = () => {
     const handleMarkAsRead = async (notificationId) => {
         try {
             const config = { headers: { Authorization: `Bearer ${token}` } };
-            await axios.patch(`http://localhost:3000/api/notifications/${notificationId}/read`, {}, config);
+            await axios.patch(apiUrl(`/api/notifications/${notificationId}/read`), {}, config);
 
             // Optimistically update UI while refetching
             setNotifications(prev => prev.map(n =>
@@ -89,7 +90,7 @@ const Header = () => {
     const handleMarkAllAsRead = async () => {
         try {
             const config = { headers: { Authorization: `Bearer ${token}` } };
-            await axios.post('http://localhost:3000/api/notifications/mark-all-read', {}, config);
+            await axios.post(apiUrl('/api/notifications/mark-all-read'), {}, config);
 
             // Optimistically update all notifications to read
             setNotifications(prev => prev.map(n => ({ ...n, status: 'read' })));

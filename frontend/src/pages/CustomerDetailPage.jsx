@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
+import { apiUrl } from '../utils/api';
 import '../App.css';
 
 const CustomerDetailPage = () => {
@@ -30,9 +31,9 @@ const CustomerDetailPage = () => {
         try {
             const config = { headers: { Authorization: `Bearer ${token}` } };
             const [customerRes, logRes, applicationsRes] = await Promise.all([
-                axios.get(`http://localhost:3000/api/customers/${id}`, config),
-                axios.get(`http://localhost:3000/api/customers/${id}/communications`, config),
-                axios.get(`http://localhost:3000/api/customers/${id}/applications`, config)
+                axios.get(apiUrl(`/api/customers/${id}`), config),
+                axios.get(apiUrl(`/api/customers/${id}/communications`), config),
+                axios.get(apiUrl(`/api/customers/${id}/applications`), config)
             ]);
             setCustomer(customerRes.data);
             setFormData({
@@ -94,7 +95,7 @@ const CustomerDetailPage = () => {
                 phone: formData.phones.filter(p => p.trim()).join(', '),
                 email: formData.emails.filter(e => e.trim()).join(', ')
             };
-            const res = await axios.put(`http://localhost:3000/api/customers/${id}`, submitData, config);
+            const res = await axios.put(apiUrl(`/api/customers/${id}`), submitData, config);
             setCustomer(res.data);
             setIsEditing(false);
         } catch (err) {
@@ -107,7 +108,7 @@ const CustomerDetailPage = () => {
             setError('');
             try {
                 const config = { headers: { Authorization: `Bearer ${token}` } };
-                await axios.delete(`http://localhost:3000/api/customers/${id}`, config);
+                await axios.delete(apiUrl(`/api/customers/${id}`), config);
                 showSuccessToast('Επιτυχία', 'Ο πελάτης μετακινήθηκε στον κάδο ανακύκλωσης');
                 navigate('/customers');
             } catch (err) {
@@ -123,7 +124,7 @@ const CustomerDetailPage = () => {
         try {
             const config = { headers: { Authorization: `Bearer ${token}` } };
             const body = { note: newNote, method };
-            await axios.post(`http://localhost:3000/api/customers/${id}/communications`, body, config);
+            await axios.post(apiUrl(`/api/customers/${id}/communications`), body, config);
             setNewNote('');
             setMethod('phone');
             fetchData();

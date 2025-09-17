@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
+import { apiUrl } from '../utils/api';
 import '../App.css';
 
 const AdminFieldsPage = () => {
@@ -23,7 +24,7 @@ const AdminFieldsPage = () => {
         if (!token) return;
         try {
             const config = { headers: { Authorization: `Bearer ${token}` } };
-            const res = await axios.get('http://localhost:3000/api/fields', config);
+            const res = await axios.get(apiUrl('/api/fields'), config);
             setFields(res.data);
         } catch (err) {
             setError('Failed to fetch fields');
@@ -58,7 +59,7 @@ const AdminFieldsPage = () => {
             setError('');
             try {
                 const config = { headers: { Authorization: `Bearer ${token}` } };
-                await axios.delete(`http://localhost:3000/api/fields/${fieldId}`, config);
+                await axios.delete(apiUrl(`/api/fields/${fieldId}`), config);
                 showSuccessToast('Επιτυχία', 'Το πεδίο διαγράφηκε επιτυχώς!');
                 fetchData();
             } catch (err) {
@@ -82,9 +83,9 @@ const AdminFieldsPage = () => {
 
         try {
             if (isEditing) {
-                await axios.put(`http://localhost:3000/api/fields/${currentFieldId}`, fieldData, config);
+                await axios.put(apiUrl(`/api/fields/${currentFieldId}`), fieldData, config);
             } else {
-                await axios.post('http://localhost:3000/api/fields', fieldData, config);
+                await axios.post(apiUrl('/api/fields'), fieldData, config);
             }
             resetForm();
             fetchData();
