@@ -149,23 +149,78 @@ const NewApplicationPage = () => {
     const isTeamLeaderOrAdmin = user?.role === 'TeamLeader' || user?.role === 'Admin';
     const isTopLevelLeader = isTeamLeaderOrAdmin && user?.parent_user_id === null;
 
-    // Load companies on component mount
+    // Load companies and fields on component mount
     useEffect(() => {
-        const fetchCompanies = async () => {
+        const fetchData = async () => {
             if (!token) return;
             try {
                 dispatch({ type: 'SET_LOADING', loading: true });
                 const config = { headers: { Authorization: `Bearer ${token}` } };
-                const companiesRes = await axios.get(apiUrl('/api/companies'), config);
-                setCompanies(companiesRes.data);
+
+                // Fetch companies and fields in parallel
+                const [companiesRes, fieldsRes] = await Promise.all([
+                    axios.get(apiUrl('/api/companies'), config),
+                    axios.get(apiUrl('/api/fields'), config)
+                ]);
+
+                console.log('[NewApplication] Companies data:', companiesRes.data);
+                console.log('[NewApplication] Fields data:', fieldsRes.data);
+
+                // Create a map of fields by ID for easy lookup
+                const fieldsMap = new Map();
+                fieldsRes.data.forEach(field => {
+                    fieldsMap.set(field.id, field);
+                });
+
+                // Enhance companies with their fields that have options
+                const enhancedCompanies = companiesRes.data.map(company => {
+                    // If company already has fields property with array of field objects
+                    if (company.fields && Array.isArray(company.fields)) {
+                        const enhancedFields = company.fields.map(companyField => {
+                            // Find the full field data including options
+                            const fullField = fieldsMap.get(companyField.id);
+                            if (fullField) {
+                                return {
+                                    ...companyField,
+                                    ...fullField, // This includes the options array
+                                    options: fullField.options || []
+                                };
+                            }
+                            return companyField;
+                        });
+
+                        return {
+                            ...company,
+                            fields: enhancedFields
+                        };
+                    }
+                    // If company.fields is just an array of field IDs
+                    else if (company.fields && Array.isArray(company.fields)) {
+                        const companyFields = company.fields
+                            .map(fieldId => fieldsMap.get(fieldId))
+                            .filter(Boolean); // Remove any undefined fields
+
+                        return {
+                            ...company,
+                            fields: companyFields
+                        };
+                    }
+
+                    return company;
+                });
+
+                console.log('[NewApplication] Enhanced companies:', enhancedCompanies);
+                setCompanies(enhancedCompanies);
+
             } catch (error) {
-                dispatch({ type: 'SET_ERROR', error: 'Αποτυχία φόρτωσης εταιρειών.' });
-                showErrorToast('Σφάλμα', 'Αποτυχία φόρτωσης εταιρειών');
+                console.error('[NewApplication] Error fetching data:', error);
+                dispatch({ type: 'SET_ERROR', error: 'Αποτυχία φόρτωσης δεδομένων.' });
+                showErrorToast('Σφάλμα', 'Αποτυχία φόρτωσης δεδομένων');
             } finally {
                 dispatch({ type: 'SET_LOADING', loading: false });
             }
         };
-        fetchCompanies();
+        fetchData();
     }, [token]);
 
     
@@ -426,6 +481,22 @@ const NewApplicationPage = () => {
 
     const selectedCompany = companies.find(c => c.id == state.selectedCompanyId);
 
+    // Debug logging for selectedCompany
+    useEffect(() => {
+        if (selectedCompany) {
+            console.log('[NewApplication] Selected company:', selectedCompany);
+            console.log('[NewApplication] Selected company fields:', selectedCompany.fields);
+            if (selectedCompany.fields) {
+                selectedCompany.fields.forEach((field, index) => {
+                    console.log(`[NewApplication] Field ${index}:`, field);
+                    if (field.type === 'dropdown') {
+                        console.log(`[NewApplication] Field ${index} options:`, field.options);
+                    }
+                });
+            }
+        }
+    }, [selectedCompany]);
+
     return (
         <div className="modern-form-container">
 
@@ -648,11 +719,15 @@ const NewApplicationPage = () => {
                                                         className="form-select"
                                                     >
                                                         <option value="">-- Επιλέξτε --</option>
-                                                        {field.options && field.options.map(option => (
-                                                            <option key={option.id} value={option.value}>
-                                                                {option.label}
-                                                            </option>
-                                                        ))}
+                                                        {field.options && field.options.length > 0 ? (
+                                                            field.options.map(option => (
+                                                                <option key={option.id || option.value} value={option.value}>
+                                                                    {option.label}
+                                                                </option>
+                                                            ))
+                                                        ) : (
+                                                            <option value="" disabled>Δεν υπάρχουν επιλογές διαθέσιμες</option>
+                                                        )}
                                                     </select>
                                                 ) : (
                                                     <input

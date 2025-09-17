@@ -25,6 +25,16 @@ const PDFReadinessIndicator = ({
         }
     }, [companyId, applicationData, selectedDropdownValues]);
 
+    // Debug logging - can be enabled for troubleshooting
+    // useEffect(() => {
+    //     console.log('[PDF Debug] Current pdfStatus:', {
+    //         isReady: pdfStatus.isReady,
+    //         missingFieldsCount: pdfStatus.missingFields?.length || 0,
+    //         selectedTemplate: !!pdfStatus.selectedTemplate,
+    //         showGenerateButton: showGenerateButton
+    //     });
+    // }, [pdfStatus, showGenerateButton]);
+
     const checkPDFReadiness = async () => {
         try {
             setPdfStatus(prev => ({ ...prev, loading: true }));
@@ -156,8 +166,12 @@ const PDFReadinessIndicator = ({
         if (pdfStatus.loading) return 'Έλεγχος PDF...';
         if (pdfStatus.error) return `Σφάλμα: ${pdfStatus.error}`;
         if (pdfStatus.noMatchingTemplate) return 'Δεν υπάρχει PDF template για την επιλογή σας';
-        if (pdfStatus.isReady) return 'PDF έτοιμο για δημιουργία!';
-        return `Λείπουν ${pdfStatus.missingFields.length} απαιτούμενα πεδία`;
+
+        if (pdfStatus.missingFields.length > 0) {
+            return `Απαιτούνται ${pdfStatus.missingFields.length} επιπλέον πεδία`;
+        }
+
+        return 'Όλα τα πεδία συμπληρωμένα - Έτοιμο για PDF!';
     };
 
     return (
@@ -330,6 +344,64 @@ const PDFReadinessIndicator = ({
                         padding: 15px;
                     }
 
+                    /* New Compact Missing Fields Styles */
+                    .missing-fields-compact {
+                        background: rgba(243, 156, 18, 0.1);
+                        border: 1px solid rgba(243, 156, 18, 0.3);
+                        border-radius: 8px;
+                        padding: 12px;
+                        margin-top: 10px;
+                    }
+
+                    .missing-summary {
+                        display: flex;
+                        align-items: center;
+                        gap: 8px;
+                        margin-bottom: 8px;
+                        color: #f39c12;
+                        font-weight: 600;
+                        font-size: 0.9rem;
+                    }
+
+                    .warning-icon {
+                        font-size: 1rem;
+                    }
+
+                    .missing-field-tags {
+                        display: flex;
+                        flex-wrap: wrap;
+                        gap: 6px;
+                    }
+
+                    .missing-field-tag {
+                        background: rgba(243, 156, 18, 0.2);
+                        color: #f39c12;
+                        padding: 4px 8px;
+                        border-radius: 12px;
+                        font-size: 0.8rem;
+                        font-weight: 500;
+                        border: 1px solid rgba(243, 156, 18, 0.4);
+                        transition: all 0.2s ease;
+                    }
+
+                    .missing-field-tag:hover {
+                        background: rgba(243, 156, 18, 0.3);
+                        transform: translateY(-1px);
+                        box-shadow: 0 2px 4px rgba(243, 156, 18, 0.2);
+                    }
+
+                    /* Enhanced Button Styles */
+                    .pdf-generate-btn:disabled {
+                        background: linear-gradient(135deg, #95a5a6, #7f8c8d);
+                        cursor: not-allowed;
+                        opacity: 0.8;
+                    }
+
+                    .pdf-generate-btn:disabled:hover {
+                        transform: none;
+                        box-shadow: none;
+                    }
+
                     @media (max-width: 768px) {
                         .pdf-status-header {
                             flex-direction: column;
@@ -353,14 +425,16 @@ const PDFReadinessIndicator = ({
                     </span>
                 </div>
 
-                {showGenerateButton && pdfStatus.isReady && (
+                {showGenerateButton && pdfStatus.selectedTemplate && !pdfStatus.loading && !pdfStatus.error && !pdfStatus.noMatchingTemplate && (
                     <button
                         className="pdf-generate-btn"
                         onClick={handleGeneratePDF}
-                        disabled={generatingPDF}
+                        disabled={generatingPDF || pdfStatus.missingFields.length > 0}
                     >
                         {generatingPDF ? (
                             <>⏳ Δημιουργία...</>
+                        ) : pdfStatus.missingFields.length > 0 ? (
+                            <>⚠️ Λείπουν {pdfStatus.missingFields.length} πεδία</>
                         ) : (
                             <>📄 Εκτύπωση Συμβολαίου</>
                         )}
@@ -373,11 +447,15 @@ const PDFReadinessIndicator = ({
                     {pdfStatus.selectedTemplate && (
                         <div className="template-info">
                             <h4>📋 Template: {pdfStatus.selectedTemplate.template_name}</h4>
-                            <div className="template-details">
-                                <span>🔗 {pdfStatus.selectedTemplate.option_value}</span>
-                                <span>🎯 {pdfStatus.selectedTemplate.placeholders_detected} placeholders</span>
-                                <span>📊 {pdfStatus.selectedTemplate.analysis_status}</span>
-                            </div>
+
+                            {/* Εμφάνιση details μόνο αν είναι έτοιμο ή σχεδόν έτοιμο */}
+                            {pdfStatus.missingFields.length === 0 && (
+                                <div className="template-details">
+                                    <span>🔗 {pdfStatus.selectedTemplate.option_value}</span>
+                                    <span>🎯 {pdfStatus.selectedTemplate.placeholders_detected} placeholders</span>
+                                    <span>📊 {pdfStatus.selectedTemplate.analysis_status}</span>
+                                </div>
+                            )}
                         </div>
                     )}
 
@@ -398,15 +476,17 @@ const PDFReadinessIndicator = ({
                         </>
                     )}
 
-                    {/* Missing Fields */}
+                    {/* Missing Fields - Compact Design */}
                     {pdfStatus.missingFields.length > 0 && (
-                        <div className="missing-fields">
-                            <h4>⚠️ Απαιτούμενα πεδία που λείπουν:</h4>
-                            <div className="missing-field-list">
+                        <div className="missing-fields-compact">
+                            <div className="missing-summary">
+                                <span className="warning-icon">⚠️</span>
+                                <span>Για δημιουργία PDF, συμπληρώστε:</span>
+                            </div>
+                            <div className="missing-field-tags">
                                 {pdfStatus.missingFields.map((field, index) => (
-                                    <div key={index} className="missing-field-item">
-                                        <span>❌</span>
-                                        <span>{field.fieldLabel}</span>
+                                    <div key={index} className="missing-field-tag">
+                                        {field.fieldLabel}
                                     </div>
                                 ))}
                             </div>
