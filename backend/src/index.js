@@ -22,6 +22,7 @@ const adminBillingRoutes = require('./routes/adminBillingRoutes'); // <-- ΝΕΟ
 const teamCompanyRoutes = require('./routes/teamCompanyRoutes');
 const infoPortalRoutes = require('./routes/infoPortalRoutes');
 const pdfTemplateRoutes = require('./routes/pdfTemplateRoutes');
+const legalRoutes = require('./routes/legalRoutes');
 const { pdfErrorHandler, pdfTimeout } = require('./middleware/pdfErrorHandler');
 
 const app = express();
@@ -66,6 +67,7 @@ app.use('/api/admin-billing', adminBillingRoutes); // <-- ΝΕΟ
 app.use('/api/team-companies', teamCompanyRoutes);
 app.use('/api/infoportal', infoPortalRoutes);
 app.use('/api/pdf-templates', pdfTimeout(60000), pdfTemplateRoutes);
+app.use('/api/legal', legalRoutes);
 app.use('/api/ai', aiRoutes);
 
 // Global error handler

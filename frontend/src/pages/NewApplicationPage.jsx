@@ -3,6 +3,7 @@ import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
+import { useLegalCompliance } from '../context/LegalComplianceContext';
 import FileUpload from '../components/FileUpload';
 import PDFReadinessIndicator from '../components/PDFReadinessIndicator';
 import SignedPDFUpload from '../components/SignedPDFUpload';
@@ -13,9 +14,10 @@ import '../App.css';
 // Step indicators component
 const StepIndicator = ({ currentStep, totalSteps }) => {
     const steps = [
-        { number: 1, title: 'Στοιχεία Πελάτη', icon: '👤' },
-        { number: 2, title: 'Στοιχεία Αίτησης', icon: '📋' },
-        { number: 3, title: 'Προεπισκόπηση', icon: '✅' }
+        { number: 1, title: 'Legal Compliance', icon: '⚖️' },
+        { number: 2, title: 'Στοιχεία Πελάτη', icon: '👤' },
+        { number: 3, title: 'Στοιχεία Αίτησης', icon: '📋' },
+        { number: 4, title: 'Προεπισκόπηση', icon: '✅' }
     ];
 
     return (
@@ -141,6 +143,7 @@ const NewApplicationPage = () => {
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const { showSuccessToast, showErrorToast, showInfoToast, showWarningToast } = useNotifications();
+    const { checkLegalCompliance, isLegallyCompliant } = useLegalCompliance();
 
     // Get draftId from URL params
     const draftId = searchParams.get('draftId');
@@ -597,6 +600,19 @@ const NewApplicationPage = () => {
         }
     }, [draftId, loadDraftData, companies]);
 
+    // Check legal compliance on component mount
+    useEffect(() => {
+        const compliant = checkLegalCompliance('application_creation');
+        if (!compliant) {
+            // User will be redirected to legal acceptance modal
+            // We stay on step 1 (Legal Compliance) until completion
+            dispatch({ type: 'SET_CURRENT_STEP', step: 1 });
+        } else if (state.currentStep === 1 && isLegallyCompliant()) {
+            // If user is compliant and still on legal step, move to customer details
+            dispatch({ type: 'SET_CURRENT_STEP', step: 2 });
+        }
+    }, [checkLegalCompliance, isLegallyCompliant, state.currentStep]);
+
     return (
         <div className="modern-form-container">
 
@@ -619,12 +635,140 @@ const NewApplicationPage = () => {
             </div>
 
             <div className="wizard-container">
-                <StepIndicator currentStep={state.currentStep} totalSteps={3} />
-                <ProgressBar currentStep={state.currentStep} totalSteps={3} />
+                <StepIndicator currentStep={state.currentStep} totalSteps={4} />
+                <ProgressBar currentStep={state.currentStep} totalSteps={4} />
 
                 <div className="step-content">
-                    {/* Step 1: Customer Details */}
+                    {/* Step 1: Legal Compliance */}
                     {state.currentStep === 1 && (
+                        <div className="step-panel fade-in">
+                            <div className="step-header">
+                                <h2>⚖️ Legal Compliance Check</h2>
+                                <p>Επιβεβαίωση νομικής συμμόρφωσης για επεξεργασία προσωπικών δεδομένων</p>
+                            </div>
+
+                            <div className="form-card">
+                                {isLegallyCompliant() ? (
+                                    <div style={{
+                                        background: '#f0fdf4',
+                                        border: '2px solid #10b981',
+                                        borderRadius: '12px',
+                                        padding: '24px',
+                                        textAlign: 'center'
+                                    }}>
+                                        <div style={{ fontSize: '3rem', marginBottom: '16px' }}>✅</div>
+                                        <h3 style={{ color: '#065f46', margin: '0 0 12px 0', fontSize: '1.5rem' }}>
+                                            Legal Compliance Επιβεβαιωμένο
+                                        </h3>
+                                        <p style={{ color: '#047857', margin: '0 0 20px 0', fontSize: '1.1rem' }}>
+                                            Έχετε ολοκληρώσει επιτυχώς τη νομική αποδοχή. Μπορείτε να προχωρήσετε
+                                            στη δημιουργία αίτησης.
+                                        </p>
+                                        <div style={{
+                                            background: '#ecfdf5',
+                                            border: '1px solid #10b981',
+                                            borderRadius: '8px',
+                                            padding: '16px',
+                                            marginTop: '16px'
+                                        }}>
+                                            <h4 style={{ color: '#065f46', margin: '0 0 8px 0' }}>
+                                                🛡️ Προστασία Διαθέσιμη
+                                            </h4>
+                                            <ul style={{
+                                                color: '#047857',
+                                                fontSize: '0.9rem',
+                                                textAlign: 'left',
+                                                margin: '0',
+                                                paddingLeft: '20px'
+                                            }}>
+                                                <li>GDPR Compliance επιβεβαιωμένο</li>
+                                                <li>Πλήρες audit trail ενεργό</li>
+                                                <li>Νομική προστασία για τον διαχειριστή</li>
+                                                <li>Email verification ολοκληρωμένο</li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div style={{
+                                        background: '#fef2f2',
+                                        border: '2px solid #ef4444',
+                                        borderRadius: '12px',
+                                        padding: '24px',
+                                        textAlign: 'center'
+                                    }}>
+                                        <div style={{ fontSize: '3rem', marginBottom: '16px' }}>⚠️</div>
+                                        <h3 style={{ color: '#dc2626', margin: '0 0 12px 0', fontSize: '1.5rem' }}>
+                                            Legal Compliance Απαιτείται
+                                        </h3>
+                                        <p style={{ color: '#991b1b', margin: '0 0 20px 0', fontSize: '1.1rem' }}>
+                                            Για να προχωρήσετε στη δημιουργία αίτησης, θα πρέπει πρώτα να ολοκληρώσετε
+                                            τη νομική αποδοχή των όρων και των συμφωνιών GDPR.
+                                        </p>
+                                        <div style={{
+                                            background: '#fee2e2',
+                                            border: '1px solid #ef4444',
+                                            borderRadius: '8px',
+                                            padding: '16px',
+                                            marginTop: '16px'
+                                        }}>
+                                            <h4 style={{ color: '#dc2626', margin: '0 0 8px 0' }}>
+                                                📋 Απαιτούμενες Ενέργειες
+                                            </h4>
+                                            <ul style={{
+                                                color: '#991b1b',
+                                                fontSize: '0.9rem',
+                                                textAlign: 'left',
+                                                margin: '0',
+                                                paddingLeft: '20px'
+                                            }}>
+                                                <li>Αποδοχή Terms of Service</li>
+                                                <li>Αποδοχή Data Processing Agreement</li>
+                                                <li>Υπογραφή User Compliance Declarations</li>
+                                                <li>Επιβεβαίωση email</li>
+                                            </ul>
+                                        </div>
+                                        <p style={{
+                                            color: '#7f1d1d',
+                                            fontSize: '0.9rem',
+                                            marginTop: '16px',
+                                            fontStyle: 'italic'
+                                        }}>
+                                            Η διαδικασία θα ανοίξει αυτόματα όταν προσπαθήσετε να προχωρήσετε.
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="step-navigation">
+                                {isLegallyCompliant() ? (
+                                    <button
+                                        className="nav-button primary"
+                                        onClick={() => {
+                                            const compliant = checkLegalCompliance('application_creation');
+                                            if (compliant) {
+                                                dispatch({ type: 'SET_CURRENT_STEP', step: 2 });
+                                            }
+                                        }}
+                                    >
+                                        ✅ Προχώρημα στα Στοιχεία Πελάτη →
+                                    </button>
+                                ) : (
+                                    <button
+                                        className="nav-button disabled"
+                                        onClick={() => {
+                                            // This will trigger the legal acceptance modal
+                                            checkLegalCompliance('application_creation');
+                                        }}
+                                    >
+                                        ⚠️ Ολοκλήρωση Legal Compliance Required
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Step 2: Customer Details (now moved to step 2) */}
+                    {state.currentStep === 2 && (
                         <div className="step-panel fade-in">
                             <div className="step-header">
                                 <h2>👤 Στοιχεία Πελάτη</h2>
@@ -793,8 +937,8 @@ const NewApplicationPage = () => {
                         </div>
                     )}
 
-                    {/* Step 2: Application Details */}
-                    {state.currentStep === 2 && (
+                    {/* Step 3: Application Details */}
+                    {state.currentStep === 4 && (
                         <div className="step-panel fade-in">
                             <div className="step-header">
                                 <h2>📋 Στοιχεία Αίτησης</h2>
@@ -909,7 +1053,7 @@ const NewApplicationPage = () => {
                     )}
 
                     {/* Step 3: Preview & Submit */}
-                    {state.currentStep === 3 && (
+                    {state.currentStep === 4 && (
                         <div className="step-panel fade-in">
                             <div className="step-header">
                                 <h2>✅ Προεπισκόπηση & Υποβολή</h2>
@@ -1001,7 +1145,7 @@ const NewApplicationPage = () => {
                             </div>
 
                             {/* PDF Generation and Upload */}
-                            {state.currentStep === 3 && (
+                            {state.currentStep === 4 && (
                                 <PDFErrorBoundary fallbackMessage="Σφάλμα στη λειτουργία PDF. Παρακαλώ ανανεώστε τη σελίδα.">
                                     <div className="pdf-section">
                                         <PDFReadinessIndicator

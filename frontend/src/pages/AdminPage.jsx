@@ -45,6 +45,13 @@ const AdminPage = () => {
             link: '/admin/invoicing',
             color: 'from-pink-500 to-rose-600'
         },
+        {
+            title: 'Legal Compliance Dashboard',
+            description: 'Παρακολούθηση νομικής συμμόρφωσης, GDPR compliance και διαχείριση legal acceptances.',
+            icon: '⚖️',
+            link: '/admin/legal',
+            color: 'from-red-500 to-purple-600'
+        },
     ];
 
     return (

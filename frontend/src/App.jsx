@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthContext } from './context/AuthContext';
 import { NotificationProvider } from './context/NotificationContext';
 import { CookieConsentProvider } from './context/CookieConsentContext';
+import { LegalComplianceProvider } from './context/LegalComplianceContext';
 import ErrorBoundary from './components/ErrorBoundary';
 import MainLayout from './components/MainLayout';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -39,6 +40,9 @@ const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 const InfoPortalPage = lazy(() => import('./pages/InfoPortalPage'));
 const PrivacyPolicyPage = lazy(() => import('./pages/PrivacyPolicyPage'));
 const CookiePolicyPage = lazy(() => import('./pages/CookiePolicyPage'));
+const LegalVerificationPage = lazy(() => import('./pages/LegalVerificationPage'));
+const AdminLegalDashboard = lazy(() => import('./pages/AdminLegalDashboard'));
+const LegalAcceptanceModal = lazy(() => import('./components/LegalAcceptanceModal'));
 
 function App() {
   const { loading } = useContext(AuthContext);
@@ -50,79 +54,86 @@ function App() {
   return (
     <ErrorBoundary>
       <CookieConsentProvider>
-        <NotificationProvider>
-        <Suspense fallback={
-          <div style={{
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            height: '100vh',
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            color: 'white',
-            fontSize: '1.2rem'
-          }}>
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '15px'
-            }}>
+        <LegalComplianceProvider>
+          <NotificationProvider>
+            <Suspense fallback={
               <div style={{
-                border: '3px solid rgba(255,255,255,0.3)',
-                borderTop: '3px solid white',
-                borderRadius: '50%',
-                width: '40px',
-                height: '40px',
-                animation: 'spin 1s linear infinite'
-              }}></div>
-              Φόρτωση...
-            </div>
-            <style>{`
-              @keyframes spin {
-                0% { transform: rotate(0deg); }
-                100% { transform: rotate(360deg); }
-              }
-            `}</style>
-          </div>
-        }>
-          <Routes>
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/register" element={<RegisterPage />} />
-            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-            <Route path="/reset-password" element={<ResetPasswordPage />} />
-            <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
-            <Route path="/cookie-policy" element={<CookiePolicyPage />} />
-            <Route element={<ProtectedRoute />}>
-              <Route element={<MainLayout />}>
-              <Route path="/dashboard" element={<DashboardPage />} />
-              <Route path="/customers" element={<CustomersPage />} />
-              <Route path="/customers/:id" element={<CustomerDetailPage />} />
-              <Route path="/application/new" element={<NewApplicationPage />} />
-              <Route path="/application/edit/:id" element={<EditApplicationPage />} />
-              <Route path="/application/:id" element={<ApplicationDetailPage />} />
-              <Route path="/renewals" element={<RenewalsPage />} />
-              <Route path="/applications" element={<ApplicationsPage />} />
-              <Route path="/notifications" element={<NotificationsPage />} />
-              <Route path="/infoportal" element={<InfoPortalPage />} />
-              <Route path="/profile" element={<ProfilePage />} />
-              <Route element={<FinanceProtectedRoute />}>
-                <Route path="/payments" element={<PaymentsPage />} />
-                <Route path="/commissions" element={<CommissionsPage />} />
-                <Route path="/reporting" element={<ReportingPage />} />
-              </Route>
-              <Route path="/admin" element={<AdminPage />} />
-              <Route path="/admin/fields" element={<AdminFieldsPage />} />
-              <Route path="/admin/companies" element={<AdminCompaniesPage />} />
-              <Route path="/admin/recycle-bin" element={<AdminRecycleBinPage />} />
-              <Route path="/admin/users" element={<AdminUsersPage />} />
-              <Route path="/admin/billing-settings" element={<AdminBillingSettingsPage />} />
-              <Route path="/admin/invoicing" element={<AdminInvoicingPage />} />
-              <Route path="/team-company-management" element={<TeamCompanyManagementPage />} />
-            </Route>
-          </Route>
-          <Route path="/" element={<Navigate to="/dashboard" />} />
-        </Routes>
-        </Suspense>
-        </NotificationProvider>
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                height: '100vh',
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                color: 'white',
+                fontSize: '1.2rem'
+              }}>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '15px'
+                }}>
+                  <div style={{
+                    border: '3px solid rgba(255,255,255,0.3)',
+                    borderTop: '3px solid white',
+                    borderRadius: '50%',
+                    width: '40px',
+                    height: '40px',
+                    animation: 'spin 1s linear infinite'
+                  }}></div>
+                  Φόρτωση...
+                </div>
+                <style>{`
+                  @keyframes spin {
+                    0% { transform: rotate(0deg); }
+                    100% { transform: rotate(360deg); }
+                  }
+                `}</style>
+              </div>
+            }>
+              <Routes>
+                <Route path="/login" element={<LoginPage />} />
+                <Route path="/register" element={<RegisterPage />} />
+                <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+                <Route path="/reset-password" element={<ResetPasswordPage />} />
+                <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
+                <Route path="/cookie-policy" element={<CookiePolicyPage />} />
+                <Route path="/legal/verify" element={<LegalVerificationPage />} />
+                <Route element={<ProtectedRoute />}>
+                  <Route element={<MainLayout />}>
+                    <Route path="/dashboard" element={<DashboardPage />} />
+                    <Route path="/customers" element={<CustomersPage />} />
+                    <Route path="/customers/:id" element={<CustomerDetailPage />} />
+                    <Route path="/application/new" element={<NewApplicationPage />} />
+                    <Route path="/application/edit/:id" element={<EditApplicationPage />} />
+                    <Route path="/application/:id" element={<ApplicationDetailPage />} />
+                    <Route path="/renewals" element={<RenewalsPage />} />
+                    <Route path="/applications" element={<ApplicationsPage />} />
+                    <Route path="/notifications" element={<NotificationsPage />} />
+                    <Route path="/infoportal" element={<InfoPortalPage />} />
+                    <Route path="/profile" element={<ProfilePage />} />
+                    <Route element={<FinanceProtectedRoute />}>
+                      <Route path="/payments" element={<PaymentsPage />} />
+                      <Route path="/commissions" element={<CommissionsPage />} />
+                      <Route path="/reporting" element={<ReportingPage />} />
+                    </Route>
+                    <Route path="/admin" element={<AdminPage />} />
+                    <Route path="/admin/fields" element={<AdminFieldsPage />} />
+                    <Route path="/admin/companies" element={<AdminCompaniesPage />} />
+                    <Route path="/admin/recycle-bin" element={<AdminRecycleBinPage />} />
+                    <Route path="/admin/users" element={<AdminUsersPage />} />
+                    <Route path="/admin/billing-settings" element={<AdminBillingSettingsPage />} />
+                    <Route path="/admin/invoicing" element={<AdminInvoicingPage />} />
+                    <Route path="/admin/legal" element={<AdminLegalDashboard />} />
+                    <Route path="/team-company-management" element={<TeamCompanyManagementPage />} />
+                  </Route>
+                </Route>
+                <Route path="/" element={<Navigate to="/dashboard" />} />
+              </Routes>
+
+              {/* Legal Acceptance Modal - Global */}
+              <LegalAcceptanceModal />
+            </Suspense>
+          </NotificationProvider>
+        </LegalComplianceProvider>
       </CookieConsentProvider>
     </ErrorBoundary>
   );
