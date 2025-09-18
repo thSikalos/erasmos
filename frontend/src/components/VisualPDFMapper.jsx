@@ -568,7 +568,7 @@ const VisualPDFMapper = ({
 
                     .mapper-content {
                         display: grid;
-                        grid-template-columns: 1fr 300px;
+                        grid-template-columns: 1fr 450px;
                         gap: 20px;
                         min-height: 600px;
                     }
@@ -723,7 +723,7 @@ const VisualPDFMapper = ({
                         border: 1px solid rgba(255, 255, 255, 0.1);
                         display: flex;
                         flex-direction: column;
-                        max-height: 600px;
+                        max-height: 800px;
                     }
 
                     .section-header {
@@ -1036,7 +1036,19 @@ const VisualPDFMapper = ({
                         font-weight: 600;
                     }
 
+                    @media (max-width: 1400px) {
+                        .mapper-content {
+                            grid-template-columns: 1fr 400px;
+                        }
+                    }
+
                     @media (max-width: 1200px) {
+                        .mapper-content {
+                            grid-template-columns: 1fr 350px;
+                        }
+                    }
+
+                    @media (max-width: 1000px) {
                         .mapper-content {
                             grid-template-columns: 1fr;
                             gap: 15px;
@@ -1044,6 +1056,7 @@ const VisualPDFMapper = ({
 
                         .fields-section {
                             order: -1;
+                            max-height: 400px;
                         }
 
                         .pdf-controls {
