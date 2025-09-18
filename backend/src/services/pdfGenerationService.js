@@ -1,4 +1,5 @@
 const { PDFDocument, rgb, StandardFonts } = require('pdf-lib');
+const fontkit = require('fontkit');
 const fs = require('fs').promises;
 const path = require('path');
 const pool = require('../config/db');
@@ -51,6 +52,9 @@ class PDFGenerationService {
             // Load the PDF template
             const templateBuffer = await fs.readFile(template.pdf_file_path);
             const pdfDoc = await PDFDocument.load(templateBuffer);
+
+            // Register fontkit for custom font support
+            pdfDoc.registerFontkit(fontkit);
 
             // Process the mappings and fill the PDF
             const filledDoc = await this.fillPDFWithMappings(
@@ -172,28 +176,39 @@ class PDFGenerationService {
     async fillPDFWithMappings(pdfDoc, mappings, applicationData, customerDetails, options) {
         console.log(`Filling PDF with ${mappings.length} mappings`);
 
-        // Load a Greek-compatible font
+        // Load a Unicode-compatible font that supports Greek characters
         let font;
+        let fontSupportsUnicode = false;
+
         try {
-            // For better Greek support, we'll try different approaches
-            // First, try to embed a system font that supports Greek
+            // First, try to load custom Unicode font (Noto Sans) that supports Greek
+            const fontPath = path.join(__dirname, '../../assets/fonts/NotoSans-Regular.ttf');
             try {
-                // Try to use a system font that supports Unicode/Greek
-                // This will work on most systems and supports Greek characters
-                font = await pdfDoc.embedFont(StandardFonts.TimesRoman);
-            } catch (systemFontError) {
-                console.warn('TimesRoman not available, trying alternative');
-                // Fallback to other standard fonts
+                const fontBytes = await fs.readFile(fontPath);
+                font = await pdfDoc.embedFont(fontBytes);
+                fontSupportsUnicode = true;
+                console.log('Successfully loaded Unicode font (Noto Sans) with Greek support');
+            } catch (customFontError) {
+                console.warn('Custom Unicode font not available, trying standard fonts:', customFontError.message);
+
+                // Fallback to standard fonts - but these don't support Greek properly
                 try {
-                    font = await pdfDoc.embedFont(StandardFonts.Courier);
-                } catch (courierError) {
-                    console.warn('Courier not available, using Helvetica with warning');
-                    font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+                    font = await pdfDoc.embedFont(StandardFonts.TimesRoman);
+                    console.warn('Using TimesRoman - Greek characters may not display correctly');
+                } catch (timesRomanError) {
+                    try {
+                        font = await pdfDoc.embedFont(StandardFonts.Courier);
+                        console.warn('Using Courier - Greek characters may not display correctly');
+                    } catch (courierError) {
+                        font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+                        console.warn('Using Helvetica - Greek characters may not display correctly');
+                    }
                 }
             }
         } catch (error) {
-            console.warn('Could not embed preferred font, using default');
+            console.error('Critical font loading error:', error);
             font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+            console.warn('Using Helvetica as emergency fallback');
         }
 
         // Get all pages for multi-page support
@@ -226,7 +241,8 @@ class PDFGenerationService {
                         mappingWithCoordinates,
                         value,
                         font,
-                        { width, height }
+                        { width, height },
+                        fontSupportsUnicode
                     );
                 }
             } catch (error) {
@@ -337,8 +353,9 @@ class PDFGenerationService {
      * @param {string} value - Value to fill
      * @param {PDFFont} font - Font to use
      * @param {Object} pageSize - Page dimensions
+     * @param {boolean} fontSupportsUnicode - Whether font supports Unicode characters
      */
-    async fillPlaceholder(page, mapping, value, font, pageSize) {
+    async fillPlaceholder(page, mapping, value, font, pageSize, fontSupportsUnicode = false) {
         // If coordinates are available, use them for precise placement
         if (mapping.coordinates && mapping.coordinates.x && mapping.coordinates.y) {
             const { x, y, width: fieldWidth, height: fieldHeight } = mapping.coordinates;
@@ -353,21 +370,50 @@ class PDFGenerationService {
                     maxWidth: fieldWidth || 200,
                 });
             } catch (encodingError) {
-                console.warn(`Greek text encoding issue for "${value}", using transliteration`);
-                const safeValue = this.toAsciiSafe(String(value));
-                page.drawText(safeValue, {
-                    x: x,
-                    y: pageSize.height - y,
-                    size: fieldHeight ? Math.min(fieldHeight - 2, 12) : 10,
-                    font: font,
-                    color: rgb(0, 0, 0),
-                    maxWidth: fieldWidth || 200,
-                });
+                if (fontSupportsUnicode) {
+                    // If we're using a Unicode font but still get encoding error,
+                    // log the issue but try to continue without conversion
+                    console.error(`Unexpected encoding error with Unicode font for "${value}":`, encodingError.message);
+
+                    // Try with a simpler approach - remove problematic characters but preserve readable ones
+                    const cleanValue = String(value).replace(/[\u0000-\u001F\u007F-\u009F]/g, ''); // Remove control characters only
+                    try {
+                        page.drawText(cleanValue, {
+                            x: x,
+                            y: pageSize.height - y,
+                            size: fieldHeight ? Math.min(fieldHeight - 2, 12) : 10,
+                            font: font,
+                            color: rgb(0, 0, 0),
+                            maxWidth: fieldWidth || 200,
+                        });
+                    } catch (retryError) {
+                        console.error(`Failed to render text even after cleaning: "${cleanValue}". Skipping this field.`);
+                        // Skip this field rather than converting to ASCII
+                    }
+                } else {
+                    // Using standard font that doesn't support Unicode
+                    console.warn(`Font does not support Unicode characters in "${value}". Consider using Unicode font for proper character display.`);
+
+                    // As a last resort, use ASCII conversion only for non-Unicode fonts
+                    const safeValue = this.toAsciiSafe(String(value));
+                    try {
+                        page.drawText(safeValue, {
+                            x: x,
+                            y: pageSize.height - y,
+                            size: fieldHeight ? Math.min(fieldHeight - 2, 12) : 10,
+                            font: font,
+                            color: rgb(0, 0, 0),
+                            maxWidth: fieldWidth || 200,
+                        });
+                    } catch (fallbackError) {
+                        console.error(`Failed to render even ASCII-converted text: "${safeValue}". Skipping field.`);
+                    }
+                }
             }
 
         } else {
             // Fallback: Use simple text replacement
-            await this.replaceTextInPDF(page, mapping.placeholder, value, font);
+            await this.replaceTextInPDF(page, mapping.placeholder, value, font, fontSupportsUnicode);
         }
     }
 
@@ -377,8 +423,9 @@ class PDFGenerationService {
      * @param {string} placeholder - Placeholder text
      * @param {string} value - Replacement value
      * @param {PDFFont} font - Font to use
+     * @param {boolean} fontSupportsUnicode - Whether font supports Unicode characters
      */
-    async replaceTextInPDF(page, placeholder, value, font) {
+    async replaceTextInPDF(page, placeholder, value, font, fontSupportsUnicode = false) {
         // This is a simplified approach. In a production system,
         // you would need more sophisticated text extraction and replacement
 
@@ -398,7 +445,7 @@ class PDFGenerationService {
             y = height - 300;
         }
 
-        // Handle Greek text encoding gracefully
+        // Handle text encoding based on font capabilities
         try {
             page.drawText(`${placeholder}: ${value}`, {
                 x: x,
@@ -408,18 +455,43 @@ class PDFGenerationService {
                 color: rgb(0, 0, 0),
             });
         } catch (encodingError) {
-            console.warn(`Encoding issue with text "${placeholder}: ${value}", trying ASCII fallback`);
-            // Fallback: create ASCII-safe version for display
-            const safePlaceholder = this.toAsciiSafe(placeholder);
-            const safeValue = this.toAsciiSafe(value);
+            if (fontSupportsUnicode) {
+                console.error(`Unexpected encoding error with Unicode font for "${placeholder}: ${value}":`, encodingError.message);
 
-            page.drawText(`${safePlaceholder}: ${safeValue}`, {
-                x: x,
-                y: y,
-                size: 10,
-                font: font,
-                color: rgb(0, 0, 0),
-            });
+                // Try with cleaned text (remove control characters but preserve Unicode)
+                const cleanPlaceholder = placeholder.replace(/[\u0000-\u001F\u007F-\u009F]/g, '');
+                const cleanValue = value.replace(/[\u0000-\u001F\u007F-\u009F]/g, '');
+
+                try {
+                    page.drawText(`${cleanPlaceholder}: ${cleanValue}`, {
+                        x: x,
+                        y: y,
+                        size: 10,
+                        font: font,
+                        color: rgb(0, 0, 0),
+                    });
+                } catch (retryError) {
+                    console.error(`Failed to render cleaned text: "${cleanPlaceholder}: ${cleanValue}". Skipping this field.`);
+                }
+            } else {
+                console.warn(`Font does not support Unicode characters in "${placeholder}: ${value}". Consider using Unicode font.`);
+
+                // Only convert to ASCII if using non-Unicode font
+                const safePlaceholder = this.toAsciiSafe(placeholder);
+                const safeValue = this.toAsciiSafe(value);
+
+                try {
+                    page.drawText(`${safePlaceholder}: ${safeValue}`, {
+                        x: x,
+                        y: y,
+                        size: 10,
+                        font: font,
+                        color: rgb(0, 0, 0),
+                    });
+                } catch (fallbackError) {
+                    console.error(`Failed to render ASCII-converted text: "${safePlaceholder}: ${safeValue}". Skipping field.`);
+                }
+            }
         }
     }
 
