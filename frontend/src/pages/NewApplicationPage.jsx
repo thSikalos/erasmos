@@ -147,11 +147,13 @@ const NewApplicationPage = () => {
     const [companies, setCompanies] = useState([]);
     const [state, dispatch] = useReducer(applicationReducer, {
         ...initialState,
-        isPersonal: (user?.role === 'TeamLeader' && user?.parent_user_id === null) || user?.role === 'Admin'
+        isPersonal: user?.role === 'Admin' || (user?.role === 'TeamLeader' && user?.parent_user_id === null)
     });
 
     const isTeamLeaderOrAdmin = user?.role === 'TeamLeader' || user?.role === 'Admin';
     const isTopLevelLeader = isTeamLeaderOrAdmin && user?.parent_user_id === null;
+    // Consistent definition: Top-Level Manager includes both Admins and TeamLeaders without parent
+    const isTopLevelManager = (user?.role === 'Admin' || user?.role === 'TeamLeader') && user?.parent_user_id === null;
 
     // Load draft data if draftId is provided
     const loadDraftData = useCallback(async (draftId) => {
@@ -636,15 +638,22 @@ const NewApplicationPage = () => {
                                                 <input
                                                     type="checkbox"
                                                     checked={state.isPersonal}
-                                                    onChange={e => dispatch({ type: 'SET_FIELD', field: 'isPersonal', value: e.target.checked })}
+                                                    disabled={isTopLevelManager}
+                                                    onChange={e => {
+                                                        if (!isTopLevelManager) {
+                                                            dispatch({ type: 'SET_FIELD', field: 'isPersonal', value: e.target.checked });
+                                                        }
+                                                    }}
                                                 />
-                                                <span className="slider"></span>
+                                                <span className={`slider ${isTopLevelManager ? 'disabled' : ''}`}></span>
                                             </label>
                                             <div className="toggle-info">
                                                 <h3>{state.isPersonal ? '👤 Προσωπική Αίτηση' : '👥 Αίτηση Συνεργάτη'}</h3>
-                                                <p>{state.isPersonal ? 
-                                                    '✅ Άμεση καταχώρηση χωρίς έγκριση' : 
-                                                    '⏳ Αναμονή έγκρισης από ομαδάρχη'
+                                                <p>{isTopLevelManager ?
+                                                    '🔒 Υποχρεωτικά προσωπική αίτηση για ανώτερους διαχειριστές/ομαδάρχες' :
+                                                    state.isPersonal ?
+                                                        '✅ Άμεση καταχώρηση χωρίς έγκριση' :
+                                                        '⏳ Αναμονή έγκρισης από ομαδάρχη'
                                                 }</p>
                                             </div>
                                         </div>
@@ -1397,6 +1406,39 @@ const NewApplicationPage = () => {
 
                 input:checked + .slider:before {
                     transform: translateX(30px);
+                }
+
+                .slider.disabled {
+                    background-color: #e2e8f0 !important;
+                    cursor: not-allowed;
+                    opacity: 0.7;
+                }
+
+                .slider.disabled:before {
+                    cursor: not-allowed;
+                }
+
+                input:disabled + .slider.disabled {
+                    background-color: #10b981;
+                    opacity: 0.7;
+                }
+
+                input:disabled + .slider.disabled:before {
+                    transform: translateX(30px);
+                }
+
+                /* Additional styling for top-level managers */
+                .slider.disabled {
+                    position: relative;
+                }
+
+                .slider.disabled:after {
+                    content: '🔒';
+                    position: absolute;
+                    right: -25px;
+                    top: 50%;
+                    transform: translateY(-50%);
+                    font-size: 12px;
                 }
 
                 .toggle-info h3 {

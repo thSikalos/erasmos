@@ -649,6 +649,14 @@ const MainLayout = () => {
                         </NavLink>
                     )}
                     
+                    {/* Team Company Management - for top-level managers */}
+                    {((user?.role === 'Admin' || user?.role === 'TeamLeader') && user?.parent_user_id === null) && (
+                        <NavLink to="/team-company-management" className="nav-link">
+                            <span className="nav-icon">🏢</span>
+                            Διαχείριση Εταιριών
+                        </NavLink>
+                    )}
+
                     {user?.role === 'Admin' && (
                         <NavLink to="/admin" className="nav-link">
                             <span className="nav-icon">⚙️</span>

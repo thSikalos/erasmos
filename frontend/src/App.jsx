@@ -26,6 +26,7 @@ const AdminRecycleBinPage = lazy(() => import('./pages/AdminRecycleBinPage'));
 const AdminUsersPage = lazy(() => import('./pages/AdminUsersPage'));
 const AdminBillingSettingsPage = lazy(() => import('./pages/AdminBillingSettingsPage'));
 const AdminInvoicingPage = lazy(() => import('./pages/AdminInvoicingPage'));
+const TeamCompanyManagementPage = lazy(() => import('./pages/TeamCompanyManagementPage'));
 const CommissionsPage = lazy(() => import('./pages/CommissionsPage'));
 const RenewalsPage = lazy(() => import('./pages/RenewalsPage'));
 const CustomersPage = lazy(() => import('./pages/CustomersPage'));
@@ -109,6 +110,7 @@ function App() {
               <Route path="/admin/users" element={<AdminUsersPage />} />
               <Route path="/admin/billing-settings" element={<AdminBillingSettingsPage />} />
               <Route path="/admin/invoicing" element={<AdminInvoicingPage />} />
+              <Route path="/team-company-management" element={<TeamCompanyManagementPage />} />
             </Route>
           </Route>
           <Route path="/" element={<Navigate to="/dashboard" />} />
