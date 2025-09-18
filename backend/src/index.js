@@ -19,6 +19,7 @@ const notificationsRoutes = require('./routes/notificationsRoutes');
 const remindersRoutes = require('./routes/remindersRoutes');
 const attachmentRoutes = require('./routes/attachmentRoutes');
 const adminBillingRoutes = require('./routes/adminBillingRoutes'); // <-- ΝΕΟ
+const teamCompanyRoutes = require('./routes/teamCompanyRoutes');
 const infoPortalRoutes = require('./routes/infoPortalRoutes');
 const pdfTemplateRoutes = require('./routes/pdfTemplateRoutes');
 const { pdfErrorHandler, pdfTimeout } = require('./middleware/pdfErrorHandler');
@@ -62,6 +63,7 @@ app.use('/api/notifications', notificationsRoutes);
 app.use('/api/reminders', remindersRoutes);
 app.use('/api/attachments', attachmentRoutes);
 app.use('/api/admin-billing', adminBillingRoutes); // <-- ΝΕΟ
+app.use('/api/team-companies', teamCompanyRoutes);
 app.use('/api/infoportal', infoPortalRoutes);
 app.use('/api/pdf-templates', pdfTimeout(60000), pdfTemplateRoutes);
 app.use('/api/ai', aiRoutes);

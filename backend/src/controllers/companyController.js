@@ -40,25 +40,39 @@ const createCompany = async (req, res) => {
     }
 };
 
-// --- GET ALL COMPANIES WITH THEIR FIELDS ---
+// --- GET ALL COMPANIES WITH THEIR FIELDS (FILTERED BY TEAM ACCESS) ---
 const getAllCompanies = async (req, res) => {
     try {
-        const query = `
-            SELECT 
-                c.id, 
-                c.name,
-                COALESCE(json_agg(json_build_object('id', f.id, 'label', f.label, 'type', f.type, 'is_commissionable', f.is_commissionable)) FILTER (WHERE f.id IS NOT NULL), '[]') as fields
-            FROM companies c
-            LEFT JOIN company_fields cf ON c.id = cf.company_id
-            LEFT JOIN fields f ON cf.field_id = f.id
-            GROUP BY c.id, c.name
-            ORDER BY c.name;
-        `;
-        const companies = await pool.query(query);
-        res.json(companies.rows);
+        const { getUserAccessibleCompanies } = require('./teamCompanyController');
+        const userId = req.user.id;
+        const userRole = req.user.role;
+
+        // Use the team company access filtering
+        const companies = await getUserAccessibleCompanies(userId, userRole);
+        res.json(companies);
+
     } catch (err) {
-        console.error(err.message);
-        res.status(500).send('Server Error');
+        console.error('Error in getAllCompanies:', err.message);
+
+        // Fallback to original query if team access fails (for backward compatibility)
+        try {
+            const query = `
+                SELECT
+                    c.id,
+                    c.name,
+                    COALESCE(json_agg(json_build_object('id', f.id, 'label', f.label, 'type', f.type, 'is_commissionable', f.is_commissionable)) FILTER (WHERE f.id IS NOT NULL), '[]') as fields
+                FROM companies c
+                LEFT JOIN company_fields cf ON c.id = cf.company_id
+                LEFT JOIN fields f ON cf.field_id = f.id
+                GROUP BY c.id, c.name
+                ORDER BY c.name;
+            `;
+            const companies = await pool.query(query);
+            res.json(companies.rows);
+        } catch (fallbackErr) {
+            console.error('Fallback query also failed:', fallbackErr.message);
+            res.status(500).send('Server Error');
+        }
     }
 };
 
