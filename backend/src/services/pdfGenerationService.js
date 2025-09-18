@@ -457,7 +457,16 @@ class PDFGenerationService {
      */
     async validateRequiredFields(templateId, applicationData) {
         const mappings = await this.getMappings(templateId);
-        const requiredMappings = mappings.filter(m => m.is_required);
+
+        // Get all fields to check which ones are required_for_pdf
+        const fieldsResult = await pool.query('SELECT * FROM fields');
+        const allFields = fieldsResult.rows;
+
+        // Filter mappings based on field.required_for_pdf instead of mapping.is_required
+        const requiredMappings = mappings.filter(m => {
+            const field = allFields.find(f => f.id === m.target_field_id);
+            return field?.required_for_pdf === true;
+        });
 
         const missingFields = [];
         const availableFields = [];

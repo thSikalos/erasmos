@@ -289,9 +289,10 @@ export const needsAnalysis = (template) => {
 /**
  * Check if template has sufficient mappings for PDF generation
  * @param {Array} mappings - Template mappings
+ * @param {Array} fields - All fields data (optional, for checking required_for_pdf)
  * @returns {Object} Readiness status
  */
-export const checkTemplateReadiness = (mappings) => {
+export const checkTemplateReadiness = (mappings, fields = []) => {
     if (!Array.isArray(mappings) || mappings.length === 0) {
         return {
             isReady: false,
@@ -302,7 +303,18 @@ export const checkTemplateReadiness = (mappings) => {
     }
 
     const mappedFields = mappings.filter(m => m.mapping_status === 'mapped');
-    const requiredFields = mappings.filter(m => m.is_required);
+
+    // Filter required fields based on field.required_for_pdf instead of mapping.is_required
+    const requiredFields = mappings.filter(m => {
+        if (fields.length > 0) {
+            // Use fields.required_for_pdf if fields are provided
+            const field = fields.find(f => f.id === m.target_field_id);
+            return field?.required_for_pdf === true;
+        } else {
+            // Fallback to mapping.is_required for backward compatibility
+            return m.is_required;
+        }
+    });
     const mappedRequiredFields = requiredFields.filter(m => m.mapping_status === 'mapped');
 
     const hasAllRequired = requiredFields.length === 0 || mappedRequiredFields.length === requiredFields.length;

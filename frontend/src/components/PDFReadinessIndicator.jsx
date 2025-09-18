@@ -32,6 +32,10 @@ const PDFReadinessIndicator = ({
             const token = localStorage.getItem('token');
             const config = { headers: { Authorization: `Bearer ${token}` } };
 
+            // Get all fields to check which are required_for_pdf
+            const fieldsResponse = await axios.get(apiUrl('/api/fields'), config);
+            const allFields = fieldsResponse.data || [];
+
             // First, get available templates for this company
             const templatesResponse = await axios.get(
                 apiUrl(`/api/pdf-templates/companies/${companyId}/pdf-templates`),
@@ -69,7 +73,12 @@ const PDFReadinessIndicator = ({
             );
 
             const mappings = mappingsResponse.data.mappings || [];
-            const requiredMappings = mappings.filter(m => m.is_required);
+            // Filter mappings based on field.required_for_pdf instead of mapping.is_required
+            const requiredMappings = mappings.filter(m => {
+                // Check if the field associated with this mapping is required for PDF
+                const field = allFields.find(f => f.id === m.target_field_id);
+                return field?.required_for_pdf === true;
+            });
 
             const missingFields = [];
             const availableFields = [];

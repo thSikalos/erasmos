@@ -810,7 +810,7 @@ const getVisualMappings = async (req, res) => {
                 pvm.position_y,
                 pvm.width,
                 pvm.height,
-                pvm.is_required,
+                f.required_for_pdf as is_required,
                 f.label as field_label
             FROM pdf_visual_mappings pvm
             JOIN fields f ON pvm.field_id = f.id

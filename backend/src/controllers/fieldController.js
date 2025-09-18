@@ -20,7 +20,7 @@ const getFieldWithOptions = async (fieldId) => {
         FROM fields f
         LEFT JOIN field_options fo ON f.id = fo.field_id AND fo.is_active = true
         WHERE f.id = $1
-        GROUP BY f.id, f.label, f.type, f.is_commissionable, f.show_in_applications_table
+        GROUP BY f.id, f.label, f.type, f.is_commissionable, f.show_in_applications_table, f.required_for_pdf
     `, [fieldId]);
 
     return result.rows[0];
@@ -28,7 +28,7 @@ const getFieldWithOptions = async (fieldId) => {
 
 // --- CREATE A NEW FIELD IN THE LIBRARY --- (Admin only)
 const createField = async (req, res) => {
-    const { label, type, is_commissionable, show_in_applications_table, options } = req.body;
+    const { label, type, is_commissionable, show_in_applications_table, required_for_pdf, options } = req.body;
 
     const client = await pool.connect();
     try {
@@ -63,8 +63,8 @@ const createField = async (req, res) => {
 
         // Create the field
         const newField = await client.query(
-            "INSERT INTO fields (label, type, is_commissionable, show_in_applications_table) VALUES ($1, $2, $3, $4) RETURNING *",
-            [label, type, is_commissionable, show_in_applications_table]
+            "INSERT INTO fields (label, type, is_commissionable, show_in_applications_table, required_for_pdf) VALUES ($1, $2, $3, $4, $5) RETURNING *",
+            [label, type, is_commissionable, show_in_applications_table, required_for_pdf || false]
         );
 
         const fieldId = newField.rows[0].id;
@@ -118,7 +118,7 @@ const getAllFields = async (req, res) => {
                 END as options
             FROM fields f
             LEFT JOIN field_options fo ON f.id = fo.field_id AND fo.is_active = true
-            GROUP BY f.id, f.label, f.type, f.is_commissionable, f.show_in_applications_table
+            GROUP BY f.id, f.label, f.type, f.is_commissionable, f.show_in_applications_table, f.required_for_pdf
             ORDER BY f.label ASC
         `);
         res.json(fields.rows);
@@ -131,7 +131,7 @@ const getAllFields = async (req, res) => {
 // --- UPDATE A FIELD --- (Admin only)
 const updateField = async (req, res) => {
     const { id } = req.params;
-    const { label, type, is_commissionable, show_in_applications_table, options } = req.body;
+    const { label, type, is_commissionable, show_in_applications_table, required_for_pdf, options } = req.body;
 
     const client = await pool.connect();
     try {
@@ -166,8 +166,8 @@ const updateField = async (req, res) => {
 
         // Update the field
         const result = await client.query(
-            "UPDATE fields SET label = $1, type = $2, is_commissionable = $3, show_in_applications_table = $4 WHERE id = $5 RETURNING *",
-            [label, type, is_commissionable, show_in_applications_table, id]
+            "UPDATE fields SET label = $1, type = $2, is_commissionable = $3, show_in_applications_table = $4, required_for_pdf = $5 WHERE id = $6 RETURNING *",
+            [label, type, is_commissionable, show_in_applications_table, required_for_pdf || false, id]
         );
 
         if (result.rows.length === 0) {

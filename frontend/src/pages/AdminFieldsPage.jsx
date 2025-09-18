@@ -19,6 +19,7 @@ const AdminFieldsPage = () => {
     const [type, setType] = useState('text');
     const [isCommissionable, setIsCommissionable] = useState(false);
     const [showInTable, setShowInTable] = useState(false);
+    const [requiredForPdf, setRequiredForPdf] = useState(false);
 
     // Dropdown options state
     const [fieldOptions, setFieldOptions] = useState([]);
@@ -85,6 +86,7 @@ const AdminFieldsPage = () => {
         setType('text');
         setIsCommissionable(false);
         setShowInTable(false);
+        setRequiredForPdf(false);
         setFieldOptions([]);
         setNewOptionValue('');
         setNewOptionLabel('');
@@ -142,6 +144,7 @@ const AdminFieldsPage = () => {
         setType(field.type);
         setIsCommissionable(field.is_commissionable);
         setShowInTable(field.show_in_applications_table || false);
+        setRequiredForPdf(field.required_for_pdf || false);
 
         // Load options for dropdown fields
         if (field.type === 'dropdown' && field.options) {
@@ -188,7 +191,8 @@ const AdminFieldsPage = () => {
             label,
             type,
             is_commissionable: isCommissionable,
-            show_in_applications_table: showInTable
+            show_in_applications_table: showInTable,
+            required_for_pdf: requiredForPdf
         };
 
         // Add options for dropdown fields
@@ -1124,6 +1128,15 @@ const AdminFieldsPage = () => {
                                 />
                                 <label htmlFor="show_in_applications_table">📋 Εμφάνιση στον Πίνακα Αιτήσεων;</label>
                             </div>
+                            <div className="checkbox-group-modern">
+                                <input
+                                    type="checkbox"
+                                    id="required_for_pdf"
+                                    checked={requiredForPdf}
+                                    onChange={e => setRequiredForPdf(e.target.checked)}
+                                />
+                                <label htmlFor="required_for_pdf">📄* Απαραίτητο για εκδοση PDF;</label>
+                            </div>
 
                             {/* Dropdown Options Manager */}
                             {type === 'dropdown' && (
@@ -1237,10 +1250,16 @@ const AdminFieldsPage = () => {
                             fields.map(field => (
                                 <div key={field.id} className="field-item">
                                     <div className="field-info">
-                                        <span style={{ fontWeight: '600' }}>{field.label}</span>
+                                        <span style={{ fontWeight: '600' }}>
+                                            {field.label}
+                                            {field.required_for_pdf && <span style={{ color: '#e74c3c', marginLeft: '4px' }}>*</span>}
+                                        </span>
                                         <span className="field-type-badge">{field.type}</span>
                                         {field.is_commissionable && (
                                             <span className="commission-badge">💰 Αμοιβή</span>
+                                        )}
+                                        {field.required_for_pdf && (
+                                            <span className="commission-badge" style={{ background: 'linear-gradient(135deg, #e74c3c, #c0392b)' }}>📄 PDF Required</span>
                                         )}
                                         {field.type === 'dropdown' && field.options && (
                                             <span className="options-count-badge">

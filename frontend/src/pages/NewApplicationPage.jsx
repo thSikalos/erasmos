@@ -818,7 +818,10 @@ const NewApplicationPage = () => {
                                         <h3 className="section-title">Στοιχεία Εταιρείας</h3>
                                         {selectedCompany.fields.map(field => (
                                             <div className="form-group" key={field.id}>
-                                                <label className="form-label">{field.label}</label>
+                                                <label className="form-label">
+                                                    {field.label}
+                                                    {field.required_for_pdf && <span style={{ color: '#e74c3c', marginLeft: '4px' }}>*</span>}
+                                                </label>
                                                 {field.type === 'checkbox' ? (
                                                     <label className="checkbox-label">
                                                         <input
