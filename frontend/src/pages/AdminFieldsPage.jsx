@@ -24,7 +24,6 @@ const AdminFieldsPage = () => {
     // Dropdown options state
     const [fieldOptions, setFieldOptions] = useState([]);
     const [newOptionValue, setNewOptionValue] = useState('');
-    const [newOptionLabel, setNewOptionLabel] = useState('');
 
     // Company selection state (for admin users)
     const [companies, setCompanies] = useState([]);
@@ -89,53 +88,38 @@ const AdminFieldsPage = () => {
         setRequiredForPdf(false);
         setFieldOptions([]);
         setNewOptionValue('');
-        setNewOptionLabel('');
         setTempIdCounter(-1); // Reset temporary ID counter
     };
 
     // Dropdown options management
     const addFieldOption = () => {
-        if (!newOptionValue.trim() || !newOptionLabel.trim()) {
-            showErrorToast('Σφάλμα', 'Παρακαλώ συμπλήρωσε και τα δύο πεδία');
+        if (!newOptionValue.trim()) {
+            showErrorToast('Σφάλμα', 'Παρακαλώ συμπλήρωσε το όνομα προγράμματος');
             return;
         }
 
         // Check for duplicate values
         if (fieldOptions.some(opt => opt.value === newOptionValue.trim())) {
-            showErrorToast('Σφάλμα', 'Αυτή η τιμή υπάρχει ήδη');
+            showErrorToast('Σφάλμα', 'Αυτό το όνομα προγράμματος υπάρχει ήδη');
             return;
         }
 
         const newOption = {
             id: tempIdCounter, // Negative ID for temporary options
             value: newOptionValue.trim(),
-            label: newOptionLabel.trim(),
+            label: newOptionValue.trim(), // Use the same value for both value and label
             order: fieldOptions.length
         };
 
         setFieldOptions([...fieldOptions, newOption]);
         setTempIdCounter(tempIdCounter - 1); // Decrement for next temporary option
         setNewOptionValue('');
-        setNewOptionLabel('');
     };
 
     const removeFieldOption = (optionId) => {
         setFieldOptions(fieldOptions.filter(opt => opt.id !== optionId));
     };
 
-    const moveOptionUp = (index) => {
-        if (index === 0) return;
-        const newOptions = [...fieldOptions];
-        [newOptions[index], newOptions[index - 1]] = [newOptions[index - 1], newOptions[index]];
-        setFieldOptions(newOptions);
-    };
-
-    const moveOptionDown = (index) => {
-        if (index === fieldOptions.length - 1) return;
-        const newOptions = [...fieldOptions];
-        [newOptions[index], newOptions[index + 1]] = [newOptions[index + 1], newOptions[index]];
-        setFieldOptions(newOptions);
-    };
 
     const handleEditClick = (field) => {
         setIsEditing(true);
@@ -217,124 +201,6 @@ const AdminFieldsPage = () => {
         }
     };
 
-    const handlePDFUpload = async (option) => {
-        // Check if option has valid ID (not temporary negative ID)
-        if (typeof option.id === 'number' && option.id < 0) {
-            showErrorToast('Σφάλμα', 'Παρακαλώ αποθηκεύστε το πεδίο πρώτα πριν ανεβάσετε PDF template');
-            return;
-        }
-
-        // Create a file input element dynamically
-        const fileInput = document.createElement('input');
-        fileInput.type = 'file';
-        fileInput.accept = '.pdf';
-        fileInput.style.display = 'none';
-
-        fileInput.onchange = async (event) => {
-            const file = event.target.files[0];
-            if (!file) return;
-
-            if (file.type !== 'application/pdf') {
-                showErrorToast('Σφάλμα', 'Παρακαλώ επιλέξτε ένα αρχείο PDF');
-                return;
-            }
-
-            // Check file size (limit to 10MB)
-            const maxSize = 10 * 1024 * 1024; // 10MB
-            if (file.size > maxSize) {
-                showErrorToast('Σφάλμα', 'Το αρχείο PDF είναι πολύ μεγάλο. Μέγιστο μέγεθος: 10MB');
-                return;
-            }
-
-            try {
-                // Show loading state
-                const loadingToast = showErrorToast('Φόρτωση...', `Ανέβασμα PDF template για "${option.label}"...`);
-
-                const formData = new FormData();
-                formData.append('pdf', file);
-                formData.append('fieldOptionId', option.id);
-                formData.append('templateName', `${option.label} Template`);
-
-                // Add company ID for admin users
-                if (user?.role === 'Admin') {
-                    if (selectedCompanyId) {
-                        formData.append('companyId', selectedCompanyId);
-                        console.log('PDF Upload: Adding companyId:', selectedCompanyId);
-                    } else {
-                        console.warn('PDF Upload: No company selected for admin user');
-                        showErrorToast('Σφάλμα', 'Παρακαλώ επιλέξτε εταιρία πρώτα');
-                        return;
-                    }
-                }
-
-                console.log('PDF Upload: Sending request with fieldOptionId:', option.id);
-                console.log('PDF Upload: File details:', {
-                    name: file.name,
-                    size: file.size,
-                    type: file.type
-                });
-
-                const config = {
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                        'Content-Type': 'multipart/form-data'
-                    },
-                    timeout: 60000 // 60 second timeout
-                };
-
-                const response = await axios.post(apiUrl('/api/pdf-templates/upload'), formData, config);
-
-                console.log('PDF Upload: Success response:', response.data);
-                showSuccessToast('Επιτυχία', `Το PDF template για "${option.label}" ανεβάστηκε επιτυχώς!`);
-
-                // Optionally refresh the field data to show updated status
-                fetchData();
-
-            } catch (err) {
-                console.error('PDF Upload: Error occurred:', err);
-
-                let errorMessage = 'Απέτυχε η ανάρτηση του PDF';
-                let errorDetails = '';
-
-                if (err.response) {
-                    // Server responded with error status
-                    errorMessage = err.response.data?.message || errorMessage;
-                    errorDetails = err.response.data?.details || '';
-
-                    console.error('PDF Upload: Server error:', err.response.status, err.response.data);
-
-                    if (err.response.status === 413) {
-                        errorMessage = 'Το αρχείο είναι πολύ μεγάλο';
-                    } else if (err.response.status === 400) {
-                        errorMessage = err.response.data?.message || 'Μη έγκυρα δεδομένα';
-                    } else if (err.response.status === 500) {
-                        errorMessage = 'Σφάλμα του διακομιστή. Παρακαλώ δοκιμάστε ξανά.';
-                    }
-                } else if (err.request) {
-                    // Request was made but no response received
-                    console.error('PDF Upload: Network error:', err.request);
-                    errorMessage = 'Σφάλμα δικτύου. Ελέγξτε τη σύνδεσή σας.';
-                } else {
-                    // Something else happened
-                    console.error('PDF Upload: Unknown error:', err.message);
-                    errorMessage = err.message || errorMessage;
-                }
-
-                // Show detailed error in development
-                if (process.env.NODE_ENV === 'development' && errorDetails) {
-                    console.error('PDF Upload: Error details:', errorDetails);
-                    errorMessage += '\n\nΠερισσότερες πληροφορίες στο console.';
-                }
-
-                showErrorToast('Σφάλμα PDF Upload', errorMessage);
-            }
-        };
-
-        // Trigger the file input
-        document.body.appendChild(fileInput);
-        fileInput.click();
-        document.body.removeChild(fileInput);
-    };
 
     return (
         <div>
@@ -1097,7 +963,7 @@ const AdminFieldsPage = () => {
                                     value={label} 
                                     onChange={e => setLabel(e.target.value)} 
                                     required 
-                                    placeholder="π.χ. Όνομα Πελάτη"
+                                    placeholder="π.χ. χρωμα προγραμματος και εταιρια"
                                 />
                             </div>
                             <div className="form-group-modern">
@@ -1148,15 +1014,9 @@ const AdminFieldsPage = () => {
                                         <div className="option-inputs">
                                             <input
                                                 type="text"
-                                                placeholder="Τιμή (π.χ. program_type_1)"
+                                                placeholder="ονομα προγραμματος"
                                                 value={newOptionValue}
                                                 onChange={e => setNewOptionValue(e.target.value)}
-                                            />
-                                            <input
-                                                type="text"
-                                                placeholder="Ετικέτα (π.χ. Τύπος Προγράμματος)"
-                                                value={newOptionLabel}
-                                                onChange={e => setNewOptionLabel(e.target.value)}
                                             />
                                             <button type="button" onClick={addFieldOption} className="add-option-btn">
                                                 ➕ Προσθήκη
@@ -1173,31 +1033,6 @@ const AdminFieldsPage = () => {
                                                         <strong>{option.label}</strong> ({option.value})
                                                     </span>
                                                     <div className="option-actions">
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => moveOptionUp(index)}
-                                                            disabled={index === 0}
-                                                            className="move-btn"
-                                                        >
-                                                            ⬆️
-                                                        </button>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => moveOptionDown(index)}
-                                                            disabled={index === fieldOptions.length - 1}
-                                                            className="move-btn"
-                                                        >
-                                                            ⬇️
-                                                        </button>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => handlePDFUpload(option)}
-                                                            className="pdf-upload-btn"
-                                                            title={typeof option.id === 'number' && option.id < 0 ? 'Αποθηκεύστε το πεδίο πρώτα' : `Upload PDF για ${option.label}`}
-                                                            disabled={typeof option.id === 'number' && option.id < 0}
-                                                        >
-                                                            📁
-                                                        </button>
                                                         <button
                                                             type="button"
                                                             onClick={() => removeFieldOption(option.id)}
@@ -1272,23 +1107,6 @@ const AdminFieldsPage = () => {
                                             {field.options.slice(0, 3).map(option => (
                                                 <span key={option.id} className="option-preview">
                                                     {option.label}
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => handlePDFUpload(option)}
-                                                        className="pdf-upload-btn"
-                                                        title={typeof option.id === 'number' && option.id < 0 ? 'Αποθηκεύστε το πεδίο πρώτα' : `Upload PDF για ${option.label}`}
-                                                        disabled={typeof option.id === 'number' && option.id < 0}
-                                                        style={{
-                                                            marginLeft: '8px',
-                                                            padding: '2px 6px',
-                                                            fontSize: '0.8rem',
-                                                            border: 'none',
-                                                            borderRadius: '4px',
-                                                            cursor: typeof option.id === 'number' && option.id < 0 ? 'not-allowed' : 'pointer'
-                                                        }}
-                                                    >
-                                                        📁
-                                                    </button>
                                                 </span>
                                             ))}
                                             {field.options.length > 3 && (

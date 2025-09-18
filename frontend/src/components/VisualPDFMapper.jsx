@@ -364,24 +364,6 @@ const VisualPDFMapper = ({
         return { errors, warnings };
     };
 
-    const showValidationResults = () => {
-        const { errors, warnings } = validateMappings();
-
-        let message = '🔍 Validation Results:\n\n';
-
-        if (errors.length === 0 && warnings.length === 0) {
-            message += '✅ Όλα τα mappings είναι έγκυρα!';
-        } else {
-            if (errors.length > 0) {
-                message += '❌ Σφάλματα:\n' + errors.join('\n') + '\n\n';
-            }
-            if (warnings.length > 0) {
-                message += '⚠️ Προειδοποιήσεις:\n' + warnings.join('\n');
-            }
-        }
-
-        alert(message);
-    };
 
     const handleSaveMappings = async () => {
         try {
@@ -414,12 +396,18 @@ const VisualPDFMapper = ({
 
             // Convert mappings to API format
             const mappingsData = mappings.map(mapping => ({
-                fieldId: mapping.fieldId,
+                fieldId: mapping.fieldType === 'dropdown_option_value' ? mapping.fieldId : mapping.fieldId,
                 fieldType: mapping.fieldType,
                 isCustomerField: mapping.isCustomerField || false,
                 page: mapping.page,
                 position: mapping.position,
-                isRequired: mapping.isRequired
+                isRequired: mapping.isRequired,
+                // Add dropdown option specific data
+                ...(mapping.fieldType === 'dropdown_option_value' && {
+                    optionId: mapping.optionId,
+                    optionValue: mapping.optionValue,
+                    optionLabel: mapping.optionLabel
+                })
             }));
 
             await axios.post(
@@ -733,6 +721,9 @@ const VisualPDFMapper = ({
                         border-radius: 12px;
                         padding: 15px;
                         border: 1px solid rgba(255, 255, 255, 0.1);
+                        display: flex;
+                        flex-direction: column;
+                        max-height: 600px;
                     }
 
                     .section-header {
@@ -742,6 +733,32 @@ const VisualPDFMapper = ({
                         padding-bottom: 10px;
                         border-bottom: 1px solid rgba(255, 255, 255, 0.2);
                         font-size: 1.1rem;
+                        flex-shrink: 0;
+                    }
+
+                    .fields-container {
+                        overflow-y: auto;
+                        flex: 1;
+                        margin-bottom: 20px;
+                        padding-right: 8px;
+                    }
+
+                    .fields-container::-webkit-scrollbar {
+                        width: 6px;
+                    }
+
+                    .fields-container::-webkit-scrollbar-track {
+                        background: rgba(255, 255, 255, 0.1);
+                        border-radius: 3px;
+                    }
+
+                    .fields-container::-webkit-scrollbar-thumb {
+                        background: rgba(255, 255, 255, 0.3);
+                        border-radius: 3px;
+                    }
+
+                    .fields-container::-webkit-scrollbar-thumb:hover {
+                        background: rgba(255, 255, 255, 0.5);
                     }
 
                     .field-item {
@@ -1045,14 +1062,6 @@ const VisualPDFMapper = ({
                 <h2>🎯 Visual PDF Field Mapping</h2>
                 <div className="header-actions">
                     <button
-                        className="action-btn validate-btn"
-                        onClick={showValidationResults}
-                        disabled={mappings.length === 0}
-                        title="Validate mappings quality"
-                    >
-                        🔍 Validate
-                    </button>
-                    <button
                         className="action-btn save-btn"
                         onClick={handleSaveMappings}
                         disabled={savingMappings || mappings.length === 0}
@@ -1211,7 +1220,7 @@ const VisualPDFMapper = ({
 
                 <div className="fields-section">
                     <div className="section-header">
-                        📝 Διαθέσιμα Πεδία ({(availableFields.length + customerFields.length)})
+                        📝 Διαθέσιμα Πεδία ({(availableFields.length + customerFields.length + availableFields.filter(field => field.type === 'dropdown' && field.options?.length > 0).reduce((total, field) => total + field.options.length, 0))})
                     </div>
 
                     {selectedField && (
@@ -1222,45 +1231,81 @@ const VisualPDFMapper = ({
                             padding: '10px',
                             marginBottom: '15px',
                             color: 'white',
-                            fontSize: '0.9rem'
+                            fontSize: '0.9rem',
+                            flexShrink: 0
                         }}>
                             <strong>Επιλεγμένο:</strong> {selectedField.label}<br />
                             <small>Κάνε κλικ στο PDF για τοποθέτηση</small>
                         </div>
                     )}
 
-                    {/* Customer Fields Section */}
-                    <div className="section-header" style={{ fontSize: '1rem', margin: '20px 0 10px 0', color: 'rgba(255, 255, 255, 0.8)' }}>
-                        👤 Στοιχεία Πελάτη ({customerFields.length})
-                    </div>
-
-                    {customerFields.map(field => (
-                        <div
-                            key={field.id}
-                            className={`field-item ${selectedField?.id === field.id ? 'selected' : ''}`}
-                            onClick={() => handleFieldSelect(field)}
-                            style={{ borderLeft: '3px solid #e67e22' }}
-                        >
-                            <div className="field-name">{field.label}</div>
-                            <span className="field-type">{field.type}</span>
+                    <div className="fields-container">
+                        {/* Customer Fields Section */}
+                        <div className="section-header" style={{ fontSize: '1rem', margin: '0 0 10px 0', color: 'rgba(255, 255, 255, 0.8)' }}>
+                            👤 Στοιχεία Πελάτη ({customerFields.length})
                         </div>
-                    ))}
 
-                    {/* Company Fields Section */}
-                    <div className="section-header" style={{ fontSize: '1rem', margin: '20px 0 10px 0', color: 'rgba(255, 255, 255, 0.8)' }}>
-                        🏢 Στοιχεία Εταιρείας ({availableFields.length})
-                    </div>
+                        {customerFields.map(field => (
+                            <div
+                                key={field.id}
+                                className={`field-item ${selectedField?.id === field.id ? 'selected' : ''}`}
+                                onClick={() => handleFieldSelect(field)}
+                                style={{ borderLeft: '3px solid #e67e22' }}
+                            >
+                                <div className="field-name">{field.label}</div>
+                                <span className="field-type">{field.type}</span>
+                            </div>
+                        ))}
 
-                    {availableFields.map(field => (
-                        <div
-                            key={field.id}
-                            className={`field-item ${selectedField?.id === field.id ? 'selected' : ''}`}
-                            onClick={() => handleFieldSelect(field)}
-                        >
-                            <div className="field-name">{field.label}</div>
-                            <span className="field-type">{field.type}</span>
+                        {/* Company Fields Section */}
+                        <div className="section-header" style={{ fontSize: '1rem', margin: '20px 0 10px 0', color: 'rgba(255, 255, 255, 0.8)' }}>
+                            🏢 Στοιχεία Εταιρείας ({availableFields.length})
                         </div>
-                    ))}
+
+                        {availableFields.map(field => (
+                            <div
+                                key={field.id}
+                                className={`field-item ${selectedField?.id === field.id ? 'selected' : ''}`}
+                                onClick={() => handleFieldSelect(field)}
+                            >
+                                <div className="field-name">{field.label}</div>
+                                <span className="field-type">{field.type}</span>
+                            </div>
+                        ))}
+
+                        {/* Dropdown Option Values Section */}
+                        {availableFields.filter(field => field.type === 'dropdown' && field.options?.length > 0).length > 0 && (
+                            <>
+                                <div className="section-header" style={{ fontSize: '1rem', margin: '20px 0 10px 0', color: 'rgba(255, 255, 255, 0.8)' }}>
+                                    📋 Ονόματα Προγραμμάτων ({availableFields.filter(field => field.type === 'dropdown' && field.options?.length > 0).reduce((total, field) => total + field.options.length, 0)})
+                                </div>
+
+                                {availableFields
+                                    .filter(field => field.type === 'dropdown' && field.options?.length > 0)
+                                    .map(field =>
+                                        field.options.map(option => (
+                                            <div
+                                                key={`dropdown_option_${field.id}_${option.id}`}
+                                                className={`field-item ${selectedField?.id === `dropdown_option_${field.id}_${option.id}` ? 'selected' : ''}`}
+                                                onClick={() => handleFieldSelect({
+                                                    id: `dropdown_option_${field.id}_${option.id}`,
+                                                    label: `${option.label} (${field.label})`,
+                                                    type: 'dropdown_option_value',
+                                                    fieldId: field.id,
+                                                    optionId: option.id,
+                                                    optionValue: option.value,
+                                                    optionLabel: option.label
+                                                })}
+                                                style={{ borderLeft: '3px solid #9b59b6' }}
+                                            >
+                                                <div className="field-name">{option.label}</div>
+                                                <span className="field-type">όνομα προγράμματος</span>
+                                            </div>
+                                        ))
+                                    )}
+                            </>
+                        )}
+                    </div>
 
                     <div className="mappings-list">
                         <div className="section-header">

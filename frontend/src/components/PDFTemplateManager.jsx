@@ -15,7 +15,6 @@ const PDFTemplateManager = ({ company, onClose }) => {
     // Form states
     const [selectedFieldId, setSelectedFieldId] = useState('');
     const [selectedFieldOptionId, setSelectedFieldOptionId] = useState('');
-    const [templateName, setTemplateName] = useState('');
     const [pdfFile, setPdfFile] = useState(null);
 
     // Get available options for selected field
@@ -120,9 +119,6 @@ const PDFTemplateManager = ({ company, onClose }) => {
         const file = e.target.files[0];
         if (file && file.type === 'application/pdf') {
             setPdfFile(file);
-            if (!templateName) {
-                setTemplateName(file.name.replace('.pdf', ''));
-            }
         } else {
             alert('Παρακαλώ επιλέξτε αρχείο PDF');
             e.target.value = '';
@@ -130,8 +126,8 @@ const PDFTemplateManager = ({ company, onClose }) => {
     };
 
     const handleUploadTemplate = async () => {
-        if (!selectedFieldOptionId || !templateName || !pdfFile) {
-            alert('Παρακαλώ συμπληρώστε όλα τα πεδία');
+        if (!selectedFieldOptionId || !pdfFile) {
+            alert('Παρακαλώ επιλέξτε επιλογή πεδίου και PDF αρχείο');
             return;
         }
 
@@ -151,10 +147,14 @@ const PDFTemplateManager = ({ company, onClose }) => {
             setUploadingTemplate(true);
             const token = localStorage.getItem('token');
 
+            // Generate template name from selected option
+            const selectedOption = getAvailableOptions().find(opt => opt.id.toString() === selectedFieldOptionId);
+            const generatedTemplateName = selectedOption ? `${selectedOption.label} Template` : 'PDF Template';
+
             const formData = new FormData();
             formData.append('pdf', pdfFile);
             formData.append('fieldOptionId', selectedFieldOptionId);
-            formData.append('templateName', templateName);
+            formData.append('templateName', generatedTemplateName);
 
             console.log('[PDFTemplateManager] Uploading with fieldOptionId:', selectedFieldOptionId);
 
@@ -175,7 +175,6 @@ const PDFTemplateManager = ({ company, onClose }) => {
                 // Reset form
                 setSelectedFieldId('');
                 setSelectedFieldOptionId('');
-                setTemplateName('');
                 setPdfFile(null);
 
                 // Reset file input
@@ -666,16 +665,6 @@ const PDFTemplateManager = ({ company, onClose }) => {
 
                         <div className="form-row">
                             <div className="form-group">
-                                <label>Όνομα Template:</label>
-                                <input
-                                    type="text"
-                                    value={templateName}
-                                    onChange={(e) => setTemplateName(e.target.value)}
-                                    placeholder="π.χ. Συμβόλαιο Σταθερού Προγράμματος"
-                                />
-                            </div>
-
-                            <div className="form-group">
                                 <label>PDF Αρχείο:</label>
                                 <div className="file-input-wrapper">
                                     <input
@@ -725,9 +714,6 @@ const PDFTemplateManager = ({ company, onClose }) => {
                                     <span>📋 {template.field_label}</span>
                                     <span>🔗 {template.option_value}</span>
                                     <span>{getStatusBadge(template.analysis_status)}</span>
-                                    {template.placeholders_detected > 0 && (
-                                        <span>🔍 {template.placeholders_detected} placeholders</span>
-                                    )}
                                 </div>
                             </div>
 
