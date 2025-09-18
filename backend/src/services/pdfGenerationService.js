@@ -132,22 +132,32 @@ class PDFGenerationService {
         const result = await pool.query(query, [templateId]);
 
         // Transform visual mappings to compatible format
-        return result.rows.map(row => ({
-            id: row.id,
-            pdf_template_id: row.template_id,
-            target_field_id: row.field_id,
-            field_type: row.field_type,
-            field_label: row.field_label,
-            is_required: row.is_required,
-            // Visual mapping specific data
-            page_number: row.page_number,
-            position_x: row.position_x,
-            position_y: row.position_y,
-            width: row.width,
-            height: row.height,
-            // Create a placeholder-like identifier for compatibility
-            placeholder: `[${row.field_label?.toUpperCase() || 'FIELD'}_${row.field_id}]`
-        }));
+        return result.rows.map(row => {
+            // Handle customer fields vs regular fields
+            const isCustomerField = row.is_customer_field;
+            const targetFieldId = isCustomerField ? row.customer_field_id : row.field_id;
+            const fieldLabel = isCustomerField
+                ? this.getCustomerFieldLabel(row.customer_field_id)
+                : row.field_label;
+
+            return {
+                id: row.id,
+                pdf_template_id: row.template_id,
+                target_field_id: targetFieldId,
+                field_type: row.field_type || 'text',
+                field_label: fieldLabel,
+                is_required: row.is_required,
+                is_customer_field: isCustomerField,
+                // Visual mapping specific data
+                page_number: row.page_number,
+                position_x: row.position_x,
+                position_y: row.position_y,
+                width: row.width,
+                height: row.height,
+                // Create a placeholder-like identifier for compatibility
+                placeholder: `[${fieldLabel?.toUpperCase() || 'FIELD'}_${targetFieldId}]`
+            };
+        });
     }
 
     /**
@@ -236,6 +246,11 @@ class PDFGenerationService {
      * @returns {string} Value to fill
      */
     getValueForMapping(mapping, applicationData, customerDetails) {
+        // Check if this is a customer field mapping (new system)
+        if (mapping.target_field_id && typeof mapping.target_field_id === 'string' && mapping.target_field_id.startsWith('customer_')) {
+            return this.getCustomerFieldValue(mapping.target_field_id, customerDetails);
+        }
+
         // First try to get from application data using target field ID
         if (mapping.target_field_id && applicationData[mapping.target_field_id]) {
             let value = applicationData[mapping.target_field_id];
@@ -253,8 +268,8 @@ class PDFGenerationService {
             }
         }
 
-        // Try to get from customer details based on placeholder name
-        const placeholderUpper = mapping.placeholder.toUpperCase();
+        // Try to get from customer details based on placeholder name (legacy support)
+        const placeholderUpper = (mapping.placeholder || '').toUpperCase();
 
         if (placeholderUpper.includes('ΟΝΟΜΑ') || placeholderUpper.includes('NAME')) {
             return customerDetails.full_name || '';
@@ -278,6 +293,41 @@ class PDFGenerationService {
         }
 
         return ''; // Return empty string if no value found
+    }
+
+    /**
+     * Get customer field value by field ID
+     * @param {string} fieldId - Customer field ID
+     * @param {Object} customerDetails - Customer details object
+     * @returns {string} Customer field value
+     */
+    getCustomerFieldValue(fieldId, customerDetails) {
+        const fieldMap = {
+            'customer_name': customerDetails.full_name || '',
+            'customer_afm': customerDetails.afm || '',
+            'customer_phone': customerDetails.phone || '',
+            'customer_address': customerDetails.address || '',
+            'customer_email': customerDetails.email || ''
+        };
+
+        return fieldMap[fieldId] || '';
+    }
+
+    /**
+     * Get customer field label by field ID
+     * @param {string} fieldId - Customer field ID
+     * @returns {string} Customer field label
+     */
+    getCustomerFieldLabel(fieldId) {
+        const fieldLabels = {
+            'customer_name': 'Ονοματεπώνυμο',
+            'customer_afm': 'ΑΦΜ',
+            'customer_phone': 'Τηλέφωνο',
+            'customer_address': 'Διεύθυνση',
+            'customer_email': 'Email'
+        };
+
+        return fieldLabels[fieldId] || fieldId;
     }
 
     /**

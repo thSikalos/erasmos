@@ -29,6 +29,40 @@ const VisualPDFMapper = ({
 
     const pageRef = useRef(null);
 
+    // Define customer fields for PDF mapping
+    const customerFields = [
+        {
+            id: 'customer_name',
+            label: 'Ονοματεπώνυμο',
+            type: 'text',
+            isCustomerField: true
+        },
+        {
+            id: 'customer_afm',
+            label: 'ΑΦΜ',
+            type: 'text',
+            isCustomerField: true
+        },
+        {
+            id: 'customer_phone',
+            label: 'Τηλέφωνο',
+            type: 'text',
+            isCustomerField: true
+        },
+        {
+            id: 'customer_address',
+            label: 'Διεύθυνση',
+            type: 'text',
+            isCustomerField: true
+        },
+        {
+            id: 'customer_email',
+            label: 'Email',
+            type: 'email',
+            isCustomerField: true
+        }
+    ];
+
     useEffect(() => {
         loadPDF();
         loadExistingMappings();
@@ -168,6 +202,7 @@ const VisualPDFMapper = ({
             fieldId: selectedField.id,
             fieldLabel: selectedField.label,
             fieldType: selectedField.type,
+            isCustomerField: selectedField.isCustomerField || false,
             page: currentPage,
             position: {
                 x: Math.round(x * 100) / 100, // Round to 2 decimal places
@@ -381,6 +416,7 @@ const VisualPDFMapper = ({
             const mappingsData = mappings.map(mapping => ({
                 fieldId: mapping.fieldId,
                 fieldType: mapping.fieldType,
+                isCustomerField: mapping.isCustomerField || false,
                 page: mapping.page,
                 position: mapping.position,
                 isRequired: mapping.isRequired
@@ -1175,7 +1211,7 @@ const VisualPDFMapper = ({
 
                 <div className="fields-section">
                     <div className="section-header">
-                        📝 Διαθέσιμα Πεδία ({availableFields.length})
+                        📝 Διαθέσιμα Πεδία ({(availableFields.length + customerFields.length)})
                     </div>
 
                     {selectedField && (
@@ -1192,6 +1228,28 @@ const VisualPDFMapper = ({
                             <small>Κάνε κλικ στο PDF για τοποθέτηση</small>
                         </div>
                     )}
+
+                    {/* Customer Fields Section */}
+                    <div className="section-header" style={{ fontSize: '1rem', margin: '20px 0 10px 0', color: 'rgba(255, 255, 255, 0.8)' }}>
+                        👤 Στοιχεία Πελάτη ({customerFields.length})
+                    </div>
+
+                    {customerFields.map(field => (
+                        <div
+                            key={field.id}
+                            className={`field-item ${selectedField?.id === field.id ? 'selected' : ''}`}
+                            onClick={() => handleFieldSelect(field)}
+                            style={{ borderLeft: '3px solid #e67e22' }}
+                        >
+                            <div className="field-name">{field.label}</div>
+                            <span className="field-type">{field.type}</span>
+                        </div>
+                    ))}
+
+                    {/* Company Fields Section */}
+                    <div className="section-header" style={{ fontSize: '1rem', margin: '20px 0 10px 0', color: 'rgba(255, 255, 255, 0.8)' }}>
+                        🏢 Στοιχεία Εταιρείας ({availableFields.length})
+                    </div>
 
                     {availableFields.map(field => (
                         <div

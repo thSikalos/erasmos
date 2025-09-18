@@ -17,7 +17,7 @@ const createApplication = async (req, res) => {
     let customerId = customerDetails.id;
     if (!customerId) {
         if (!customerDetails.afm || !customerDetails.full_name) { throw new Error("AFM and Full Name are required for new customers."); }
-        const newCustomerRes = await client.query("INSERT INTO customers (afm, full_name, phone, address, created_by_user_id) VALUES ($1, $2, $3, $4, $5) RETURNING id", [customerDetails.afm, customerDetails.full_name, customerDetails.phone, customerDetails.address, associate_id]);
+        const newCustomerRes = await client.query("INSERT INTO customers (afm, full_name, phone, address, email, created_by_user_id) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id", [customerDetails.afm, customerDetails.full_name, customerDetails.phone, customerDetails.address, customerDetails.email, associate_id]);
         customerId = newCustomerRes.rows[0].id;
     }
     
@@ -1562,8 +1562,8 @@ const promoteDraftToApplication = async (req, res) => {
         let customerId = customerDetails.id;
         if (!customerId) {
             const newCustomerRes = await client.query(
-                "INSERT INTO customers (afm, full_name, phone, address, created_by_user_id) VALUES ($1, $2, $3, $4, $5) RETURNING id",
-                [customerDetails.afm, customerDetails.full_name, customerDetails.phone, customerDetails.address, userId]
+                "INSERT INTO customers (afm, full_name, phone, address, email, created_by_user_id) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id",
+                [customerDetails.afm, customerDetails.full_name, customerDetails.phone, customerDetails.address, customerDetails.email, userId]
             );
             customerId = newCustomerRes.rows[0].id;
         }

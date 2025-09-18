@@ -8,7 +8,7 @@ const getAllCustomers = async (req, res) => {
     try {
         let query;
         let queryParams = [];
-        let baseQuery = `SELECT c.id, c.full_name, c.afm, c.phone, u.name as associate_name 
+        let baseQuery = `SELECT c.id, c.full_name, c.afm, c.phone, c.address, c.email, u.name as associate_name
                          FROM customers c JOIN users u ON c.created_by_user_id = u.id WHERE c.deleted_at IS NULL`;
         
         let whereClauses = [];
@@ -134,9 +134,9 @@ const getCustomerByAfm = async (req, res) => {
 // --- CREATE A NEW CUSTOMER ---
 const createCustomer = async (req, res) => { 
     const creatorUserId = req.user.id; 
-    const { afm, full_name, phone, address, notes } = req.body; 
-    try { 
-        const newCustomer = await pool.query("INSERT INTO customers (afm, full_name, phone, address, notes, created_by_user_id) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *", [afm, full_name, phone, address, notes, creatorUserId]); 
+    const { afm, full_name, phone, address, email, notes } = req.body;
+    try {
+        const newCustomer = await pool.query("INSERT INTO customers (afm, full_name, phone, address, email, notes, created_by_user_id) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *", [afm, full_name, phone, address, email, notes, creatorUserId]); 
         res.status(201).json(newCustomer.rows[0]); 
     } catch (err) { 
         if (err.code === '23505') { 
@@ -150,11 +150,11 @@ const createCustomer = async (req, res) => {
 // --- UPDATE CUSTOMER ---
 const updateCustomer = async (req, res) => {
     const { id } = req.params;
-    const { full_name, phone, address, notes } = req.body;
+    const { full_name, phone, address, email, notes } = req.body;
     try {
         const result = await pool.query(
-            "UPDATE customers SET full_name = $1, phone = $2, address = $3, notes = $4 WHERE id = $5 AND deleted_at IS NULL RETURNING *",
-            [full_name, phone, address, notes, id]
+            "UPDATE customers SET full_name = $1, phone = $2, address = $3, email = $4, notes = $5 WHERE id = $6 AND deleted_at IS NULL RETURNING *",
+            [full_name, phone, address, email, notes, id]
         );
         if (result.rows.length === 0) {
             return res.status(404).json({ message: 'Customer not found or has been deleted' });

@@ -748,21 +748,26 @@ const saveVisualMappings = async (req, res) => {
 
         // Insert new visual mappings
         for (const mapping of mappings) {
+            const isCustomerField = mapping.isCustomerField || false;
+
             await client.query(`
                 INSERT INTO pdf_visual_mappings (
                     template_id, field_id, field_type, page_number,
-                    position_x, position_y, width, height, is_required
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                    position_x, position_y, width, height, is_required,
+                    is_customer_field, customer_field_id
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
             `, [
                 templateId,
-                mapping.fieldId,
+                isCustomerField ? null : mapping.fieldId, // NULL for customer fields
                 mapping.fieldType,
                 mapping.page,
                 mapping.position.x,
                 mapping.position.y,
                 mapping.position.width,
                 mapping.position.height,
-                mapping.isRequired || false
+                mapping.isRequired || false,
+                isCustomerField,
+                isCustomerField ? mapping.fieldId : null // Store customer field ID
             ]);
         }
 
@@ -794,6 +799,20 @@ const saveVisualMappings = async (req, res) => {
 };
 
 /**
+ * Get customer field label by field ID
+ */
+const getCustomerFieldLabel = (fieldId) => {
+    const customerFieldLabels = {
+        'customer_name': 'Ονοματεπώνυμο',
+        'customer_afm': 'ΑΦΜ',
+        'customer_phone': 'Τηλέφωνο',
+        'customer_address': 'Διεύθυνση',
+        'customer_email': 'Email'
+    };
+    return customerFieldLabels[fieldId] || fieldId;
+};
+
+/**
  * Get visual mappings for a PDF template
  */
 const getVisualMappings = async (req, res) => {
@@ -810,28 +829,39 @@ const getVisualMappings = async (req, res) => {
                 pvm.position_y,
                 pvm.width,
                 pvm.height,
-                f.required_for_pdf as is_required,
+                pvm.is_required,
+                pvm.is_customer_field,
+                pvm.customer_field_id,
                 f.label as field_label
             FROM pdf_visual_mappings pvm
-            JOIN fields f ON pvm.field_id = f.id
+            LEFT JOIN fields f ON pvm.field_id = f.id
             WHERE pvm.template_id = $1
             ORDER BY pvm.page_number, pvm.position_y, pvm.position_x
         `, [templateId]);
 
-        const mappings = result.rows.map(row => ({
-            id: row.id,
-            fieldId: row.field_id,
-            fieldLabel: row.field_label,
-            fieldType: row.field_type,
-            page: row.page_number,
-            position: {
-                x: parseFloat(row.position_x),
-                y: parseFloat(row.position_y),
-                width: parseFloat(row.width),
-                height: parseFloat(row.height)
-            },
-            isRequired: row.is_required
-        }));
+        const mappings = result.rows.map(row => {
+            // Handle customer fields vs regular fields
+            const fieldId = row.is_customer_field ? row.customer_field_id : row.field_id;
+            const fieldLabel = row.is_customer_field
+                ? getCustomerFieldLabel(row.customer_field_id)
+                : row.field_label;
+
+            return {
+                id: row.id,
+                fieldId: fieldId,
+                fieldLabel: fieldLabel,
+                fieldType: row.field_type,
+                isCustomerField: row.is_customer_field,
+                page: row.page_number,
+                position: {
+                    x: parseFloat(row.position_x),
+                    y: parseFloat(row.position_y),
+                    width: parseFloat(row.width),
+                    height: parseFloat(row.height)
+                },
+                isRequired: row.is_required
+            };
+        });
 
         res.json({
             success: true,

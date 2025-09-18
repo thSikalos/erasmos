@@ -60,7 +60,7 @@ const ProgressBar = ({ currentStep, totalSteps }) => {
 const initialState = {
     // Customer data
     afm: '',
-    customerDetails: { id: null, full_name: '', phone: '', address: '' },
+    customerDetails: { id: null, full_name: '', phone: '', address: '', email: '' },
     customerStatus: 'idle', // idle, checking, found, notFound
     
     // Application data
@@ -182,6 +182,7 @@ const NewApplicationPage = () => {
                     full_name: customerDetails.full_name || '',
                     phone: customerDetails.phone || '',
                     address: customerDetails.address || '',
+                    email: customerDetails.email || '',
                     afm: customerDetails.afm || ''
                 }
             });
@@ -773,6 +774,20 @@ const NewApplicationPage = () => {
                                             disabled={state.customerStatus === 'found'}
                                         />
                                     </div>
+                                    <div className="form-group">
+                                        <label className="form-label">Email</label>
+                                        <input
+                                            type="email"
+                                            className="form-input"
+                                            placeholder="Εισάγετε email..."
+                                            value={state.customerDetails.email || ''}
+                                            onChange={e => dispatch({
+                                                type: 'SET_CUSTOMER_DETAILS',
+                                                data: { ...state.customerDetails, email: e.target.value }
+                                            })}
+                                            disabled={state.customerStatus === 'found'}
+                                        />
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -922,6 +937,12 @@ const NewApplicationPage = () => {
                                         <div className="preview-item">
                                             <span className="label">Διεύθυνση:</span>
                                             <span className="value">{state.customerDetails.address}</span>
+                                        </div>
+                                    )}
+                                    {state.customerDetails.email && (
+                                        <div className="preview-item">
+                                            <span className="label">Email:</span>
+                                            <span className="value">{state.customerDetails.email}</span>
                                         </div>
                                     )}
                                 </div>
