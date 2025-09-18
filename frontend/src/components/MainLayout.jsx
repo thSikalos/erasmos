@@ -3,6 +3,7 @@ import { Outlet, NavLink, Link } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import Header from './Header';
 import NotificationManager from './NotificationManager';
+import CookieConsentBanner from './CookieConsentBanner';
 import '../App.css';
 
 const MainLayout = () => {
@@ -676,6 +677,9 @@ const MainLayout = () => {
 
             {/* Global Notification Manager */}
             <NotificationManager />
+
+            {/* Cookie Consent Banner */}
+            <CookieConsentBanner />
         </div>
     );
 };

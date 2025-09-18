@@ -1,5 +1,6 @@
 import React, { useContext, useState } from 'react';
 import { AuthContext } from '../context/AuthContext';
+import CookieSettingsWidget from '../components/CookieSettingsWidget';
 
 const ProfilePage = () => {
     const { user } = useContext(AuthContext);
@@ -76,6 +77,10 @@ const ProfilePage = () => {
                         display: grid;
                         grid-template-columns: 1fr 1fr;
                         gap: 30px;
+                    }
+
+                    .profile-content-full {
+                        grid-column: 1 / -1;
                     }
 
                     .profile-section {
@@ -337,6 +342,21 @@ const ProfilePage = () => {
                         <div className="profile-field-readonly">
                             {new Date().toLocaleDateString('el-GR')} - Τώρα
                         </div>
+                    </div>
+                </div>
+
+                {/* Cookie Settings Section */}
+                <div className="profile-content-full">
+                    <div style={{
+                        background: 'rgba(255, 255, 255, 0.15)',
+                        backdropFilter: 'blur(20px)',
+                        borderRadius: '20px',
+                        padding: '30px',
+                        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',
+                        border: '1px solid rgba(255, 255, 255, 0.2)',
+                        marginBottom: '30px'
+                    }}>
+                        <CookieSettingsWidget />
                     </div>
                 </div>
 

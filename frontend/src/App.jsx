@@ -2,6 +2,7 @@ import React, { useContext, Suspense, lazy } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthContext } from './context/AuthContext';
 import { NotificationProvider } from './context/NotificationContext';
+import { CookieConsentProvider } from './context/CookieConsentContext';
 import ErrorBoundary from './components/ErrorBoundary';
 import MainLayout from './components/MainLayout';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -36,6 +37,8 @@ const NotificationsPage = lazy(() => import('./pages/NotificationsPage'));
 const ApplicationsPage = lazy(() => import('./pages/ApplicationsPage'));
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 const InfoPortalPage = lazy(() => import('./pages/InfoPortalPage'));
+const PrivacyPolicyPage = lazy(() => import('./pages/PrivacyPolicyPage'));
+const CookiePolicyPage = lazy(() => import('./pages/CookiePolicyPage'));
 
 function App() {
   const { loading } = useContext(AuthContext);
@@ -46,7 +49,8 @@ function App() {
 
   return (
     <ErrorBoundary>
-      <NotificationProvider>
+      <CookieConsentProvider>
+        <NotificationProvider>
         <Suspense fallback={
           <div style={{
             display: 'flex',
@@ -85,6 +89,8 @@ function App() {
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
             <Route path="/reset-password" element={<ResetPasswordPage />} />
+            <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
+            <Route path="/cookie-policy" element={<CookiePolicyPage />} />
             <Route element={<ProtectedRoute />}>
               <Route element={<MainLayout />}>
               <Route path="/dashboard" element={<DashboardPage />} />
@@ -116,7 +122,8 @@ function App() {
           <Route path="/" element={<Navigate to="/dashboard" />} />
         </Routes>
         </Suspense>
-      </NotificationProvider>
+        </NotificationProvider>
+      </CookieConsentProvider>
     </ErrorBoundary>
   );
 }
