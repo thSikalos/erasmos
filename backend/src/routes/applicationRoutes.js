@@ -25,7 +25,14 @@ const {
     // PDF Generation routes
     generateApplicationPDF,
     checkPDFReadiness,
-    uploadSignedPDF
+    uploadSignedPDF,
+    // Draft Applications routes
+    saveDraftApplication,
+    getDraftApplications,
+    getDraftApplicationById,
+    updateDraftApplication,
+    deleteDraftApplication,
+    promoteDraftToApplication
 } = require('../controllers/applicationController');
 
 // Configure multer for signed PDF uploads
@@ -66,6 +73,14 @@ router.use(authMiddleware);
 router.get('/renewals/export', exportRenewals); // <-- ΝΕΟ
 router.get('/renewals', getRenewals);
 router.get('/team-applications', getTeamApplications);
+
+// Draft Applications routes
+router.post('/drafts', saveDraftApplication);
+router.get('/drafts', getDraftApplications);
+router.get('/drafts/:id', getDraftApplicationById);
+router.put('/drafts/:id', updateDraftApplication);
+router.delete('/drafts/:id', deleteDraftApplication);
+router.post('/drafts/:id/promote', promoteDraftToApplication);
 
 router.post('/', createApplication);
 router.get('/', getApplications);

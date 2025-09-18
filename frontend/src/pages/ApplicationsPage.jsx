@@ -14,6 +14,7 @@ const ApplicationsPage = () => {
     const [pendingApplications, setPendingApplications] = useState([]);
     const [onHoldApplications, setOnHoldApplications] = useState([]);
     const [registeredApplications, setRegisteredApplications] = useState([]);
+    const [draftApplications, setDraftApplications] = useState([]);
     const [displayableFields, setDisplayableFields] = useState([]);
     const [loading, setLoading] = useState(true);
     const [successMessage, setSuccessMessage] = useState('');
@@ -57,6 +58,7 @@ const ApplicationsPage = () => {
     const filteredPendingApplications = getFilteredApplications(pendingApplications);
     const filteredOnHoldApplications = getFilteredApplications(onHoldApplications);
     const filteredRegisteredApplications = getFilteredApplications(registeredApplications);
+    const filteredDraftApplications = getFilteredApplications(draftApplications);
 
     const handleSearchChange = (value) => {
         setSearchTerm(value);
@@ -69,19 +71,21 @@ const ApplicationsPage = () => {
         setLoading(true);
         try {
             const config = { headers: { Authorization: `Bearer ${token}` } };
-            const [pendingResponse, onHoldResponse, registeredResponse, fieldsResponse] = await Promise.all([
+            const [pendingResponse, onHoldResponse, registeredResponse, draftsResponse, fieldsResponse] = await Promise.all([
                 axios.get(apiUrl(`/api/applications/team-applications?paid_status=all&status_filter=${encodeURIComponent('Προς Καταχώρηση')}`), config),
                 axios.get(apiUrl(`/api/applications/team-applications?paid_status=all&status_filter=${encodeURIComponent('Εκκρεμότητα')}`), config),
                 axios.get(apiUrl(`/api/applications/team-applications?paid_status=all&status_filter=${encodeURIComponent('Καταχωρήθηκε')}`), config),
+                axios.get(apiUrl('/api/applications/drafts'), config),
                 axios.get(apiUrl('/api/applications/displayable-fields'), config)
             ]);
 
             setPendingApplications(pendingResponse.data);
             setOnHoldApplications(onHoldResponse.data);
             setRegisteredApplications(registeredResponse.data);
+            setDraftApplications(draftsResponse.data);
 
             // Combine all applications for the search functionality
-            const allApplications = [...pendingResponse.data, ...onHoldResponse.data, ...registeredResponse.data];
+            const allApplications = [...pendingResponse.data, ...onHoldResponse.data, ...registeredResponse.data, ...draftsResponse.data];
             setApplications(allApplications);
             setDisplayableFields(fieldsResponse.data);
         } catch (error) {
@@ -193,6 +197,50 @@ const ApplicationsPage = () => {
         }
     };
 
+    // Draft Applications Functions
+    const handleEditDraft = (draftId) => {
+        navigate(`/application/new?draftId=${draftId}`);
+    };
+
+    const handleDeleteDraft = async (draftId) => {
+        if (!window.confirm('Είστε σίγουροι ότι θέλετε να διαγράψετε αυτή την προσωρινή αίτηση;')) {
+            return;
+        }
+
+        try {
+            const config = { headers: { Authorization: `Bearer ${token}` } };
+            await axios.delete(apiUrl(`/api/applications/drafts/${draftId}`), config);
+
+            setSuccessMessage('Προσωρινή αίτηση διαγράφηκε επιτυχώς!');
+            setTimeout(() => setSuccessMessage(''), 3000);
+            fetchApplications(); // Refresh data
+        } catch (error) {
+            console.error("Failed to delete draft application", error);
+            setError('Σφάλμα κατά τη διαγραφή της προσωρινής αίτησης');
+            setTimeout(() => setError(''), 3000);
+        }
+    };
+
+    const handlePromoteDraft = async (draftId) => {
+        if (!window.confirm('Θέλετε να υποβάλετε αυτή την προσωρινή αίτηση; Θα μετατραπεί σε κανονική αίτηση.')) {
+            return;
+        }
+
+        try {
+            const config = { headers: { Authorization: `Bearer ${token}` } };
+            await axios.post(apiUrl(`/api/applications/drafts/${draftId}/promote`), {}, config);
+
+            setSuccessMessage('Η προσωρινή αίτηση υποβλήθηκε επιτυχώς!');
+            setTimeout(() => setSuccessMessage(''), 3000);
+            fetchApplications(); // Refresh data
+        } catch (error) {
+            console.error("Failed to promote draft application", error);
+            const errorMessage = error.response?.data?.message || 'Σφάλμα κατά την υποβολή της προσωρινής αίτησης';
+            setError(errorMessage);
+            setTimeout(() => setError(''), 5000);
+        }
+    };
+
     // Handle simple application payment toggle
     const handleSimplePaymentToggle = async (applicationId, currentStatus) => {
         try {
@@ -248,6 +296,94 @@ const ApplicationsPage = () => {
     }
 
     const canManagePayments = user.role === 'TeamLeader' || user.role === 'Admin';
+
+    // Helper function to render draft applications table
+    const renderDraftApplicationTable = (tableApplications, tableName, statusClass) => {
+        if (tableApplications.length === 0) {
+            return (
+                <div className={`applications-content ${statusClass}`}>
+                    <div className="table-header">
+                        <h3>{tableName}</h3>
+                    </div>
+                    <div className="empty-table-message">
+                        <p>Δεν υπάρχουν προσωρινές αιτήσεις.</p>
+                    </div>
+                </div>
+            );
+        }
+
+        return (
+            <div className={`applications-content ${statusClass}`}>
+                <div className="table-header">
+                    <h3>{tableName}</h3>
+                </div>
+                <div className="applications-table-scroll">
+                    <table className="modern-applications-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Πελάτης</th>
+                                <th>Εταιρία</th>
+                                <th>Ημερομηνία</th>
+                                <th>Ενέργειες</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {tableApplications.map((draft) => (
+                                <tr key={draft.id} className="application-row draft-row">
+                                    <td>#{draft.id}</td>
+                                    <td>
+                                        <div>
+                                            <div className="customer-name">{draft.customer_name}</div>
+                                            <div className="customer-phone">{draft.customer_phone}</div>
+                                        </div>
+                                    </td>
+                                    <td className="company-name">{draft.company_name}</td>
+                                    <td>
+                                        {new Date(draft.updated_at || draft.created_at).toLocaleDateString('el-GR')}
+                                    </td>
+                                    <td>
+                                        <div className="draft-actions">
+                                            <button
+                                                className="btn-edit-draft"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleEditDraft(draft.id);
+                                                }}
+                                                title="Επεξεργασία"
+                                            >
+                                                ✏️ Επεξεργασία
+                                            </button>
+                                            <button
+                                                className="btn-promote-draft"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handlePromoteDraft(draft.id);
+                                                }}
+                                                title="Υποβολή Αίτησης"
+                                            >
+                                                🚀 Υποβολή
+                                            </button>
+                                            <button
+                                                className="btn-delete-draft"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleDeleteDraft(draft.id);
+                                                }}
+                                                title="Διαγραφή"
+                                            >
+                                                🗑️ Διαγραφή
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        );
+    };
 
     // Helper function to render a table for specific applications
     const renderApplicationTable = (tableApplications, tableName, statusClass) => {
@@ -607,7 +743,7 @@ const ApplicationsPage = () => {
                     <div className="loading-spinner-icon"></div>
                     <p>Φόρτωση αιτήσεων...</p>
                 </div>
-            ) : (filteredPendingApplications.length === 0 && filteredOnHoldApplications.length === 0 && filteredRegisteredApplications.length === 0) ? (
+            ) : (filteredPendingApplications.length === 0 && filteredOnHoldApplications.length === 0 && filteredRegisteredApplications.length === 0 && filteredDraftApplications.length === 0) ? (
                 <div className="empty-state">
                     <p>
                         {searchTerm
@@ -930,6 +1066,99 @@ const ApplicationsPage = () => {
                                 margin-top: 8px;
                                 display: block;
                             }
+
+                            /* Draft Applications Styling */
+                            .applications-content.draft-status {
+                                border-top: 4px solid #6c757d;
+                            }
+
+                            .draft-status .table-header {
+                                border-left-color: #6c757d;
+                                background: linear-gradient(135deg, rgba(108, 117, 125, 0.1), rgba(108, 117, 125, 0.05));
+                            }
+
+                            .draft-status .table-header h3 {
+                                color: #6c757d;
+                            }
+
+                            .draft-status .modern-applications-table thead {
+                                background: linear-gradient(135deg, #6c757d, #5a6268);
+                            }
+
+                            .draft-row {
+                                background: rgba(108, 117, 125, 0.05) !important;
+                                border-left: 3px solid #6c757d;
+                            }
+
+                            .draft-row:hover {
+                                background: rgba(108, 117, 125, 0.1) !important;
+                                cursor: default;
+                            }
+
+                            .draft-actions {
+                                display: flex;
+                                gap: 8px;
+                                flex-wrap: wrap;
+                            }
+
+                            .btn-edit-draft,
+                            .btn-promote-draft,
+                            .btn-delete-draft {
+                                padding: 6px 12px;
+                                border: none;
+                                border-radius: 6px;
+                                font-size: 0.8rem;
+                                font-weight: 500;
+                                cursor: pointer;
+                                transition: all 0.2s ease;
+                                display: flex;
+                                align-items: center;
+                                gap: 4px;
+                            }
+
+                            .btn-edit-draft {
+                                background: linear-gradient(135deg, #007bff, #0056b3);
+                                color: white;
+                            }
+
+                            .btn-edit-draft:hover {
+                                transform: translateY(-1px);
+                                box-shadow: 0 4px 12px rgba(0, 123, 255, 0.3);
+                            }
+
+                            .btn-promote-draft {
+                                background: linear-gradient(135deg, #28a745, #1e7e34);
+                                color: white;
+                            }
+
+                            .btn-promote-draft:hover {
+                                transform: translateY(-1px);
+                                box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
+                            }
+
+                            .btn-delete-draft {
+                                background: linear-gradient(135deg, #dc3545, #bd2130);
+                                color: white;
+                            }
+
+                            .btn-delete-draft:hover {
+                                transform: translateY(-1px);
+                                box-shadow: 0 4px 12px rgba(220, 53, 69, 0.3);
+                            }
+
+                            @media (max-width: 768px) {
+                                .draft-actions {
+                                    flex-direction: column;
+                                    align-items: stretch;
+                                }
+
+                                .btn-edit-draft,
+                                .btn-promote-draft,
+                                .btn-delete-draft {
+                                    width: 100%;
+                                    justify-content: center;
+                                }
+                            }
                         `}
                     </style>
 
@@ -941,6 +1170,9 @@ const ApplicationsPage = () => {
 
                     {/* Registered Applications Table */}
                     {renderApplicationTable(filteredRegisteredApplications, "Καταχωρήθηκε", "registered-status")}
+
+                    {/* Draft Applications Table */}
+                    {renderDraftApplicationTable(filteredDraftApplications, "Προσωρινά Αποθηκευμένες", "draft-status")}
                 </div>
             )}
 

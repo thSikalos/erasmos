@@ -1298,6 +1298,362 @@ const uploadSignedPDF = async (req, res) => {
     }
 };
 
+// --- DRAFT APPLICATIONS FUNCTIONS ---
+
+// Save draft application (no validation, no notifications)
+const saveDraftApplication = async (req, res) => {
+    const { company_id, field_values, contract_end_date, customerDetails, notes } = req.body;
+    const { id: userId } = req.user;
+
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+
+        // Prepare application data
+        const applicationData = {
+            company_id,
+            field_values: field_values || {},
+            contract_end_date,
+            notes
+        };
+
+        // Prepare customer details
+        const customer_details = customerDetails || {};
+
+        const insertQuery = `
+            INSERT INTO draft_applications
+            (user_id, company_id, customer_details, application_data, contract_end_date)
+            VALUES ($1, $2, $3, $4, $5)
+            RETURNING id
+        `;
+
+        const result = await client.query(insertQuery, [
+            userId,
+            company_id || null,
+            JSON.stringify(customer_details),
+            JSON.stringify(applicationData),
+            contract_end_date || null
+        ]);
+
+        await client.query('COMMIT');
+
+        res.status(201).json({
+            success: true,
+            message: 'Draft application saved successfully',
+            draftId: result.rows[0].id
+        });
+
+    } catch (err) {
+        await client.query('ROLLBACK');
+        console.error('Error saving draft application:', err.message);
+        res.status(500).send('Server Error');
+    } finally {
+        client.release();
+    }
+};
+
+// Get user's draft applications
+const getDraftApplications = async (req, res) => {
+    const { id: userId } = req.user;
+
+    try {
+        const query = `
+            SELECT
+                da.id,
+                da.customer_details,
+                da.application_data,
+                da.contract_end_date,
+                da.created_at,
+                da.updated_at,
+                c.name as company_name
+            FROM draft_applications da
+            LEFT JOIN companies c ON da.company_id = c.id
+            WHERE da.user_id = $1
+            ORDER BY da.updated_at DESC
+        `;
+
+        const result = await pool.query(query, [userId]);
+
+        // Process the results to extract useful info for display
+        const drafts = result.rows.map(draft => {
+            const customerDetails = draft.customer_details || {};
+            const applicationData = draft.application_data || {};
+
+            return {
+                id: draft.id,
+                customer_name: customerDetails.full_name || 'Άγνωστος Πελάτης',
+                customer_phone: customerDetails.phone || '',
+                company_name: draft.company_name || 'Χωρίς Εταιρία',
+                contract_end_date: draft.contract_end_date,
+                created_at: draft.created_at,
+                updated_at: draft.updated_at,
+                field_count: Object.keys(applicationData.field_values || {}).length
+            };
+        });
+
+        res.json(drafts);
+
+    } catch (err) {
+        console.error('Error fetching draft applications:', err.message);
+        res.status(500).send('Server Error');
+    }
+};
+
+// Get draft application by ID
+const getDraftApplicationById = async (req, res) => {
+    const { id: draftId } = req.params;
+    const { id: userId } = req.user;
+
+    try {
+        const query = `
+            SELECT da.*, c.name as company_name
+            FROM draft_applications da
+            LEFT JOIN companies c ON da.company_id = c.id
+            WHERE da.id = $1 AND da.user_id = $2
+        `;
+
+        const result = await pool.query(query, [draftId, userId]);
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ message: 'Draft application not found' });
+        }
+
+        res.json(result.rows[0]);
+
+    } catch (err) {
+        console.error('Error fetching draft application:', err.message);
+        res.status(500).send('Server Error');
+    }
+};
+
+// Update draft application
+const updateDraftApplication = async (req, res) => {
+    const { id: draftId } = req.params;
+    const { company_id, field_values, contract_end_date, customerDetails, notes } = req.body;
+    const { id: userId } = req.user;
+
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+
+        // Check if draft belongs to user
+        const checkQuery = `
+            SELECT id FROM draft_applications
+            WHERE id = $1 AND user_id = $2
+        `;
+        const checkResult = await client.query(checkQuery, [draftId, userId]);
+
+        if (checkResult.rows.length === 0) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({ message: 'Draft application not found' });
+        }
+
+        // Prepare updated data
+        const applicationData = {
+            company_id,
+            field_values: field_values || {},
+            contract_end_date,
+            notes
+        };
+
+        const customer_details = customerDetails || {};
+
+        const updateQuery = `
+            UPDATE draft_applications
+            SET company_id = $1,
+                customer_details = $2,
+                application_data = $3,
+                contract_end_date = $4,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = $5 AND user_id = $6
+            RETURNING id
+        `;
+
+        await client.query(updateQuery, [
+            company_id || null,
+            JSON.stringify(customer_details),
+            JSON.stringify(applicationData),
+            contract_end_date || null,
+            draftId,
+            userId
+        ]);
+
+        await client.query('COMMIT');
+
+        res.json({
+            success: true,
+            message: 'Draft application updated successfully'
+        });
+
+    } catch (err) {
+        await client.query('ROLLBACK');
+        console.error('Error updating draft application:', err.message);
+        res.status(500).send('Server Error');
+    } finally {
+        client.release();
+    }
+};
+
+// Delete draft application
+const deleteDraftApplication = async (req, res) => {
+    const { id: draftId } = req.params;
+    const { id: userId } = req.user;
+
+    try {
+        const deleteQuery = `
+            DELETE FROM draft_applications
+            WHERE id = $1 AND user_id = $2
+            RETURNING id
+        `;
+
+        const result = await pool.query(deleteQuery, [draftId, userId]);
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ message: 'Draft application not found' });
+        }
+
+        res.json({
+            success: true,
+            message: 'Draft application deleted successfully'
+        });
+
+    } catch (err) {
+        console.error('Error deleting draft application:', err.message);
+        res.status(500).send('Server Error');
+    }
+};
+
+// Convert draft to regular application
+const promoteDraftToApplication = async (req, res) => {
+    const { id: draftId } = req.params;
+    const { id: userId } = req.user;
+
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+
+        // Get draft data
+        const draftQuery = `
+            SELECT * FROM draft_applications
+            WHERE id = $1 AND user_id = $2
+        `;
+        const draftResult = await client.query(draftQuery, [draftId, userId]);
+
+        if (draftResult.rows.length === 0) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({ message: 'Draft application not found' });
+        }
+
+        const draft = draftResult.rows[0];
+        const applicationData = draft.application_data || {};
+        const customerDetails = draft.customer_details || {};
+        const fieldValues = applicationData.field_values || {};
+
+        // Validate required fields before promotion
+        if (!applicationData.company_id || !customerDetails.full_name || !customerDetails.afm) {
+            await client.query('ROLLBACK');
+            return res.status(400).json({
+                message: 'Missing required fields for application submission',
+                required: ['company_id', 'customer.full_name', 'customer.afm']
+            });
+        }
+
+        // Handle customer creation/retrieval (same logic as createApplication)
+        let customerId = customerDetails.id;
+        if (!customerId) {
+            const newCustomerRes = await client.query(
+                "INSERT INTO customers (afm, full_name, phone, address, created_by_user_id) VALUES ($1, $2, $3, $4, $5) RETURNING id",
+                [customerDetails.afm, customerDetails.full_name, customerDetails.phone, customerDetails.address, userId]
+            );
+            customerId = newCustomerRes.rows[0].id;
+        }
+
+        // Calculate commission (same logic as createApplication)
+        const parentRes = await client.query('SELECT parent_user_id FROM users WHERE id = $1', [userId]);
+        const team_leader_id = parentRes.rows[0]?.parent_user_id;
+
+        if (!team_leader_id) {
+            throw new Error("Associate does not have a team leader.");
+        }
+
+        const baseCommissionRes = await client.query(
+            "SELECT amount FROM user_commissions WHERE associate_id = $1 AND company_id = $2",
+            [userId, applicationData.company_id]
+        );
+        let totalCommission = baseCommissionRes.rows.length > 0 ? parseFloat(baseCommissionRes.rows[0].amount) : 0;
+
+        const fieldIds = Object.keys(fieldValues).map(id => parseInt(id));
+        if (fieldIds.length > 0) {
+            const fieldCommissionsRes = await client.query(
+                "SELECT ufc.field_id, ufc.amount FROM user_field_commissions ufc JOIN fields f ON ufc.field_id = f.id WHERE ufc.associate_id = $1 AND ufc.field_id = ANY($2::int[]) AND f.is_commissionable = true",
+                [userId, fieldIds]
+            );
+            for (const commissionRule of fieldCommissionsRes.rows) {
+                if (fieldValues[commissionRule.field_id] && String(fieldValues[commissionRule.field_id]) !== 'false') {
+                    totalCommission += parseFloat(commissionRule.amount);
+                }
+            }
+        }
+
+        // Create the application
+        const appQuery = `
+            INSERT INTO applications
+            (customer_id, user_id, company_id, total_commission, contract_end_date, status)
+            VALUES ($1, $2, $3, $4, $5, 'Προς Καταχώρηση')
+            RETURNING id
+        `;
+        const appResult = await client.query(appQuery, [
+            customerId, userId, applicationData.company_id, totalCommission, draft.contract_end_date
+        ]);
+        const newApplicationId = appResult.rows[0].id;
+
+        // Insert field values
+        for (const fieldId in fieldValues) {
+            const dataQuery = 'INSERT INTO application_values (application_id, field_id, value) VALUES ($1, $2, $3)';
+            await client.query(dataQuery, [newApplicationId, fieldId, String(fieldValues[fieldId])]);
+        }
+
+        // Send notification (same as createApplication)
+        try {
+            const creatorQuery = 'SELECT name FROM users WHERE id = $1';
+            const creatorResult = await client.query(creatorQuery, [userId]);
+            const creatorName = creatorResult.rows[0]?.name || 'Unknown';
+
+            await NotificationService.createNotification(
+                NotificationService.NOTIFICATION_TYPES.NEW_APPLICATION,
+                {
+                    application_id: newApplicationId,
+                    creator_id: userId,
+                    creator_name: creatorName,
+                    customer_name: customerDetails.full_name,
+                    company_id: applicationData.company_id
+                }
+            );
+        } catch (notificationError) {
+            console.error('Failed to send new application notification:', notificationError);
+        }
+
+        // Delete the draft
+        await client.query('DELETE FROM draft_applications WHERE id = $1', [draftId]);
+
+        await client.query('COMMIT');
+
+        res.status(201).json({
+            success: true,
+            message: 'Draft promoted to application successfully',
+            applicationId: newApplicationId,
+            totalCommission
+        });
+
+    } catch (err) {
+        await client.query('ROLLBACK');
+        console.error('Error promoting draft to application:', err.message);
+        res.status(500).send(err.message);
+    } finally {
+        client.release();
+    }
+};
+
 module.exports = {
     createApplication,
     getApplications,
@@ -1319,5 +1675,12 @@ module.exports = {
     // PDF Generation functions
     generateApplicationPDF,
     checkPDFReadiness,
-    uploadSignedPDF
+    uploadSignedPDF,
+    // Draft Applications functions
+    saveDraftApplication,
+    getDraftApplications,
+    getDraftApplicationById,
+    updateDraftApplication,
+    deleteDraftApplication,
+    promoteDraftToApplication
 };

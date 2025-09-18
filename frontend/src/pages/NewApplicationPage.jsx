@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext, useReducer, useCallback } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
@@ -139,7 +139,11 @@ const applicationReducer = (state, action) => {
 const NewApplicationPage = () => {
     const { token, user } = useContext(AuthContext);
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
     const { showSuccessToast, showErrorToast, showInfoToast, showWarningToast } = useNotifications();
+
+    // Get draftId from URL params
+    const draftId = searchParams.get('draftId');
     const [companies, setCompanies] = useState([]);
     const [state, dispatch] = useReducer(applicationReducer, {
         ...initialState,
@@ -148,6 +152,52 @@ const NewApplicationPage = () => {
 
     const isTeamLeaderOrAdmin = user?.role === 'TeamLeader' || user?.role === 'Admin';
     const isTopLevelLeader = isTeamLeaderOrAdmin && user?.parent_user_id === null;
+
+    // Load draft data if draftId is provided
+    const loadDraftData = useCallback(async (draftId) => {
+        if (!draftId || !token) return;
+
+        try {
+            const config = { headers: { Authorization: `Bearer ${token}` } };
+            const response = await axios.get(apiUrl(`/api/applications/drafts/${draftId}`), config);
+            const draft = response.data;
+
+            // Parse application data
+            const applicationData = draft.application_data || {};
+            const customerDetails = draft.customer_details || {};
+
+            // Update state with draft data
+            dispatch({ type: 'SET_FIELD', field: 'selectedCompanyId', value: applicationData.company_id?.toString() || '' });
+            dispatch({ type: 'SET_FIELD', field: 'fieldValues', value: applicationData.field_values || {} });
+            dispatch({ type: 'SET_FIELD', field: 'contractEndDate', value: draft.contract_end_date || '' });
+
+            // Set customer details
+            dispatch({ type: 'SET_FIELD', field: 'afm', value: customerDetails.afm || '' });
+            dispatch({
+                type: 'SET_CUSTOMER_DETAILS',
+                data: {
+                    id: customerDetails.id || null,
+                    full_name: customerDetails.full_name || '',
+                    phone: customerDetails.phone || '',
+                    address: customerDetails.address || '',
+                    afm: customerDetails.afm || ''
+                }
+            });
+
+            // Set customer status based on whether customer exists
+            if (customerDetails.id) {
+                dispatch({ type: 'SET_CUSTOMER_STATUS', status: 'found' });
+            } else if (customerDetails.afm) {
+                dispatch({ type: 'SET_CUSTOMER_STATUS', status: 'notFound' });
+            }
+
+            showInfoToast('Draft Loaded', 'Τα δεδομένα της προσωρινής αίτησης φορτώθηκαν επιτυχώς');
+
+        } catch (err) {
+            console.error('Error loading draft:', err);
+            showErrorToast('Σφάλμα', 'Δεν ήταν δυνατή η φόρτωση της προσωρινής αίτησης');
+        }
+    }, [token]);
 
     // Load companies and fields on component mount
     useEffect(() => {
@@ -411,6 +461,46 @@ const NewApplicationPage = () => {
         }
     };
 
+    // Save as draft function (no validation required)
+    const saveDraft = async () => {
+        dispatch({ type: 'SET_LOADING', loading: true });
+        dispatch({ type: 'SET_ERROR', error: '' });
+
+        try {
+            const config = { headers: { Authorization: `Bearer ${token}` } };
+            const draftData = {
+                company_id: state.selectedCompanyId ? parseInt(state.selectedCompanyId) : null,
+                field_values: state.fieldValues || {},
+                contract_end_date: state.contractEndDate || null,
+                customerDetails: state.customerDetails || {},
+                notes: 'Προσωρινή αποθήκευση από τη φόρμα'
+            };
+
+            let response;
+            if (draftId) {
+                // Update existing draft
+                response = await axios.put(apiUrl(`/api/applications/drafts/${draftId}`), draftData, config);
+                showSuccessToast('Επιτυχία', 'Η προσωρινή αίτηση ενημερώθηκε επιτυχώς!');
+            } else {
+                // Create new draft
+                response = await axios.post(apiUrl('/api/applications/drafts'), draftData, config);
+                showSuccessToast('Επιτυχία', 'Η αίτηση αποθηκεύτηκε προσωρινά!');
+            }
+
+            setTimeout(() => {
+                navigate('/applications');
+            }, 1000);
+
+        } catch (err) {
+            console.error('Error saving draft:', err);
+            const errorMessage = err.response?.data?.message || 'Σφάλμα κατά την προσωρινή αποθήκευση';
+            dispatch({ type: 'SET_ERROR', error: errorMessage });
+            showErrorToast('Σφάλμα', errorMessage);
+        } finally {
+            dispatch({ type: 'SET_LOADING', loading: false });
+        }
+    };
+
     const handleSubmit = async () => {
         dispatch({ type: 'SET_LOADING', loading: true });
         dispatch({ type: 'SET_ERROR', error: '' });
@@ -497,6 +587,13 @@ const NewApplicationPage = () => {
         }
     }, [selectedCompany]);
 
+    // Load draft data when draftId changes
+    useEffect(() => {
+        if (draftId && companies.length > 0) {
+            loadDraftData(draftId);
+        }
+    }, [draftId, loadDraftData, companies]);
+
     return (
         <div className="modern-form-container">
 
@@ -504,8 +601,18 @@ const NewApplicationPage = () => {
                 <Link to="/dashboard" className="back-link">
                     ← Επιστροφή στο Dashboard
                 </Link>
-                <h1 className="form-title">Δημιουργία Νέας Αίτησης</h1>
-                <p className="form-subtitle">Ακολουθήστε τα βήματα για να ολοκληρώσετε την αίτηση</p>
+                <h1 className="form-title">{draftId ? 'Επεξεργασία Προσωρινής Αίτησης' : 'Δημιουργία Νέας Αίτησης'}</h1>
+                <p className="form-subtitle">
+                    {draftId
+                        ? 'Επεξεργασία προσωρινά αποθηκευμένης αίτησης'
+                        : 'Ακολουθήστε τα βήματα για να ολοκληρώσετε την αίτηση'
+                    }
+                </p>
+                {draftId && (
+                    <div className="draft-indicator">
+                        💾 Επεξεργασία προσωρινής αίτησης #{draftId}
+                    </div>
+                )}
             </div>
 
             <div className="wizard-container">
@@ -911,18 +1018,33 @@ const NewApplicationPage = () => {
                             Επόμενο →
                         </button>
                     ) : (
-                        <button
-                            type="button"
-                            className="btn-success"
-                            onClick={handleSubmit}
-                            disabled={state.loading}
-                        >
-                            {state.loading ? (
-                                <><span className="spinner"></span> Υποβολή...</>
-                            ) : (
-                                '🚀 Υποβολή Αίτησης'
-                            )}
-                        </button>
+                        <div className="submit-buttons">
+                            <button
+                                type="button"
+                                className="btn-draft"
+                                onClick={saveDraft}
+                                disabled={state.loading}
+                                title="Αποθήκευση προσωρινά χωρίς υποβολή"
+                            >
+                                {state.loading ? (
+                                    <><span className="spinner"></span> Αποθήκευση...</>
+                                ) : (
+                                    '💾 Προσωρινή Αποθήκευση'
+                                )}
+                            </button>
+                            <button
+                                type="button"
+                                className="btn-success"
+                                onClick={handleSubmit}
+                                disabled={state.loading}
+                            >
+                                {state.loading ? (
+                                    <><span className="spinner"></span> Υποβολή...</>
+                                ) : (
+                                    '🚀 Υποβολή Αίτησης'
+                                )}
+                            </button>
+                        </div>
                     )}
                 </div>
 
@@ -2033,6 +2155,77 @@ const NewApplicationPage = () => {
                         left: 10px;
                         min-width: auto;
                     }
+
+                    .submit-buttons {
+                        display: flex;
+                        gap: 15px;
+                    }
+                }
+
+                /* Draft button styles */
+                .submit-buttons {
+                    display: flex;
+                    gap: 15px;
+                    align-items: center;
+                }
+
+                .btn-draft {
+                    padding: 15px 25px;
+                    border: 2px solid #6c757d;
+                    background: linear-gradient(135deg, #6c757d, #5a6268);
+                    color: white;
+                    border-radius: 12px;
+                    font-weight: 600;
+                    font-size: 1rem;
+                    cursor: pointer;
+                    transition: all 0.3s ease;
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    min-width: 200px;
+                    justify-content: center;
+                    box-shadow: 0 4px 15px rgba(108, 117, 125, 0.3);
+                }
+
+                .btn-draft:hover:not(:disabled) {
+                    transform: translateY(-2px);
+                    box-shadow: 0 6px 20px rgba(108, 117, 125, 0.4);
+                    background: linear-gradient(135deg, #5a6268, #495057);
+                }
+
+                .btn-draft:active {
+                    transform: translateY(-1px);
+                }
+
+                .btn-draft:disabled {
+                    opacity: 0.6;
+                    cursor: not-allowed;
+                    transform: none;
+                }
+
+                @media (max-width: 768px) {
+                    .submit-buttons {
+                        flex-direction: column;
+                        width: 100%;
+                    }
+
+                    .btn-draft, .btn-success {
+                        width: 100%;
+                        min-width: auto;
+                    }
+                }
+
+                /* Draft indicator styles */
+                .draft-indicator {
+                    background: linear-gradient(135deg, #6c757d, #5a6268);
+                    color: white;
+                    padding: 10px 20px;
+                    border-radius: 8px;
+                    margin-top: 15px;
+                    font-weight: 600;
+                    font-size: 0.9rem;
+                    box-shadow: 0 2px 10px rgba(108, 117, 125, 0.3);
+                    display: inline-block;
                 }
             `}</style>
         </div>
