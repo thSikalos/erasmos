@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, memo, useCallback } from 'react';
 import '../styles/Mobile.css';
 
-const ResponsiveTable = ({
+const ResponsiveTable = memo(({
   data = [],
   columns = [],
   renderActions = null,
@@ -144,7 +144,7 @@ const ResponsiveTable = ({
       </table>
     </div>
   );
-};
+});
 
 // Status Badge Component
 export const StatusBadge = ({ status, type = 'default' }) => {

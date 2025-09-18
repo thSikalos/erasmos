@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import PDFFieldMappingInterface from './PDFFieldMappingInterface';
-import VisualPDFMapper from './VisualPDFMapper';
+import LazyPDFMapper from './LazyPDFMapper';
 import SimplePDFViewer from './SimplePDFViewer';
 import { apiUrl } from '../utils/api';
 
@@ -758,7 +758,7 @@ const PDFTemplateManager = ({ company, onClose }) => {
 
             {/* Visual PDF Mapping Interface */}
             {showMappingInterface && mappingInterfaceData && (
-                <VisualPDFMapper
+                <LazyPDFMapper
                     templateId={mappingInterfaceData.templateId}
                     availableFields={mappingInterfaceData.availableFields}
                     onMappingsSaved={handleMappingsSaved}

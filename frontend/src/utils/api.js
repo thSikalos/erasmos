@@ -14,6 +14,12 @@ if (!apiBaseUrl) {
 
 export const API_BASE_URL = apiBaseUrl;
 
+// Debug logging
+console.log('🔧 UTILS API Configuration:');
+console.log('- API_BASE_URL:', API_BASE_URL);
+console.log('- VITE_API_URL:', import.meta.env.VITE_API_URL);
+console.log('- DEFAULT_BACKEND_PORT:', DEFAULT_BACKEND_PORT);
+
 // Helper function to build API URLs
 export const apiUrl = (endpoint) => {
     // Remove leading slash if present to avoid double slashes

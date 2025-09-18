@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { Pie, Bar } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -21,7 +21,7 @@ ChartJS.register(
   ArcElement
 );
 
-const ChartComponent = ({ chartData }) => {
+const ChartComponent = memo(({ chartData }) => {
     const pieData = {
         labels: chartData.appsByCompany.map(d => d.company_name),
         datasets: [{
@@ -52,6 +52,6 @@ const ChartComponent = ({ chartData }) => {
             </div>
         </div>
     );
-};
+});
 
 export default ChartComponent;
