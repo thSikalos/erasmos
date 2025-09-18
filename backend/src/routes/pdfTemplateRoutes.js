@@ -29,49 +29,49 @@ router.get('/companies/:companyId/pdf-templates',
 );
 
 // Get specific template details with placeholders and mappings
-router.get('/pdf-templates/:templateId',
+router.get('/:templateId',
     authMiddleware,
     pdfTemplateController.getPDFTemplateDetails
 );
 
 // Analyze PDF template and generate mapping suggestions
-router.post('/pdf-templates/:templateId/analyze',
+router.post('/:templateId/analyze',
     authMiddleware,
     pdfTemplateController.analyzePDFTemplate
 );
 
 // Save field mappings for a PDF template
-router.post('/pdf-templates/:templateId/mappings',
+router.post('/:templateId/mappings',
     authMiddleware,
     pdfTemplateController.savePDFMappings
 );
 
 // Get existing mappings for a PDF template
-router.get('/pdf-templates/:templateId/mappings',
+router.get('/:templateId/mappings',
     authMiddleware,
     pdfTemplateController.getPDFMappings
 );
 
 // Delete a PDF template
-router.delete('/pdf-templates/:templateId',
+router.delete('/:templateId',
     authMiddleware,
     pdfTemplateController.deletePDFTemplate
 );
 
 // Download PDF template file
-router.get('/pdf-templates/:templateId/download',
+router.get('/:templateId/download',
     authMiddleware,
     pdfTemplateController.downloadPDFTemplate
 );
 
 // Save visual mappings for a PDF template (position-based)
-router.post('/pdf-templates/:templateId/visual-mappings',
+router.post('/:templateId/visual-mappings',
     authMiddleware,
     pdfTemplateController.saveVisualMappings
 );
 
 // Get visual mappings for a PDF template
-router.get('/pdf-templates/:templateId/visual-mappings',
+router.get('/:templateId/visual-mappings',
     authMiddleware,
     pdfTemplateController.getVisualMappings
 );

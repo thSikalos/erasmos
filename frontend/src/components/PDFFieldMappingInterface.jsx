@@ -40,7 +40,7 @@ const PDFFieldMappingInterface = ({
 
             // Try to load existing mappings first
             const existingMappingsResponse = await axios.get(
-                apiUrl(`/api/pdf-templates/pdf-templates/${templateId}/mappings`),
+                apiUrl(`/api/pdf-templates/${templateId}/mappings`),
                 config
             );
 
@@ -127,7 +127,7 @@ const PDFFieldMappingInterface = ({
             };
 
             const response = await axios.get(
-                apiUrl(`/api/pdf-templates/pdf-templates/${templateId}/download`),
+                apiUrl(`/api/pdf-templates/${templateId}/download`),
                 config
             );
 
@@ -235,7 +235,7 @@ const PDFFieldMappingInterface = ({
             }));
 
             await axios.post(
-                apiUrl(`/api/pdf-templates/pdf-templates/${templateId}/mappings`),
+                apiUrl(`/api/pdf-templates/${templateId}/mappings`),
                 { mappings: mappingsArray },
                 config
             );
@@ -288,7 +288,7 @@ const PDFFieldMappingInterface = ({
     const mappedPlaceholders = placeholders.filter(p => mappings[p.text]);
 
     // Construct PDF URL for viewing
-    const pdfUrl = apiUrl(`/api/pdf-templates/pdf-templates/${templateId}/download`);
+    const pdfUrl = apiUrl(`/api/pdf-templates/${templateId}/download`);
 
     return (
         <div className="pdf-field-mapping-interface">

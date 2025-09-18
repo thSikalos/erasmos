@@ -64,6 +64,10 @@ const useSessionTimeout = (token, onTokenRefresh, onLogout) => {
         clearAllTimers();
     }, [clearAllTimers]);
 
+    const handleAutoRefreshToggle = useCallback(() => {
+        setAutoRefresh(prev => !prev);
+    }, []);
+
     const startCountdown = useCallback((tokenExpiration) => {
         tokenExpirationRef.current = tokenExpiration;
 
@@ -122,7 +126,7 @@ const useSessionTimeout = (token, onTokenRefresh, onLogout) => {
                     remainingTime: Math.floor((tokenExpiration - Date.now()) / 1000),
                     onRefresh: handleRefreshClick,
                     onDismiss: dismissWarning,
-                    onAutoRefreshToggle: useCallback(() => setAutoRefresh(prev => !prev), [])
+                    onAutoRefreshToggle: handleAutoRefreshToggle
                 });
 
                 // Start the countdown
@@ -135,7 +139,7 @@ const useSessionTimeout = (token, onTokenRefresh, onLogout) => {
                 remainingTime: Math.floor(timeToExpiry / 1000),
                 onRefresh: handleRefreshClick,
                 onDismiss: dismissWarning,
-                onAutoRefreshToggle: useCallback(() => setAutoRefresh(prev => !prev), [])
+                onAutoRefreshToggle: handleAutoRefreshToggle
             });
 
             // Start the countdown immediately
@@ -145,7 +149,7 @@ const useSessionTimeout = (token, onTokenRefresh, onLogout) => {
             console.log('[SESSION] Token already expired');
             onLogout();
         }
-    }, [autoRefresh, handleRefreshClick, dismissWarning, refreshToken, onLogout, startCountdown]);
+    }, [autoRefresh, handleRefreshClick, dismissWarning, refreshToken, onLogout, startCountdown, handleAutoRefreshToggle]);
 
     // Initialize timers when token changes
     useEffect(() => {

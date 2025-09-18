@@ -252,7 +252,7 @@ const PDFTemplateManager = ({ company, onClose }) => {
             const config = { headers: { Authorization: `Bearer ${token}` } };
 
             await axios.delete(
-                apiUrl(`/api/pdf-templates/pdf-templates/${templateId}`),
+                apiUrl(`/api/pdf-templates/${templateId}`),
                 config
             );
 

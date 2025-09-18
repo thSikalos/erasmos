@@ -104,7 +104,7 @@ const VisualPDFMapper = ({
             };
 
             const response = await axios.get(
-                apiUrl(`/api/pdf-templates/pdf-templates/${templateId}/download`),
+                apiUrl(`/api/pdf-templates/${templateId}/download`),
                 config
             );
 
@@ -125,7 +125,7 @@ const VisualPDFMapper = ({
             const config = { headers: { Authorization: `Bearer ${token}` } };
 
             const response = await axios.get(
-                apiUrl(`/api/pdf-templates/pdf-templates/${templateId}/visual-mappings`),
+                apiUrl(`/api/pdf-templates/${templateId}/visual-mappings`),
                 config
             );
 
@@ -411,7 +411,7 @@ const VisualPDFMapper = ({
             }));
 
             await axios.post(
-                apiUrl(`/api/pdf-templates/pdf-templates/${templateId}/visual-mappings`),
+                apiUrl(`/api/pdf-templates/${templateId}/visual-mappings`),
                 { mappings: mappingsData },
                 config
             );

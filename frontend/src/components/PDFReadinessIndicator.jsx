@@ -68,7 +68,7 @@ const PDFReadinessIndicator = ({
 
             // Check if this template has mappings and if all required fields are filled
             const mappingsResponse = await axios.get(
-                apiUrl(`/api/pdf-templates/pdf-templates/${selectedTemplate.id}/mappings`),
+                apiUrl(`/api/pdf-templates/${selectedTemplate.id}/mappings`),
                 config
             );
 
