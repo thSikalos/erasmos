@@ -4,6 +4,7 @@ import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
 import { apiUrl } from '../utils/api';
+import PaymentStatementModal from '../components/PaymentStatementModal';
 
 const PaymentsPage = () => {
     const { token, user } = useContext(AuthContext);
@@ -25,6 +26,12 @@ const PaymentsPage = () => {
     const [successMessage, setSuccessMessage] = useState('');
     const [editingStatement, setEditingStatement] = useState(null);
     const [displayFields, setDisplayFields] = useState([]);
+
+    // Modal state
+    const [modalOpen, setModalOpen] = useState(false);
+    const [selectedStatement, setSelectedStatement] = useState(null);
+    const [statementDetails, setStatementDetails] = useState([]);
+    const [modalLoading, setModalLoading] = useState(false);
 
     const fetchData = async () => {
         if (!token) return;
@@ -70,6 +77,10 @@ const PaymentsPage = () => {
             }
         });
         return ids;
+    }, [statements]);
+
+    const unpaidStatements = useMemo(() => {
+        return statements.filter(st => st.status === 'Draft');
     }, [statements]);
 
     const payableApps = useMemo(() => {
@@ -135,12 +146,12 @@ const PaymentsPage = () => {
         .filter(app => selectedAppIds.has(app.application_id))
         .reduce((sum, app) => sum + (app.total_commission ? parseFloat(app.total_commission) : 0), 0);
 
-    const getStatusBadge = (paymentStatus) => {
+    const getStatusBadge = (status) => {
         const statusMap = {
-            'draft': { emoji: '📝', class: 'draft', text: 'Draft' },
-            'paid': { emoji: '✅', class: 'paid', text: 'Paid' }
+            'Draft': { emoji: '📝', class: 'draft', text: 'Εκκρεμής' },
+            'Paid': { emoji: '✅', class: 'paid', text: 'Πληρωμένη' }
         };
-        const statusInfo = statusMap[paymentStatus] || { emoji: '📋', class: 'default', text: paymentStatus };
+        const statusInfo = statusMap[status] || { emoji: '📋', class: 'default', text: status };
         return `${statusInfo.emoji} ${statusInfo.text}`;
     };
 
@@ -209,6 +220,34 @@ const PaymentsPage = () => {
         setEditingStatement(null);
         setSelectedAppIds(new Set());
         setSelectedAssociateId('');
+    };
+
+    const handleStatementClick = async (statement) => {
+        setSelectedStatement(statement);
+        setModalOpen(true);
+        setModalLoading(true);
+        setStatementDetails([]);
+
+        try {
+            const config = { headers: { Authorization: `Bearer ${token}` } };
+            const response = await axios.get(apiUrl(`/api/payments/statements/${statement.id}/details`), config);
+            setStatementDetails(response.data.items || []);
+        } catch (error) {
+            console.error("Failed to fetch statement details", error);
+            showErrorToast('Σφάλμα Φόρτωσης', 'Αδυναμία φόρτωσης λεπτομερειών ταμειακής κατάστασης');
+        } finally {
+            setModalLoading(false);
+        }
+    };
+
+    const handleCloseModal = () => {
+        setModalOpen(false);
+        setSelectedStatement(null);
+        setStatementDetails([]);
+    };
+
+    const handlePaymentStatusUpdate = () => {
+        fetchData(); // Refresh the statements list
     };
 
     return (
@@ -864,16 +903,106 @@ const PaymentsPage = () => {
                     <div className="stat-label">Συνεργάτες</div>
                 </div>
                 <div className="stat-card">
-                    <div className="stat-icon">📋</div>
-                    <div className="stat-number">{statements.length}</div>
-                    <div className="stat-label">Ταμειακές</div>
+                    <div className="stat-icon">⏳</div>
+                    <div className="stat-number">{unpaidStatements.length}</div>
+                    <div className="stat-label">Εκκρεμείς</div>
+                </div>
+                <div className="stat-card">
+                    <div className="stat-icon">✅</div>
+                    <div className="stat-number">{statements.length - unpaidStatements.length}</div>
+                    <div className="stat-label">Πληρωμένες</div>
                 </div>
                 <div className="stat-card">
                     <div className="stat-icon">💰</div>
                     <div className="stat-number">
-                        {statements.reduce((sum, st) => sum + parseFloat(st.total_amount || 0), 0).toFixed(2)}€
+                        {unpaidStatements.reduce((sum, st) => sum + parseFloat(st.total_amount || 0), 0).toFixed(2)}€
                     </div>
-                    <div className="stat-label">Σύνολο</div>
+                    <div className="stat-label">Εκκρεμές Ποσό</div>
+                </div>
+            </div>
+
+            <div className="modern-card">
+                <div className="card-content">
+                    <div className="card-header">
+                        <h3 className="card-title">⏳ Εκκρεμείς Ταμειακές</h3>
+                    </div>
+
+                    {unpaidStatements.length > 0 ? (
+                        <table className="applications-table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Παραλήπτης</th>
+                                    <th>Ποσό</th>
+                                    <th>Status</th>
+                                    <th>Ημερομηνία</th>
+                                    <th>Ενέργειες</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {unpaidStatements.map(st => (
+                                    <tr
+                                        key={st.id}
+                                        onClick={() => handleStatementClick(st)}
+                                        style={{cursor: 'pointer'}}
+                                        title="Κάντε κλικ για λεπτομέρειες"
+                                    >
+                                        <td><strong>#{st.id}</strong></td>
+                                        <td>{st.recipient_name}</td>
+                                        <td><strong>{parseFloat(st.total_amount).toFixed(2)} €</strong></td>
+                                        <td>
+                                            <span className="status-badge">
+                                                {getStatusBadge(st.status)}
+                                            </span>
+                                        </td>
+                                        <td>{new Date(st.created_at).toLocaleDateString('el-GR')}</td>
+                                        <td onClick={(e) => e.stopPropagation()}>
+                                            <div style={{display: 'flex', gap: '5px', flexWrap: 'wrap'}}>
+                                                <button
+                                                    onClick={() => handleDownloadPdf(st.id)}
+                                                    className="pdf-button"
+                                                >
+                                                    📄 PDF
+                                                </button>
+                                                <button
+                                                    onClick={() => handleDownloadExcel(st.id)}
+                                                    className="excel-button"
+                                                >
+                                                    📊 Excel
+                                                </button>
+                                                <button
+                                                    onClick={() => handleMarkAsPaid(st.id)}
+                                                    className="mark-paid-button"
+                                                >
+                                                    ✅ Πλήρωσα
+                                                </button>
+                                                <button
+                                                    onClick={() => handleEditStatement(st.id)}
+                                                    className="edit-button"
+                                                >
+                                                    ✏️ Επεξεργασία
+                                                </button>
+                                                <button
+                                                    onClick={() => handleDeleteStatement(st.id)}
+                                                    className="delete-button"
+                                                >
+                                                    🗑️ Διαγραφή
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    ) : (
+                        <div className="empty-state">
+                            <div className="empty-icon">✅</div>
+                            <p>Όλες οι ταμειακές καταστάσεις έχουν πληρωθεί!</p>
+                            <p style={{fontSize: '0.9rem', opacity: '0.7'}}>
+                                Μόλις δημιουργηθούν νέες ταμειακές, θα εμφανιστούν εδώ
+                            </p>
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -976,7 +1105,7 @@ const PaymentsPage = () => {
             <div className="modern-card">
                 <div className="card-content">
                     <div className="card-header">
-                        <h3 className="card-title">📊 Ιστορικό Ταμειακών</h3>
+                        <h3 className="card-title">📊 Πλήρες Ιστορικό Ταμειακών</h3>
                     </div>
                     
                     {statements.length > 0 ? (
@@ -993,13 +1122,18 @@ const PaymentsPage = () => {
                             </thead>
                             <tbody>
                                 {statements.map(st => (
-                                    <tr key={st.id}>
+                                    <tr
+                                        key={st.id}
+                                        onClick={() => handleStatementClick(st)}
+                                        style={{cursor: 'pointer'}}
+                                        title="Κάντε κλικ για λεπτομέρειες"
+                                    >
                                         <td><strong>#{st.id}</strong></td>
                                         <td>{st.recipient_name}</td>
                                         <td><strong>{parseFloat(st.total_amount).toFixed(2)} €</strong></td>
                                         <td>
                                             <span className="status-badge">
-                                                {getStatusBadge(st.payment_status)}
+                                                {getStatusBadge(st.status)}
                                             </span>
                                             {st.paid_date && (
                                                 <div style={{fontSize: '0.8rem', color: '#666', marginTop: '2px'}}>
@@ -1008,7 +1142,7 @@ const PaymentsPage = () => {
                                             )}
                                         </td>
                                         <td>{new Date(st.created_at).toLocaleDateString('el-GR')}</td>
-                                        <td>
+                                        <td onClick={(e) => e.stopPropagation()}>
                                             <div style={{display: 'flex', gap: '5px', flexWrap: 'wrap'}}>
                                                 <button
                                                     onClick={() => handleDownloadPdf(st.id)}
@@ -1022,28 +1156,6 @@ const PaymentsPage = () => {
                                                 >
                                                     📊 Excel
                                                 </button>
-                                                {st.payment_status === 'draft' && (
-                                                    <>
-                                                        <button
-                                                            onClick={() => handleEditStatement(st.id)}
-                                                            className="edit-button"
-                                                        >
-                                                            ✏️ Επεξεργασία
-                                                        </button>
-                                                        <button
-                                                            onClick={() => handleMarkAsPaid(st.id)}
-                                                            className="mark-paid-button"
-                                                        >
-                                                            ✅ Πληρώθηκε
-                                                        </button>
-                                                        <button
-                                                            onClick={() => handleDeleteStatement(st.id)}
-                                                            className="delete-button"
-                                                        >
-                                                            🗑️ Διαγραφή
-                                                        </button>
-                                                    </>
-                                                )}
                                             </div>
                                         </td>
                                     </tr>
@@ -1062,6 +1174,14 @@ const PaymentsPage = () => {
                 </div>
             </div>
 
+            <PaymentStatementModal
+                isOpen={modalOpen}
+                onClose={handleCloseModal}
+                statement={selectedStatement}
+                statementDetails={statementDetails}
+                loading={modalLoading}
+                onPaymentStatusUpdate={handlePaymentStatusUpdate}
+            />
 
         </div>
     );

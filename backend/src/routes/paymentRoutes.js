@@ -7,6 +7,7 @@ const {
     createClawback,
     getStatements,
     getStatement,
+    getStatementDetails,
     updateStatementStatus,
     generateStatementPdf,
     generateStatementExcel,
@@ -27,6 +28,7 @@ router.post('/statements', (req, res, next) => {
 }, createPaymentStatement);
 router.get('/statements', getStatements);
 router.get('/statements/:id', getStatement);
+router.get('/statements/:id/details', getStatementDetails);
 router.get('/statements/:id/pdf', generateStatementPdf);
 router.get('/statements/:id/excel', generateStatementExcel);
 router.patch('/statements/:id/status', updateStatementStatus);

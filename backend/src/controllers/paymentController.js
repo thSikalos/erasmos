@@ -150,7 +150,7 @@ const createPaymentStatement = async (req, res) => {
                         JOIN applications a ON si.application_id = a.id
                         WHERE a.user_id = b.target_user_id
                         AND DATE_TRUNC('month', ps.created_at) = DATE_TRUNC('month', CURRENT_DATE)
-                        AND ps.payment_status = 'paid'  -- Only count paid statements for bonus
+                        AND ps.status = 'Paid'  -- Only count paid statements for bonus
                         AND (
                             -- If bonus has specific companies, count only those
                             EXISTS(SELECT 1 FROM bonus_companies bc WHERE bc.bonus_id = b.id)
@@ -319,7 +319,7 @@ const deletePaymentStatement = async (req, res) => {
 
         // Check if statement exists and is draft status
         const statementCheck = await client.query(
-            `SELECT id, creator_id, payment_status FROM payment_statements
+            `SELECT id, creator_id, status FROM payment_statements
              WHERE id = $1 FOR UPDATE`,
             [id]
         );
@@ -338,7 +338,7 @@ const deletePaymentStatement = async (req, res) => {
         }
 
         // Check if statement is still in draft status
-        if (statement.payment_status !== 'draft') {
+        if (statement.status !== 'Draft') {
             await client.query('ROLLBACK');
             return res.status(400).json({ message: 'Cannot delete paid statement' });
         }
@@ -373,7 +373,7 @@ const editPaymentStatement = async (req, res) => {
 
         // Check if statement exists and is draft status
         const statementCheck = await client.query(
-            `SELECT id, creator_id, recipient_id, payment_status FROM payment_statements
+            `SELECT id, creator_id, recipient_id, status FROM payment_statements
              WHERE id = $1 FOR UPDATE`,
             [id]
         );
@@ -392,7 +392,7 @@ const editPaymentStatement = async (req, res) => {
         }
 
         // Check if statement is still in draft status
-        if (statement.payment_status !== 'draft') {
+        if (statement.status !== 'Draft') {
             await client.query('ROLLBACK');
             return res.status(400).json({ message: 'Cannot edit paid statement' });
         }
@@ -522,7 +522,7 @@ const getStatement = async (req, res) => {
                 ps.id,
                 ps.recipient_id,
                 ps.total_amount,
-                ps.payment_status,
+                ps.status,
                 ps.created_at,
                 ps.paid_date,
                 ps.creator_id,
@@ -556,6 +556,50 @@ const getStatement = async (req, res) => {
     }
 };
 
+// --- GET STATEMENT DETAILS WITH ITEMS ---
+const getStatementDetails = async (req, res) => {
+    const { id } = req.params;
+    const userId = req.user.id;
+    try {
+        // Get statement details with recipient info
+        const statementQuery = `
+            SELECT
+                ps.id,
+                ps.recipient_id,
+                ps.total_amount,
+                ps.status,
+                ps.created_at,
+                ps.paid_date,
+                ps.creator_id,
+                u.name as recipient_name
+            FROM payment_statements ps
+            JOIN users u ON ps.recipient_id = u.id
+            WHERE ps.id = $1
+        `;
+        const statementResult = await pool.query(statementQuery, [id]);
+        if (statementResult.rows.length === 0) {
+            return res.status(404).json({ message: 'Payment statement not found' });
+        }
+        const statement = statementResult.rows[0];
+
+        // Check if user has permission (must be creator or admin)
+        if (statement.creator_id !== userId && req.user.role !== 'Admin') {
+            return res.status(403).json({ message: 'Not authorized to access this statement' });
+        }
+
+        // Get statement items with all details
+        const items = await getStatementItems(id);
+
+        res.json({
+            statement,
+            items
+        });
+    } catch (err) {
+        console.error('Error fetching payment statement details:', err.message);
+        res.status(500).json({ message: 'Server error' });
+    }
+};
+
 // --- MARK PAYMENT STATEMENT AS PAID ---
 const markStatementAsPaid = async (req, res) => {
     const { id } = req.params;
@@ -564,7 +608,7 @@ const markStatementAsPaid = async (req, res) => {
     try {
         // Check if statement exists and user has permission
         const statementCheck = await pool.query(
-            `SELECT id, creator_id, payment_status FROM payment_statements WHERE id = $1`,
+            `SELECT id, creator_id, status FROM payment_statements WHERE id = $1`,
             [id]
         );
 
@@ -580,14 +624,14 @@ const markStatementAsPaid = async (req, res) => {
         }
 
         // Check if statement is still in draft status
-        if (statement.payment_status !== 'draft') {
+        if (statement.status !== 'Draft') {
             return res.status(400).json({ message: 'Statement is already marked as paid' });
         }
 
         // Mark as paid
         const result = await pool.query(
             `UPDATE payment_statements
-             SET payment_status = 'paid', paid_date = CURRENT_TIMESTAMP
+             SET status = 'Paid', paid_date = CURRENT_TIMESTAMP
              WHERE id = $1
              RETURNING *`,
             [id]
@@ -718,6 +762,7 @@ module.exports = {
     createClawback,
     getStatements,
     getStatement,
+    getStatementDetails,
     updateStatementStatus,
     generateStatementPdf,
     generateStatementExcel,
