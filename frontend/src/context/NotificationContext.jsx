@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import NotificationManager from '../components/NotificationManager';
+import sseService from '../services/sseService';
 
 const NotificationContext = createContext();
 
@@ -14,6 +15,7 @@ export const useNotifications = () => {
 export const NotificationProvider = ({ children }) => {
     const [toast, setToast] = useState(null);
     const [confirmModal, setConfirmModal] = useState(null);
+    const [sseConnected, setSseConnected] = useState(false);
 
     // Toast utility functions - consistent with PaymentsPage pattern
     const showToast = useCallback((type, title, message, duration = 5000, options = {}) => {
@@ -195,6 +197,75 @@ export const NotificationProvider = ({ children }) => {
         );
     }, [showErrorToast]);
 
+    // Initialize SSE connection and handle real-time toasts
+    useEffect(() => {
+        const token = localStorage.getItem('token');
+        if (!token) {
+            console.log('📡 No auth token found, skipping SSE connection');
+            return;
+        }
+
+        // Connect to SSE
+        sseService.connect(token);
+
+        // Handle SSE connection events
+        const handleConnected = () => {
+            console.log('📡 SSE connected');
+            setSseConnected(true);
+        };
+
+        const handleDisconnected = () => {
+            console.log('📡 SSE disconnected');
+            setSseConnected(false);
+        };
+
+        const handleError = (error) => {
+            console.error('📡 SSE error:', error);
+            setSseConnected(false);
+        };
+
+        // Handle real-time toast notifications
+        const handleToastNotification = (data) => {
+            console.log('📡 Received real-time toast:', data);
+
+            // Map backend notification types to frontend toast types
+            const typeMapping = {
+                'system_success': 'success',
+                'system_error': 'error',
+                'system_warning': 'warning',
+                'system_info': 'info'
+            };
+
+            const toastType = typeMapping[data.notification_type] || 'info';
+
+            // Show toast using existing context method
+            showToast(
+                toastType,
+                data.title || 'Ειδοποίηση',
+                data.message,
+                data.duration || 5000,
+                {
+                    linkUrl: data.linkUrl
+                }
+            );
+        };
+
+        // Register event listeners
+        sseService.on('connected', handleConnected);
+        sseService.on('disconnected', handleDisconnected);
+        sseService.on('error', handleError);
+        sseService.on('toast', handleToastNotification);
+
+        // Cleanup on unmount
+        return () => {
+            sseService.off('connected', handleConnected);
+            sseService.off('disconnected', handleDisconnected);
+            sseService.off('error', handleError);
+            sseService.off('toast', handleToastNotification);
+            sseService.disconnect();
+        };
+    }, [showToast]); // Add showToast as dependency
+
     const contextValue = {
         // Toast state and functions
         toast,
@@ -217,7 +288,11 @@ export const NotificationProvider = ({ children }) => {
         showApplicationStatusToast,
         showPaymentToast,
         showReminderToast,
-        handleNetworkError
+        handleNetworkError,
+
+        // SSE connection status
+        sseConnected,
+        sseService
     };
 
     return (

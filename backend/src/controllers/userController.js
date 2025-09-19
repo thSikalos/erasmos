@@ -151,7 +151,7 @@ const loginUser = async (req, res) => {
         
         const payload = { user: { id: user.id, role: user.role, email: user.email, name: user.name, parent_user_id: user.parent_user_id } };
         
-        jwt.sign(payload, 'mySuperSecretKey123', { expiresIn: '1h' }, (err, token) => {
+        jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '1h' }, (err, token) => {
             if (err) { console.error('JWT SIGNING ERROR:', err); return res.status(500).send('Server Error during token generation'); }
             res.json({ token });
         });
@@ -273,7 +273,7 @@ const refreshToken = async (req, res) => {
             }
         };
 
-        jwt.sign(payload, 'mySuperSecretKey123', { expiresIn: '1h' }, (err, newToken) => {
+        jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '1h' }, (err, newToken) => {
             if (err) {
                 console.error('JWT REFRESH ERROR:', err);
                 return res.status(500).json({ message: 'Error generating new token' });

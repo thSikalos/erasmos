@@ -1,4 +1,5 @@
 const pool = require('../config/db');
+const NotificationService = require('../services/notificationService');
 
 // --- GET UNREAD IN-APP NOTIFICATIONS FOR LOGGED-IN USER ---
 const getMyNotifications = async (req, res) => {
@@ -88,10 +89,10 @@ const prepareEmailSummary = async (req, res) => {
                 // Insert the draft notification, assigned to the team leader
                 const insertQuery = `
                     INSERT INTO notifications (user_id, message, status, channel, notification_type, metadata)
-                    VALUES ($1, $2, 'draft', 'email', 'MONTHLY_SUMMARY', $3) RETURNING *`;
+                    VALUES ($1, $2, 'draft', 'email', $3, $4) RETURNING *`;
 
                 const emailMetadata = {
-                    type: 'MONTHLY_SUMMARY',
+                    type: NotificationService.NOTIFICATION_TYPES.MONTHLY_SUMMARY,
                     member_name: member.name,
                     member_id: member.id,
                     total_amount: subtotal.toFixed(2),
@@ -99,7 +100,7 @@ const prepareEmailSummary = async (req, res) => {
                     vat_text: vatText,
                     period: `${new Date().getMonth() + 1}/${new Date().getFullYear()}`
                 };
-                const draftRes = await client.query(insertQuery, [teamLeaderId, message, JSON.stringify(emailMetadata)]);
+                const draftRes = await client.query(insertQuery, [teamLeaderId, message, NotificationService.NOTIFICATION_TYPES.MONTHLY_SUMMARY, JSON.stringify(emailMetadata)]);
                 createdDrafts.push(draftRes.rows[0]);
             }
         }
@@ -157,7 +158,7 @@ const sendNotification = async (req, res) => {
 
             // Generate email content based on type
             const emailContent = NotificationService.emailService.generateEmailContent(
-                notification.notification_type || 'SYSTEM_ALERT',
+                notification.notification_type || NotificationService.NOTIFICATION_TYPES.SYSTEM_ALERT,
                 {
                     ...metadata,
                     message: notification.message
@@ -199,11 +200,66 @@ const sendNotification = async (req, res) => {
     }
 };
 
+// --- CREATE TOAST NOTIFICATION ---
+const createToastNotification = async (req, res) => {
+    try {
+        const { type, title, message, duration, link_url } = req.body;
+        const userId = req.user.id;
+
+        // Validate required fields
+        if (!type || !message) {
+            return res.status(400).json({
+                message: 'Type and message are required',
+                required: ['type', 'message']
+            });
+        }
+
+        // Validate notification type
+        const validTypes = [
+            NotificationService.NOTIFICATION_TYPES.SYSTEM_SUCCESS,
+            NotificationService.NOTIFICATION_TYPES.SYSTEM_ERROR,
+            NotificationService.NOTIFICATION_TYPES.SYSTEM_WARNING,
+            NotificationService.NOTIFICATION_TYPES.SYSTEM_INFO
+        ];
+
+        if (!validTypes.includes(type)) {
+            return res.status(400).json({
+                message: 'Invalid notification type',
+                validTypes: validTypes
+            });
+        }
+
+        // Create toast notification via central service
+        const notifications = await NotificationService.createNotification(type, {
+            user_id: userId,
+            title: title || 'Ειδοποίηση',
+            message: message,
+            duration: duration || 5000,
+            link_url: link_url || null
+        });
+
+        res.status(201).json({
+            success: true,
+            message: 'Toast notification created successfully',
+            notifications: notifications
+        });
+
+    } catch (error) {
+        console.error('Create toast notification error:', error.message);
+        res.status(500).json({
+            success: false,
+            message: 'Server Error',
+            error: error.message
+        });
+    }
+};
+
 module.exports = {
     getMyNotifications,
     markAsRead,
     markAllAsRead,
     prepareEmailSummary,
     getDraftEmailNotifications,
-    sendNotification
+    sendNotification,
+    createToastNotification
 };

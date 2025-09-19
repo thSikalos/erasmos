@@ -1,5 +1,6 @@
 const pool = require('../config/db');
 const EmailService = require('./emailService');
+const sseService = require('./sseService');
 
 class NotificationService {
     static NOTIFICATION_TYPES = {
@@ -12,12 +13,19 @@ class NotificationService {
         NEW_REMINDER: 'new_reminder',
         USER_STATUS_CHANGE: 'user_status_change',
         TEAM_STATUS_CHANGE: 'team_status_change',
-        SUBTEAM_STATUS_CHANGE: 'subteam_status_change'
+        SUBTEAM_STATUS_CHANGE: 'subteam_status_change',
+        MONTHLY_SUMMARY: 'monthly_summary',
+        // Toast notification types
+        SYSTEM_SUCCESS: 'system_success',
+        SYSTEM_ERROR: 'system_error',
+        SYSTEM_WARNING: 'system_warning',
+        SYSTEM_INFO: 'system_info'
     };
 
     static CHANNELS = {
         IN_APP: 'in-app',
-        EMAIL: 'email'
+        EMAIL: 'email',
+        TOAST: 'toast'
     };
 
     static emailService = new EmailService();
@@ -36,8 +44,16 @@ class NotificationService {
             const recipients = await this.getRecipientsForNotificationType(type, data, client);
             const message = this.generateMessage(type, data);
 
-            // Always create both in-app and email notifications
-            const channels = [this.CHANNELS.IN_APP, this.CHANNELS.EMAIL];
+            // Determine channels based on notification type
+            let channels;
+            if ([this.NOTIFICATION_TYPES.SYSTEM_SUCCESS, this.NOTIFICATION_TYPES.SYSTEM_ERROR,
+                 this.NOTIFICATION_TYPES.SYSTEM_WARNING, this.NOTIFICATION_TYPES.SYSTEM_INFO].includes(type)) {
+                // Toast notifications only create TOAST channel (real-time only, not stored in DB)
+                channels = [this.CHANNELS.TOAST];
+            } else {
+                // Regular notifications create both in-app and email notifications
+                channels = [this.CHANNELS.IN_APP, this.CHANNELS.EMAIL];
+            }
             const createdNotifications = [];
 
             for (const recipientId of recipients) {
@@ -53,26 +69,48 @@ class NotificationService {
 
                 // Create notification for each channel
                 for (const channel of channels) {
-                    const insertQuery = `
-                        INSERT INTO notifications (user_id, message, status, channel, link_url, notification_type, metadata)
-                        VALUES ($1, $2, 'unread', $3, $4, $5, $6)
-                        RETURNING *`;
+                    if (channel === this.CHANNELS.TOAST) {
+                        // Toast notifications are not stored in DB - they're sent directly via real-time connection
+                        const toastNotification = {
+                            id: `toast-${Date.now()}-${recipientId}`,
+                            user_id: recipientId,
+                            message,
+                            channel,
+                            link_url: linkUrl,
+                            notification_type: type,
+                            metadata,
+                            status: 'sent',
+                            created_at: new Date().toISOString()
+                        };
 
-                    const result = await client.query(insertQuery, [
-                        recipientId,
-                        message,
-                        channel,
-                        linkUrl,
-                        type,
-                        JSON.stringify(metadata)
-                    ]);
+                        createdNotifications.push(toastNotification);
 
-                    const notification = result.rows[0];
-                    createdNotifications.push(notification);
+                        // TODO: Send toast notification via WebSocket/SSE to frontend
+                        await this.sendToastNotification(toastNotification, recipientId, data);
 
-                    // Send email if channel is EMAIL
-                    if (channel === this.CHANNELS.EMAIL) {
-                        await this.sendEmailNotification(notification, recipientId, type, data, client);
+                    } else {
+                        // Regular notifications are stored in database
+                        const insertQuery = `
+                            INSERT INTO notifications (user_id, message, status, channel, link_url, notification_type, metadata)
+                            VALUES ($1, $2, 'unread', $3, $4, $5, $6)
+                            RETURNING *`;
+
+                        const result = await client.query(insertQuery, [
+                            recipientId,
+                            message,
+                            channel,
+                            linkUrl,
+                            type,
+                            JSON.stringify(metadata)
+                        ]);
+
+                        const notification = result.rows[0];
+                        createdNotifications.push(notification);
+
+                        // Send email if channel is EMAIL
+                        if (channel === this.CHANNELS.EMAIL) {
+                            await this.sendEmailNotification(notification, recipientId, type, data, client);
+                        }
                     }
                 }
             }
@@ -169,12 +207,34 @@ class NotificationService {
                 const statusAdminResult = await client.query(statusAdminQuery);
                 return statusAdminResult.rows.map(row => row.id);
 
+            case this.NOTIFICATION_TYPES.MONTHLY_SUMMARY:
+                // Monthly summary notifications are typically drafts created for team leaders
+                // They should not auto-notify anyone - they're manually sent
+                return [];
+
+            case this.NOTIFICATION_TYPES.SYSTEM_SUCCESS:
+            case this.NOTIFICATION_TYPES.SYSTEM_ERROR:
+            case this.NOTIFICATION_TYPES.SYSTEM_WARNING:
+            case this.NOTIFICATION_TYPES.SYSTEM_INFO:
+                // Toast notifications are sent to specific user(s) passed in data.user_ids
+                // If no specific users, send to the creating user
+                if (data.user_ids && Array.isArray(data.user_ids)) {
+                    return data.user_ids;
+                } else if (data.user_id) {
+                    return [data.user_id];
+                }
+                return [];
+
             // Handle uppercase variants from old database records
             case 'USER_STATUS_CHANGE':
             case 'TEAM_STATUS_CHANGE':
             case 'SUBTEAM_STATUS_CHANGE':
             case 'SYSTEM_ALERT':
-                // Legacy uppercase variants - notify all admins
+            case 'MONTHLY_SUMMARY':
+                // Legacy uppercase variants - notify all admins for status changes, no one for monthly summary
+                if (type === 'MONTHLY_SUMMARY') {
+                    return [];
+                }
                 const legacyAdminQuery = `SELECT id FROM users WHERE role = 'Admin' AND deleted_at IS NULL`;
                 const legacyAdminResult = await client.query(legacyAdminQuery);
                 return legacyAdminResult.rows.map(row => row.id);
@@ -242,6 +302,17 @@ class NotificationService {
             case 'SUBTEAM_STATUS_CHANGE':
                 return `Ο χρήστης ${data.user_name} και η υπο-ομάδα του έγινε ${data.new_status} από ${data.changed_by} (${data.affected_direct_children} άμεσα παιδιά επηρεάστηκαν)`;
 
+            case this.NOTIFICATION_TYPES.MONTHLY_SUMMARY:
+            case 'MONTHLY_SUMMARY':
+                return data.message || 'Μηνιαία ενημέρωση αμοιβών';
+
+            case this.NOTIFICATION_TYPES.SYSTEM_SUCCESS:
+            case this.NOTIFICATION_TYPES.SYSTEM_ERROR:
+            case this.NOTIFICATION_TYPES.SYSTEM_WARNING:
+            case this.NOTIFICATION_TYPES.SYSTEM_INFO:
+                // Toast notifications use the provided message directly
+                return data.message || data.title || 'Ειδοποίηση συστήματος';
+
             case 'SYSTEM_ALERT':
                 return data.message || 'Νέα ειδοποίηση συστήματος';
 
@@ -274,6 +345,17 @@ class NotificationService {
 
             case this.NOTIFICATION_TYPES.NEW_REMINDER:
                 return '/dashboard'; // Reminders are shown on dashboard
+
+            case this.NOTIFICATION_TYPES.MONTHLY_SUMMARY:
+            case 'MONTHLY_SUMMARY':
+                return '/notifications'; // Monthly summaries are managed in notifications
+
+            case this.NOTIFICATION_TYPES.SYSTEM_SUCCESS:
+            case this.NOTIFICATION_TYPES.SYSTEM_ERROR:
+            case this.NOTIFICATION_TYPES.SYSTEM_WARNING:
+            case this.NOTIFICATION_TYPES.SYSTEM_INFO:
+                // Toast notifications can have custom link_url from data, otherwise null (no navigation)
+                return data.link_url || null;
 
             case this.NOTIFICATION_TYPES.USER_STATUS_CHANGE:
             case this.NOTIFICATION_TYPES.TEAM_STATUS_CHANGE:
@@ -388,6 +470,34 @@ class NotificationService {
             } catch (updateError) {
                 console.error('Failed to update notification status:', updateError);
             }
+        }
+    }
+
+    /**
+     * Send toast notification to frontend via real-time connection
+     */
+    static async sendToastNotification(toastNotification, recipientId, data) {
+        try {
+            const sseMessage = {
+                type: 'toast',
+                notification_type: toastNotification.notification_type,
+                title: data.title || 'Ειδοποίηση',
+                message: toastNotification.message,
+                duration: data.duration || 5000,
+                linkUrl: toastNotification.link_url,
+                id: toastNotification.id,
+                timestamp: toastNotification.created_at
+            };
+
+            console.log(`🍞 Sending toast notification to user ${recipientId}:`, sseMessage);
+
+            // Send via SSE to frontend
+            const sent = sseService.sendToUser(recipientId, sseMessage);
+
+            return { success: sent };
+        } catch (error) {
+            console.error('Failed to send toast notification:', error);
+            return { success: false, error: error.message };
         }
     }
 

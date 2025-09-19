@@ -16,6 +16,7 @@ const bonusRoutes = require('./routes/bonusRoutes');
 const commissionsRoutes = require('./routes/commissionsRoutes');
 const reportsRoutes = require('./routes/reportsRoutes');
 const notificationsRoutes = require('./routes/notificationsRoutes');
+const sseRoutes = require('./routes/sseRoutes');
 const remindersRoutes = require('./routes/remindersRoutes');
 const attachmentRoutes = require('./routes/attachmentRoutes');
 const adminBillingRoutes = require('./routes/adminBillingRoutes'); // <-- ΝΕΟ
@@ -24,6 +25,7 @@ const infoPortalRoutes = require('./routes/infoPortalRoutes');
 const pdfTemplateRoutes = require('./routes/pdfTemplateRoutes');
 const legalRoutes = require('./routes/legalRoutes');
 const { pdfErrorHandler, pdfTimeout } = require('./middleware/pdfErrorHandler');
+const sseService = require('./services/sseService');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -61,6 +63,7 @@ app.use('/api/bonuses', bonusRoutes);
 app.use('/api/commissions', commissionsRoutes);
 app.use('/api/reports', reportsRoutes);
 app.use('/api/notifications', notificationsRoutes);
+app.use('/api/sse', sseRoutes);
 app.use('/api/reminders', remindersRoutes);
 app.use('/api/attachments', attachmentRoutes);
 app.use('/api/admin-billing', adminBillingRoutes); // <-- ΝΕΟ
@@ -93,4 +96,9 @@ app.use((error, req, res, next) => {
     res.status(500).json({ message: 'Internal Server Error', error: error.message });
 });
 
-app.listen(PORT, () => { console.log(`Server is running on http://localhost:${PORT}`); });
+app.listen(PORT, () => {
+    console.log(`Server is running on http://localhost:${PORT}`);
+
+    // Start SSE heartbeat to keep connections alive
+    sseService.startHeartbeat(30000); // 30 seconds
+});

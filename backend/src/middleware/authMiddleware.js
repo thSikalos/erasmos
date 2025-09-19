@@ -20,7 +20,7 @@ const authMiddleware = async (req, res, next) => {
 
   try {
     // Επιβεβαίωση του token
-    const decoded = jwt.verify(token, 'mySuperSecretKey123');
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
     console.log('Auth middleware - decoded token:', decoded);
 
     // Get the user from database to check current status

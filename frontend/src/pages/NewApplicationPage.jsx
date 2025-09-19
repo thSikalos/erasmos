@@ -155,6 +155,27 @@ const NewApplicationPage = () => {
     // Consistent definition: Top-Level Manager includes both Admins and TeamLeaders without parent
     const isTopLevelManager = (user?.role === 'Admin' || user?.role === 'TeamLeader') && user?.parent_user_id === null;
 
+    // Centralized toast notification function
+    const sendCentralizedToast = async (type, title, message, duration = 5000) => {
+        try {
+            const config = { headers: { Authorization: `Bearer ${token}` } };
+            await axios.post(apiUrl('/api/notifications/toast'), {
+                type,
+                title,
+                message,
+                duration
+            }, config);
+            // Note: The toast will appear automatically via SSE
+        } catch (error) {
+            console.error('Failed to send centralized toast:', error);
+            // Fallback to local toast on error
+            if (type === 'system_success') showSuccessToast(title, message);
+            else if (type === 'system_error') showErrorToast(title, message);
+            else if (type === 'system_warning') showWarningToast(title, message);
+            else showInfoToast(title, message);
+        }
+    };
+
     // Load draft data if draftId is provided
     const loadDraftData = useCallback(async (draftId) => {
         if (!draftId || !token) return;
@@ -553,12 +574,12 @@ const NewApplicationPage = () => {
                 }
                 
                 if (uploadedCount === state.uploadedFiles.length) {
-                    showSuccessToast('Επιτυχής Δημιουργία', 'Αίτηση και αρχεία δημιουργήθηκαν επιτυχώς!');
+                    await sendCentralizedToast('system_success', '✅ Επιτυχής Δημιουργία', 'Αίτηση και αρχεία δημιουργήθηκαν επιτυχώς!');
                 } else {
-                    showWarningToast('Μερική Επιτυχία', `Αίτηση δημιουργήθηκε! ${uploadedCount}/${state.uploadedFiles.length} αρχεία ανέβηκαν.`);
+                    await sendCentralizedToast('system_warning', '⚠️ Μερική Επιτυχία', `Αίτηση δημιουργήθηκε! ${uploadedCount}/${state.uploadedFiles.length} αρχεία ανέβηκαν.`);
                 }
             } else {
-                showSuccessToast('Επιτυχής Δημιουργία', 'Αίτηση δημιουργήθηκε επιτυχώς!');
+                await sendCentralizedToast('system_success', '✅ Επιτυχής Δημιουργία', 'Αίτηση δημιουργήθηκε επιτυχώς!');
             }
             setTimeout(() => {
                 navigate('/dashboard');
@@ -566,7 +587,7 @@ const NewApplicationPage = () => {
         } catch (err) {
             const errorMessage = err.response?.data?.message || 'Αποτυχία δημιουργίας αίτησης.';
             dispatch({ type: 'SET_ERROR', error: errorMessage });
-            showErrorToast('Σφάλμα Δημιουργίας', errorMessage);
+            await sendCentralizedToast('system_error', '❌ Σφάλμα Δημιουργίας', errorMessage);
         } finally {
             dispatch({ type: 'SET_LOADING', loading: false });
         }

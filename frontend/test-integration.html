@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Toast Notification Integration Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .status {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        .connected {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .disconnected {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+        .logs {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: monospace;
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 20px;
+        }
+        .toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            min-width: 300px;
+            max-width: 500px;
+            padding: 15px;
+            border-radius: 5px;
+            color: white;
+            font-weight: bold;
+            z-index: 1000;
+            transform: translateX(100%);
+            transition: transform 0.3s ease;
+        }
+        .toast.show {
+            transform: translateX(0);
+        }
+        .toast.success {
+            background-color: #28a745;
+        }
+        .toast.error {
+            background-color: #dc3545;
+        }
+        .toast.warning {
+            background-color: #ffc107;
+            color: #212529;
+        }
+        .toast.info {
+            background-color: #17a2b8;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎉 Toast Notification Integration Test</h1>
+
+        <div id="status" class="status disconnected">
+            ❌ SSE Connection: Disconnected
+        </div>
+
+        <div class="test-section">
+            <h3>1. SSE Connection Test</h3>
+            <p>This will test the SSE connection to the backend notifications system.</p>
+            <button onclick="connectSSE()">Connect SSE</button>
+            <button onclick="disconnectSSE()">Disconnect SSE</button>
+        </div>
+
+        <div class="test-section">
+            <h3>2. Toast Notification Tests</h3>
+            <p>These buttons will send toast notifications via the centralized API:</p>
+            <button onclick="sendToast('system_success', '✅ Success', 'This is a success toast from the central system!')">Success Toast</button>
+            <button onclick="sendToast('system_error', '❌ Error', 'This is an error toast from the central system!')">Error Toast</button>
+            <button onclick="sendToast('system_warning', '⚠️ Warning', 'This is a warning toast from the central system!')">Warning Toast</button>
+            <button onclick="sendToast('system_info', 'ℹ️ Info', 'This is an info toast from the central system!')">Info Toast</button>
+        </div>
+
+        <div class="logs" id="logs">
+            <strong>📝 Event Logs:</strong><br>
+            Waiting for events...
+        </div>
+    </div>
+
+    <script>
+        let eventSource = null;
+        let isConnected = false;
+        const token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjp7ImlkIjo0LCJyb2xlIjoiQWRtaW4iLCJlbWFpbCI6InRoc2lrYWxvc0BnbWFpbC5jb20iLCJuYW1lIjoizpjOtc-MzrTPic-Bzr_PgiDOo865zrrOsc67z4zPgiIsInBhcmVudF91c2VyX2lkIjpudWxsfSwiaWF0IjoxNzU4MzE2Mzk2LCJleHAiOjE3NTg0MDI3OTZ9.3HO1GhO_EpmbDyFm0gd3MJ4oO4TCprG70P1iSJTbeAw';
+
+        function log(message) {
+            const logs = document.getElementById('logs');
+            const timestamp = new Date().toLocaleTimeString();
+            logs.innerHTML += `<br>[${timestamp}] ${message}`;
+            logs.scrollTop = logs.scrollHeight;
+        }
+
+        function updateStatus(connected) {
+            const status = document.getElementById('status');
+            if (connected) {
+                status.className = 'status connected';
+                status.innerHTML = '✅ SSE Connection: Connected';
+            } else {
+                status.className = 'status disconnected';
+                status.innerHTML = '❌ SSE Connection: Disconnected';
+            }
+            isConnected = connected;
+        }
+
+        function showToast(type, title, message, duration = 5000) {
+            // Remove existing toast
+            const existingToast = document.querySelector('.toast');
+            if (existingToast) {
+                existingToast.remove();
+            }
+
+            // Create new toast
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.innerHTML = `<strong>${title}</strong><br>${message}`;
+
+            document.body.appendChild(toast);
+
+            // Show toast
+            setTimeout(() => toast.classList.add('show'), 100);
+
+            // Hide toast after duration
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => toast.remove(), 300);
+            }, duration);
+        }
+
+        function connectSSE() {
+            if (isConnected) {
+                log('⚠️ Already connected to SSE');
+                return;
+            }
+
+            try {
+                const url = `http://localhost:3000/api/sse/events?token=${encodeURIComponent(token)}`;
+                eventSource = new EventSource(url);
+
+                eventSource.onopen = () => {
+                    log('📡 SSE connection opened');
+                    updateStatus(true);
+                };
+
+                eventSource.onmessage = (event) => {
+                    try {
+                        const data = JSON.parse(event.data);
+                        log(`📨 Received: ${data.type} - ${JSON.stringify(data).substring(0, 100)}...`);
+
+                        if (data.type === 'toast') {
+                            // Map backend types to frontend types
+                            const typeMapping = {
+                                'system_success': 'success',
+                                'system_error': 'error',
+                                'system_warning': 'warning',
+                                'system_info': 'info'
+                            };
+
+                            const toastType = typeMapping[data.notification_type] || 'info';
+                            showToast(toastType, data.title, data.message, data.duration);
+                        }
+                    } catch (error) {
+                        log(`❌ Failed to parse SSE message: ${error.message}`);
+                    }
+                };
+
+                eventSource.onerror = (error) => {
+                    log(`❌ SSE error: ${error.message || 'Connection failed'}`);
+                    updateStatus(false);
+                };
+
+            } catch (error) {
+                log(`❌ Failed to create SSE connection: ${error.message}`);
+            }
+        }
+
+        function disconnectSSE() {
+            if (eventSource) {
+                eventSource.close();
+                eventSource = null;
+            }
+            updateStatus(false);
+            log('🔌 SSE disconnected');
+        }
+
+        async function sendToast(type, title, message) {
+            if (!isConnected) {
+                log('❌ Cannot send toast - SSE not connected');
+                return;
+            }
+
+            try {
+                const response = await fetch('http://localhost:3000/api/notifications/toast', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        type,
+                        title,
+                        message,
+                        duration: 6000
+                    })
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    log(`✅ Toast sent successfully: ${result.notifications[0].id}`);
+                } else {
+                    log(`❌ Failed to send toast: ${response.status} ${response.statusText}`);
+                }
+            } catch (error) {
+                log(`❌ Error sending toast: ${error.message}`);
+            }
+        }
+
+        // Auto-connect on page load
+        window.addEventListener('load', () => {
+            log('🚀 Page loaded - ready for testing');
+            setTimeout(connectSSE, 1000); // Auto-connect after 1 second
+        });
+    </script>
+</body>
+</html>

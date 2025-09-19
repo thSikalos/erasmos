@@ -7,7 +7,8 @@ const {
     markAllAsRead,
     prepareEmailSummary,
     getDraftEmailNotifications,
-    sendNotification
+    sendNotification,
+    createToastNotification
 } = require('../controllers/notificationsController');
 
 router.use(authMiddleware);
@@ -22,5 +23,7 @@ router.post('/prepare-summary', prepareEmailSummary);
 router.get('/drafts', getDraftEmailNotifications);
 router.post('/:id/send', sendNotification);
 
+// Toast notifications functionality
+router.post('/toast', createToastNotification);
 
 module.exports = router;
