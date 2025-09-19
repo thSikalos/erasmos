@@ -135,7 +135,7 @@ class DocumentGenerator {
 
         // Timestamp
         const now = new Date();
-        const timestamp = now.toLocaleDateString('el-GR') + ' ' + now.toLocaleTimeString('el-GR');
+        const timestamp = now.toLocaleDateString('el-GR', { timeZone: 'Europe/Athens' }) + ' ' + now.toLocaleTimeString('el-GR', { timeZone: 'Europe/Athens' });
         doc.fontSize(7)
            .fillColor(colors.secondary)
            .text(`Δημιουργήθηκε: ${timestamp}`, 50, footerY + 15, { align: 'right' });
@@ -301,7 +301,19 @@ class DocumentGenerator {
     }
 
     generateLegalComplianceExcel(data, options) {
-        return this.templates.legalComplianceExcel.generate(data, options);
+        console.log(`[DOCUMENT_GENERATOR] Starting generateLegalComplianceExcel...`);
+        console.log(`[DOCUMENT_GENERATOR] Data keys:`, Object.keys(data));
+        console.log(`[DOCUMENT_GENERATOR] Options:`, options);
+
+        try {
+            const result = this.templates.legalComplianceExcel.generate(data, options);
+            console.log(`[DOCUMENT_GENERATOR] generateLegalComplianceExcel completed successfully`);
+            return result;
+        } catch (error) {
+            console.error(`💥 [DOCUMENT_GENERATOR] Error in generateLegalComplianceExcel:`, error);
+            console.error(`💥 [DOCUMENT_GENERATOR] Error stack:`, error.stack);
+            throw error;
+        }
     }
 
     generateSignedLegalContractPDF(data, options) {

@@ -62,7 +62,7 @@ class LegalCompliancePdfTemplate {
                day: 'numeric',
                hour: '2-digit',
                minute: '2-digit'
-           })}`, 60, headerY + 60, { align: 'center' });
+           })} (Ώρα Ελλάδας)`, 60, headerY + 60, { align: 'center' });
 
         // Horizontal line
         doc.strokeColor('#e5e7eb')
@@ -164,7 +164,7 @@ class LegalCompliancePdfTemplate {
         doc.text('🔒 Digital Signature:', 80, signatureY);
 
         const signatureData = [
-            `📅 Timestamp: ${new Date(acceptance.acceptance_timestamp).toLocaleString('el-GR')}`,
+            `📅 Timestamp: ${this.formatGreeceDateTime(acceptance.acceptance_timestamp)} (Ώρα Ελλάδας)`,
             `🌐 IP Address: ${acceptance.ip_address}`,
             `💻 User Agent: ${acceptance.user_agent.substring(0, 60)}...`,
             `🆔 Session ID: ${acceptance.session_id}`
@@ -202,7 +202,7 @@ class LegalCompliancePdfTemplate {
            .text('📧 Email Verification:', 80, emailY);
 
         const emailStatus = acceptance.email_verified ?
-            `✅ Verified at: ${new Date(acceptance.email_verified_at || acceptance.updated_at).toLocaleString('el-GR')}` :
+            `✅ Verified at: ${this.formatGreeceDateTime(acceptance.email_verified_at || acceptance.updated_at)} (Ώρα Ελλάδας)` :
             `⏳ Pending verification (Code: ${acceptance.verification_code || 'N/A'})`;
 
         doc.fontSize(9)
@@ -240,6 +240,18 @@ class LegalCompliancePdfTemplate {
         const crypto = require('crypto');
         const timestamp = new Date().getTime();
         return crypto.createHash('md5').update(`erasmos-legal-${timestamp}`).digest('hex').substring(0, 12).toUpperCase();
+    }
+
+    formatGreeceDateTime(date) {
+        return new Date(date).toLocaleString('el-GR', {
+            timeZone: 'Europe/Athens',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit'
+        });
     }
 
     async generateSignedContract(contractData, options = {}) {
@@ -304,7 +316,7 @@ class LegalCompliancePdfTemplate {
                day: 'numeric',
                hour: '2-digit',
                minute: '2-digit'
-           })}`, 60, headerY + 95, { align: 'left' });
+           })} (Ώρα Ελλάδας)`, 60, headerY + 95, { align: 'left' });
 
         // Horizontal line
         doc.strokeColor('#e5e7eb')
@@ -359,7 +371,7 @@ class LegalCompliancePdfTemplate {
 
         acceptances.forEach((item, index) => {
             const status = item.accepted ? '✅ ACCEPTED' : '❌ NOT ACCEPTED';
-            const dateStr = item.date ? new Date(item.date).toLocaleString('el-GR') : 'N/A';
+            const dateStr = item.date ? this.formatGreeceDateTime(item.date) + ' (Ώρα Ελλάδας)' : 'N/A';
 
             doc.fontSize(12)
                .fillColor('#374151')
@@ -450,12 +462,12 @@ class LegalCompliancePdfTemplate {
            .fontSize(11);
 
         const signatureDetails = [
-            `📅 Signed At: ${new Date(signature.timestamp).toLocaleString('el-GR')}`,
+            `📅 Signed At: ${this.formatGreeceDateTime(signature.timestamp)} (Ώρα Ελλάδας)`,
             `🌐 IP Address: ${signature.ipAddress}`,
             `💻 Device: ${signature.userAgent.substring(0, 80)}...`,
             `🆔 Session ID: ${signature.sessionId}`,
             `🔑 Verification Code: ${signature.verificationCode || 'N/A'}`,
-            `📧 Email Verified: ${signature.emailVerifiedAt ? new Date(signature.emailVerifiedAt).toLocaleString('el-GR') : 'Pending'}`
+            `📧 Email Verified: ${signature.emailVerifiedAt ? this.formatGreeceDateTime(signature.emailVerifiedAt) + ' (Ώρα Ελλάδας)' : 'Pending'}`
         ];
 
         signatureDetails.forEach((detail, index) => {
@@ -509,7 +521,7 @@ class LegalCompliancePdfTemplate {
 
         doc.fontSize(10)
            .fillColor('#10b981')
-           .text(`✅ Accepted on: ${new Date(acceptedAt).toLocaleString('el-GR')}`, 60, doc.y + 25);
+           .text(`✅ Accepted on: ${this.formatGreeceDateTime(acceptedAt)} (Ώρα Ελλάδας)`, 60, doc.y + 25);
 
         doc.y += 50;
 

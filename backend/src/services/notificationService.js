@@ -202,10 +202,10 @@ class NotificationService {
             case this.NOTIFICATION_TYPES.NEW_REMINDER:
                 if (data.assignee_id === data.creator_id) {
                     // Self-assigned reminder, notify team leader
-                    return `Νέα υπενθύμιση από ${data.creator_name}: "${data.title}" (καταληκτική ημερομηνία: ${new Date(data.due_date).toLocaleDateString('el-GR')})`;
+                    return `Νέα υπενθύμιση από ${data.creator_name}: "${data.title}" (καταληκτική ημερομηνία: ${new Date(data.due_date).toLocaleDateString('el-GR', { timeZone: 'Europe/Athens' })})`;
                 } else {
                     // Assigned to someone else
-                    return `Σας ανατέθηκε νέα υπενθύμιση από ${data.creator_name}: "${data.title}" (καταληκτική ημερομηνία: ${new Date(data.due_date).toLocaleDateString('el-GR')})`;
+                    return `Σας ανατέθηκε νέα υπενθύμιση από ${data.creator_name}: "${data.title}" (καταληκτική ημερομηνία: ${new Date(data.due_date).toLocaleDateString('el-GR', { timeZone: 'Europe/Athens' })})`;
                 }
 
             default:

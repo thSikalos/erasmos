@@ -1084,7 +1084,9 @@ router.get('/admin/export', authMiddleware, async (req, res) => {
         console.log(`[LEGAL] Exporting legal compliance report from ${fromDate} to ${toDate}, format: ${format}`);
 
         // Gather comprehensive legal data
+        console.log(`[LEGAL] Starting gatherLegalComplianceData...`);
         const legalData = await gatherLegalComplianceData(fromDate, toDate);
+        console.log(`[LEGAL] gatherLegalComplianceData completed. Data keys:`, Object.keys(legalData));
 
         // Generate document using DocumentGenerator
 
@@ -1098,13 +1100,17 @@ router.get('/admin/export', authMiddleware, async (req, res) => {
             pdfDoc.end();
         } else {
             // Default to Excel
+            console.log(`[LEGAL] Starting Excel generation...`);
             const workbook = await documentGenerator.generateExcel('legal_compliance', legalData);
+            console.log(`[LEGAL] Excel generation completed`);
 
             res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
             res.setHeader('Content-Disposition', `attachment; filename="legal-compliance-report-${from}-${to}.xlsx"`);
 
+            console.log(`[LEGAL] Writing Excel to response...`);
             await workbook.xlsx.write(res);
             res.end();
+            console.log(`[LEGAL] Excel export completed successfully`);
         }
 
         // Log the export action
@@ -1112,7 +1118,13 @@ router.get('/admin/export', authMiddleware, async (req, res) => {
             `Legal compliance report exported (${format}) for period ${fromDate.toISOString()} to ${toDate.toISOString()}`, true);
 
     } catch (error) {
-        console.error('Legal export error:', error);
+        console.error('💥 Legal export error:', error);
+        console.error('💥 Error stack:', error.stack);
+        console.error('💥 Error details:', {
+            message: error.message,
+            name: error.name,
+            code: error.code
+        });
         await logLegalAction(req, 'LEGAL_EXPORT_ERROR',
             `Failed to export legal compliance report: ${error.message}`, true);
         res.status(500).json({
@@ -1126,13 +1138,15 @@ router.get('/admin/export', authMiddleware, async (req, res) => {
 // Helper function to gather comprehensive legal compliance data
 async function gatherLegalComplianceData(fromDate, toDate) {
     try {
+        console.log(`[LEGAL] Starting gatherLegalComplianceData with dates:`, fromDate, toDate);
+
         // Get all legal acceptances within date range
+        console.log(`[LEGAL] Querying legal_acceptances...`);
         const acceptancesResult = await pool.query(`
             SELECT
                 la.*,
                 u.name as user_name,
                 u.email as user_email,
-                u.created_at as user_registration_date,
                 ucd.has_legal_authority,
                 ucd.has_obtained_consents,
                 ucd.has_informed_data_subjects,
@@ -1150,8 +1164,10 @@ async function gatherLegalComplianceData(fromDate, toDate) {
             WHERE la.created_at >= $1 AND la.created_at <= $2
             ORDER BY la.created_at DESC
         `, [fromDate, toDate]);
+        console.log(`[LEGAL] legal_acceptances query completed. Rows: ${acceptancesResult.rows.length}`);
 
         // Get audit trail for the period
+        console.log(`[LEGAL] Querying legal_action_logs...`);
         const auditTrailResult = await pool.query(`
             SELECT
                 lal.*,
@@ -1162,40 +1178,44 @@ async function gatherLegalComplianceData(fromDate, toDate) {
             ORDER BY lal.created_at DESC
             LIMIT 1000
         `, [fromDate, toDate]);
+        console.log(`[LEGAL] legal_action_logs query completed. Rows: ${auditTrailResult.rows.length}`);
 
         // Get comprehensive user status
+        console.log(`[LEGAL] Querying users status...`);
         const usersStatusResult = await pool.query(`
             SELECT
                 u.id,
                 u.name,
                 u.email,
-                u.created_at,
+                u.password_changed_at as created_at,
                 COUNT(la.id) as legal_acceptance_count,
                 MAX(la.created_at) as latest_acceptance_date,
                 CASE
                     WHEN COUNT(la.id) = 0 THEN 'NO ACCEPTANCE'
-                    WHEN MAX(la.is_valid) = true THEN 'COMPLIANT'
-                    WHEN MAX(la.email_verified) = true THEN 'EMAIL VERIFIED'
-                    WHEN MAX(la.is_complete) = true THEN 'PENDING VERIFICATION'
+                    WHEN BOOL_OR(la.is_valid) = true THEN 'COMPLIANT'
+                    WHEN BOOL_OR(la.email_verified) = true THEN 'EMAIL VERIFIED'
+                    WHEN BOOL_OR(la.is_complete) = true THEN 'PENDING VERIFICATION'
                     ELSE 'INCOMPLETE'
                 END as legal_status,
                 CASE
-                    WHEN MAX(la.email_verified) = true THEN 'VERIFIED'
-                    WHEN MAX(la.email_verification_required) = true THEN 'PENDING'
+                    WHEN BOOL_OR(la.email_verified) = true THEN 'VERIFIED'
+                    WHEN BOOL_OR(la.email_verification_required) = true THEN 'PENDING'
                     ELSE 'NOT REQUIRED'
                 END as email_verification_status,
                 CASE
                     WHEN COUNT(la.id) = 0 THEN 'No legal acceptance started'
-                    WHEN MAX(la.is_valid) = false AND MAX(la.email_verified) = false THEN 'Email verification pending'
+                    WHEN NOT BOOL_OR(la.is_valid) AND NOT BOOL_OR(la.email_verified) THEN 'Email verification pending'
                     ELSE 'None'
                 END as compliance_issues
             FROM users u
             LEFT JOIN legal_acceptances la ON u.id = la.user_id AND la.superseded_by IS NULL
-            GROUP BY u.id, u.name, u.email, u.created_at
-            ORDER BY u.created_at DESC
+            GROUP BY u.id, u.name, u.email, u.password_changed_at
+            ORDER BY u.password_changed_at DESC
         `);
+        console.log(`[LEGAL] users status query completed. Rows: ${usersStatusResult.rows.length}`);
 
         // Calculate statistics
+        console.log(`[LEGAL] Calculating statistics...`);
         const stats = {
             totalAcceptances: acceptancesResult.rows.length,
             completedAcceptances: acceptancesResult.rows.filter(a => a.is_valid).length,
@@ -1208,6 +1228,9 @@ async function gatherLegalComplianceData(fromDate, toDate) {
                 Math.round((acceptancesResult.rows.filter(a => a.is_valid).length / acceptancesResult.rows.length) * 100) : 0
         };
 
+        console.log(`[LEGAL] Statistics calculated:`, stats);
+        console.log(`[LEGAL] Returning gatherLegalComplianceData results`);
+
         return {
             stats,
             acceptances: acceptancesResult.rows,
@@ -1216,7 +1239,8 @@ async function gatherLegalComplianceData(fromDate, toDate) {
         };
 
     } catch (error) {
-        console.error('Error gathering legal compliance data:', error);
+        console.error('💥 Error gathering legal compliance data:', error);
+        console.error('💥 Error stack:', error.stack);
         throw error;
     }
 }

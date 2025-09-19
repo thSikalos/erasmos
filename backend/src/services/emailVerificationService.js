@@ -180,7 +180,7 @@ class EmailVerificationService {
 
                 <div class="info-box">
                     <p><strong>ID Αποδοχής:</strong> ${acceptanceId}</p>
-                    <p><strong>Ημερομηνία:</strong> ${new Date().toLocaleString('el-GR')}</p>
+                    <p><strong>Ημερομηνία:</strong> ${new Date().toLocaleString('el-GR', { timeZone: 'Europe/Athens' })}</p>
                     <p><strong>Χρόνος Λήξης:</strong> 24 ώρες από την αποστολή</p>
                 </div>
 
@@ -231,7 +231,7 @@ ${verificationUrl}
 
 ΣΤΟΙΧΕΙΑ ΑΠΟΔΟΧΗΣ:
 - ID Αποδοχής: ${acceptanceId}
-- Ημερομηνία: ${new Date().toLocaleString('el-GR')}
+- Ημερομηνία: ${new Date().toLocaleString('el-GR', { timeZone: 'Europe/Athens' })}
 - Χρόνος Λήξης: 24 ώρες
 
 ΝΟΜΙΚΕΣ ΠΛΗΡΟΦΟΡΙΕΣ:
