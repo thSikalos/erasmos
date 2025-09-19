@@ -554,20 +554,28 @@ const toggleUserStatus = async (req, res) => {
         // Log the action
         console.log(`User ${user.name} (${user.email}) status changed to: ${newStatus ? 'Active' : 'Inactive'}`);
 
-        // Create notification for admins about the status change
+
+        // Send email notification to the user about status change
         try {
-            await NotificationService.createNotification(
-                'USER_STATUS_CHANGE',
-                {
-                    user_id: user.id,
-                    user_name: user.name,
-                    user_email: user.email,
-                    new_status: newStatus ? 'Ενεργός' : 'Απενεργοποιημένος',
-                    changed_by: req.user.name || 'Admin'
-                }
-            );
-        } catch (notificationError) {
-            console.error('Failed to send status change notification:', notificationError);
+            const emailService = new EmailService();
+            const emailType = newStatus ? 'USER_STATUS_ACTIVATED' : 'USER_STATUS_DEACTIVATED';
+
+            const emailContent = emailService.generateEmailContent(emailType, {
+                name: user.name,
+                email: user.email
+            }, user.name);
+
+            await emailService.sendEmail({
+                to: user.email,
+                subject: emailContent.subject,
+                text: emailContent.text,
+                html: emailContent.html
+            });
+
+            console.log(`[EMAIL] Status change email sent to user: ${user.email} (${newStatus ? 'activated' : 'deactivated'})`);
+        } catch (emailError) {
+            console.error('Failed to send user status change email:', emailError);
+            // Don't fail the status change if email fails
         }
 
         res.json({
@@ -639,21 +647,52 @@ const toggleTeamStatus = async (req, res) => {
         // Log the action
         console.log(`Team Leader ${teamLeader.name} and ${teamMemberIds.length} team members status changed to: ${newStatus ? 'Active' : 'Inactive'}`);
 
-        // Create notification for admins about the team status change
+
+        // Send email notifications to team leader and all affected team members
         try {
-            await NotificationService.createNotification(
-                'TEAM_STATUS_CHANGE',
-                {
-                    team_leader_id: teamLeader.id,
-                    team_leader_name: teamLeader.name,
-                    team_leader_email: teamLeader.email,
-                    affected_members_count: teamMemberIds.length,
-                    new_status: newStatus ? 'Ενεργή' : 'Απενεργοποιημένη',
-                    changed_by: req.user.name || 'Admin'
+            const emailService = new EmailService();
+            const emailType = newStatus ? 'USER_STATUS_ACTIVATED' : 'USER_STATUS_DEACTIVATED';
+
+            // Send email to team leader
+            const teamLeaderEmailContent = emailService.generateEmailContent(emailType, {
+                name: teamLeader.name,
+                email: teamLeader.email
+            }, teamLeader.name);
+
+            await emailService.sendEmail({
+                to: teamLeader.email,
+                subject: teamLeaderEmailContent.subject,
+                text: teamLeaderEmailContent.text,
+                html: teamLeaderEmailContent.html
+            });
+
+            console.log(`[EMAIL] Team leader status change email sent to: ${teamLeader.email} (${newStatus ? 'activated' : 'deactivated'})`);
+
+            // Send emails to all team members
+            for (const member of teamMembersResult.rows) {
+                try {
+                    const memberEmailContent = emailService.generateEmailContent(emailType, {
+                        name: member.name,
+                        email: member.email
+                    }, member.name);
+
+                    await emailService.sendEmail({
+                        to: member.email,
+                        subject: memberEmailContent.subject,
+                        text: memberEmailContent.text,
+                        html: memberEmailContent.html
+                    });
+
+                    console.log(`[EMAIL] Team member status change email sent to: ${member.email} (${newStatus ? 'activated' : 'deactivated'})`);
+                } catch (memberEmailError) {
+                    console.error(`Failed to send email to team member ${member.email}:`, memberEmailError);
+                    // Continue with other members even if one fails
                 }
-            );
-        } catch (notificationError) {
-            console.error('Failed to send team status change notification:', notificationError);
+            }
+
+        } catch (emailError) {
+            console.error('Failed to send team status change emails:', emailError);
+            // Don't fail the status change if email fails
         }
 
         res.json({
@@ -777,21 +816,54 @@ const toggleSubTeamStatus = async (req, res) => {
         // Log the action
         console.log(`User ${user.name} and ${directChildrenIds.length} direct children status changed to: ${newStatus ? 'Active' : 'Inactive'}`);
 
-        // Create notification for admins about the sub-team status change
+
+        // Send email notifications to user and affected direct children
         try {
-            await NotificationService.createNotification(
-                'SUBTEAM_STATUS_CHANGE',
-                {
-                    user_id: user.id,
-                    user_name: user.name,
-                    user_email: user.email,
-                    affected_direct_children: directChildrenIds.length,
-                    new_status: newStatus ? 'Ενεργή' : 'Απενεργοποιημένη',
-                    changed_by: req.user.name || 'Admin'
+            const emailService = new EmailService();
+            const emailType = newStatus ? 'USER_STATUS_ACTIVATED' : 'USER_STATUS_DEACTIVATED';
+
+            // Send email to the user whose status changed
+            const userEmailContent = emailService.generateEmailContent(emailType, {
+                name: user.name,
+                email: user.email
+            }, user.name);
+
+            await emailService.sendEmail({
+                to: user.email,
+                subject: userEmailContent.subject,
+                text: userEmailContent.text,
+                html: userEmailContent.html
+            });
+
+            console.log(`[EMAIL] Sub-team user status change email sent to: ${user.email} (${newStatus ? 'activated' : 'deactivated'})`);
+
+            // Send emails to direct children only if they were deactivated (when parent was deactivated)
+            if (!newStatus && directChildrenResult.rows.length > 0) {
+                for (const child of directChildrenResult.rows) {
+                    try {
+                        const childEmailContent = emailService.generateEmailContent('USER_STATUS_DEACTIVATED', {
+                            name: child.name,
+                            email: child.email
+                        }, child.name);
+
+                        await emailService.sendEmail({
+                            to: child.email,
+                            subject: childEmailContent.subject,
+                            text: childEmailContent.text,
+                            html: childEmailContent.html
+                        });
+
+                        console.log(`[EMAIL] Direct child status change email sent to: ${child.email} (deactivated)`);
+                    } catch (childEmailError) {
+                        console.error(`Failed to send email to direct child ${child.email}:`, childEmailError);
+                        // Continue with other children even if one fails
+                    }
                 }
-            );
-        } catch (notificationError) {
-            console.error('Failed to send sub-team status change notification:', notificationError);
+            }
+
+        } catch (emailError) {
+            console.error('Failed to send sub-team status change emails:', emailError);
+            // Don't fail the status change if email fails
         }
 
         res.json({

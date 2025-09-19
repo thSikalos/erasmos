@@ -234,6 +234,40 @@ class EmailService {
                     html: this.generateLegalVerificationHTML(data.verificationCode, data.acceptanceId)
                 };
 
+            case 'USER_STATUS_ACTIVATED':
+                return {
+                    subject: '✅ Ο λογαριασμός σας ενεργοποιήθηκε - ERASMOS',
+                    text: `Αγαπητέ ${data.name},\n\nΟ λογαριασμός σας στο σύστημα ERASMOS έχει ενεργοποιηθεί επιτυχώς.\n\nΜπορείτε τώρα να συνδεθείτε και να χρησιμοποιήσετε κανονικά το σύστημα.\n\nΑν έχετε οποιεσδήποτε απορίες, μη διστάσετε να επικοινωνήσετε μαζί μας.\n\nΜε εκτίμηση,\nΗ ομάδα ERASMOS`,
+                    html: this.createHtmlTemplate({
+                        title: 'Ενεργοποίηση Λογαριασμού',
+                        content: `<p>Αγαπητέ <strong>${data.name}</strong>,</p>
+                                 <div style="background: #d4edda; border: 1px solid #c3e6cb; border-radius: 8px; padding: 20px; margin: 20px 0; text-align: center;">
+                                    <h3 style="color: #155724; margin: 0;">✅ Λογαριασμός Ενεργοποιήθηκε</h3>
+                                    <p style="color: #155724; margin: 10px 0 0 0;">Ο λογαριασμός σας στο σύστημα ERASMOS έχει ενεργοποιηθεί επιτυχώς!</p>
+                                 </div>
+                                 <p>Μπορείτε τώρα να συνδεθείτε και να χρησιμοποιήσετε κανονικά το σύστημα.</p>
+                                 <p>Αν έχετε οποιεσδήποτε απορίες, μη διστάσετε να επικοινωνήσετε μαζί μας.</p>`,
+                        linkUrl: process.env.FRONTEND_URL || 'http://localhost:5173'
+                    })
+                };
+
+            case 'USER_STATUS_DEACTIVATED':
+                return {
+                    subject: '⚠️ Ο λογαριασμός σας απενεργοποιήθηκε - ERASMOS',
+                    text: `Αγαπητέ ${data.name},\n\nΣας ενημερώνουμε ότι ο λογαριασμός σας στο σύστημα ERASMOS έχει απενεργοποιηθεί.\n\nΑυτό σημαίνει ότι δεν μπορείτε πλέον να συνδεθείτε στο σύστημα μέχρι να ενεργοποιηθεί ξανά.\n\nΓια περισσότερες πληροφορίες ή για να επαναφέρετε τον λογαριασμό σας, παρακαλώ επικοινωνήστε με τον διαχειριστή του συστήματος.\n\nΜε εκτίμηση,\nΗ ομάδα ERASMOS`,
+                    html: this.createHtmlTemplate({
+                        title: 'Απενεργοποίηση Λογαριασμού',
+                        content: `<p>Αγαπητέ <strong>${data.name}</strong>,</p>
+                                 <div style="background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 8px; padding: 20px; margin: 20px 0; text-align: center;">
+                                    <h3 style="color: #721c24; margin: 0;">⚠️ Λογαριασμός Απενεργοποιήθηκε</h3>
+                                    <p style="color: #721c24; margin: 10px 0 0 0;">Ο λογαριασμός σας στο σύστημα ERASMOS έχει απενεργοποιηθεί.</p>
+                                 </div>
+                                 <p>Αυτό σημαίνει ότι δεν μπορείτε πλέον να συνδεθείτε στο σύστημα μέχρι να ενεργοποιηθεί ξανά.</p>
+                                 <p>Για περισσότερες πληροφορίες ή για να επαναφέρετε τον λογαριασμό σας, παρακαλώ επικοινωνήστε με τον διαχειριστή του συστήματος.</p>`,
+                        linkUrl: null
+                    })
+                };
+
             default:
                 return {
                     subject: 'Ειδοποίηση από το σύστημα Erasmos',

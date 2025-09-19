@@ -9,7 +9,10 @@ class NotificationService {
         NEW_USER_REGISTRATION: 'new_user_registration',
         PAYMENT_UPDATE: 'payment_update',
         SYSTEM_ALERT: 'system_alert',
-        NEW_REMINDER: 'new_reminder'
+        NEW_REMINDER: 'new_reminder',
+        USER_STATUS_CHANGE: 'user_status_change',
+        TEAM_STATUS_CHANGE: 'team_status_change',
+        SUBTEAM_STATUS_CHANGE: 'subteam_status_change'
     };
 
     static CHANNELS = {
@@ -158,8 +161,27 @@ class NotificationService {
                 }
                 return [];
 
+            case this.NOTIFICATION_TYPES.USER_STATUS_CHANGE:
+            case this.NOTIFICATION_TYPES.TEAM_STATUS_CHANGE:
+            case this.NOTIFICATION_TYPES.SUBTEAM_STATUS_CHANGE:
+                // Notify all admins for user status changes
+                const statusAdminQuery = `SELECT id FROM users WHERE role = 'Admin' AND deleted_at IS NULL`;
+                const statusAdminResult = await client.query(statusAdminQuery);
+                return statusAdminResult.rows.map(row => row.id);
+
+            // Handle uppercase variants from old database records
+            case 'USER_STATUS_CHANGE':
+            case 'TEAM_STATUS_CHANGE':
+            case 'SUBTEAM_STATUS_CHANGE':
+            case 'SYSTEM_ALERT':
+                // Legacy uppercase variants - notify all admins
+                const legacyAdminQuery = `SELECT id FROM users WHERE role = 'Admin' AND deleted_at IS NULL`;
+                const legacyAdminResult = await client.query(legacyAdminQuery);
+                return legacyAdminResult.rows.map(row => row.id);
+
             default:
                 console.warn(`Unknown notification type: ${type}`);
+                console.warn(`Stack trace:`, new Error().stack);
                 return [];
         }
     }
@@ -208,6 +230,21 @@ class NotificationService {
                     return `Σας ανατέθηκε νέα υπενθύμιση από ${data.creator_name}: "${data.title}" (καταληκτική ημερομηνία: ${new Date(data.due_date).toLocaleDateString('el-GR', { timeZone: 'Europe/Athens' })})`;
                 }
 
+            case this.NOTIFICATION_TYPES.USER_STATUS_CHANGE:
+            case 'USER_STATUS_CHANGE':
+                return `Ο χρήστης ${data.user_name} (${data.user_email}) έγινε ${data.new_status} από ${data.changed_by}`;
+
+            case this.NOTIFICATION_TYPES.TEAM_STATUS_CHANGE:
+            case 'TEAM_STATUS_CHANGE':
+                return `Η ομάδα του ${data.team_leader_name} έγινε ${data.new_status} από ${data.changed_by} (${data.affected_members_count} μέλη επηρεάστηκαν)`;
+
+            case this.NOTIFICATION_TYPES.SUBTEAM_STATUS_CHANGE:
+            case 'SUBTEAM_STATUS_CHANGE':
+                return `Ο χρήστης ${data.user_name} και η υπο-ομάδα του έγινε ${data.new_status} από ${data.changed_by} (${data.affected_direct_children} άμεσα παιδιά επηρεάστηκαν)`;
+
+            case 'SYSTEM_ALERT':
+                return data.message || 'Νέα ειδοποίηση συστήματος';
+
             default:
                 return data.message || 'Νέα ειδοποίηση';
         }
@@ -232,10 +269,19 @@ class NotificationService {
                 return '/payments';
 
             case this.NOTIFICATION_TYPES.SYSTEM_ALERT:
+            case 'SYSTEM_ALERT':
                 return data.link_url || '/admin';
 
             case this.NOTIFICATION_TYPES.NEW_REMINDER:
                 return '/dashboard'; // Reminders are shown on dashboard
+
+            case this.NOTIFICATION_TYPES.USER_STATUS_CHANGE:
+            case this.NOTIFICATION_TYPES.TEAM_STATUS_CHANGE:
+            case this.NOTIFICATION_TYPES.SUBTEAM_STATUS_CHANGE:
+            case 'USER_STATUS_CHANGE':
+            case 'TEAM_STATUS_CHANGE':
+            case 'SUBTEAM_STATUS_CHANGE':
+                return '/admin/team-management';
 
             default:
                 return null;
