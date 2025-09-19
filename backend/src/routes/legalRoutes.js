@@ -47,6 +47,7 @@ const logLegalAction = async (req, actionType, description, isSignificant = fals
 
 // GET /api/legal/status - Check user's legal compliance status
 router.get('/status', authMiddleware, async (req, res) => {
+    console.log('🔍 [LEGAL_STATUS] API call received for user:', req.user?.id, req.user?.email);
     try {
         const userId = req.user.id;
 
@@ -738,7 +739,7 @@ router.get('/admin/dashboard', authMiddleware, async (req, res) => {
                 SELECT
                     NULL as acceptance_id,
                     NULL as verification_code,
-                    u.created_at as sent_at,
+                    u.password_changed_at as sent_at,
                     u.name as user_name,
                     u.email,
                     'no_acceptance' as status,

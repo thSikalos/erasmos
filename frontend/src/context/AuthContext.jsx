@@ -128,6 +128,7 @@ export const AuthProvider = ({ children }) => {
             lastTokenCheck: Date.now()
           });
           console.log('[AUTH] User authenticated successfully');
+
         }
       } catch (error) {
         console.log('[AUTH] Token decode error:', error);
@@ -138,7 +139,15 @@ export const AuthProvider = ({ children }) => {
     }
     setLoading(false);
     return () => { axios.interceptors.response.eject(interceptor); };
-  }, [logout]); // Add logout dependency to prevent stale closures
+  }, [logout]); // Remove checkLegalCompliance dependency to avoid infinite loop
+
+  // Separate useEffect to check legal compliance when user is loaded
+  useEffect(() => {
+    if (token && user && !loading && !legalComplianceStatus) {
+      console.log('[AUTH] User and token available, checking legal compliance...');
+      checkLegalCompliance(true);
+    }
+  }, [token, user, loading, legalComplianceStatus, checkLegalCompliance]);
 
   const login = useCallback(async (newToken) => {
     console.log('[AUTH] Login initiated with new token');
