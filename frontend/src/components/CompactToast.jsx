@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 
-const ToastNotification = ({
+const CompactToast = ({
     type = 'info',
     title,
     message,
@@ -18,7 +18,6 @@ const ToastNotification = ({
 
     useEffect(() => {
         if (showCountdown && countdownTime > 0) {
-            // Set initial countdown
             setCountdown(countdownTime);
 
             const interval = setInterval(() => {
@@ -35,7 +34,6 @@ const ToastNotification = ({
         }
     }, [showCountdown, countdownTime]);
 
-    // Update countdown when countdownTime prop changes
     useEffect(() => {
         if (showCountdown && countdownTime > 0) {
             setCountdown(countdownTime);
@@ -103,18 +101,19 @@ const ToastNotification = ({
         <>
             <style>
                 {`
-                    .toast-notification {
+                    .compact-toast {
                         position: fixed;
                         top: 20px;
                         right: 20px;
-                        width: 400px;
-                        max-width: 90vw;
+                        width: auto;
+                        max-width: 350px;
+                        min-width: 280px;
                         background: rgba(255, 255, 255, 0.15);
                         backdrop-filter: blur(20px);
                         border: 1px solid ${colors.border};
-                        border-radius: 16px;
-                        padding: 20px;
-                        box-shadow: 0 20px 40px ${colors.glow};
+                        border-radius: 12px;
+                        padding: 16px;
+                        box-shadow: 0 15px 35px ${colors.glow};
                         z-index: 10000;
                         transform: translateX(${isVisible ? '0' : '400px'});
                         opacity: ${isVisible ? '1' : '0'};
@@ -123,7 +122,7 @@ const ToastNotification = ({
                         overflow: hidden;
                     }
 
-                    .toast-notification::before {
+                    .compact-toast::before {
                         content: '';
                         position: absolute;
                         top: 0;
@@ -133,7 +132,7 @@ const ToastNotification = ({
                         background: ${colors.accent};
                     }
 
-                    .toast-notification::after {
+                    .compact-toast::after {
                         content: '';
                         position: absolute;
                         top: -50%;
@@ -150,92 +149,97 @@ const ToastNotification = ({
                         50% { transform: translateX(100%) translateY(100%) rotate(45deg); }
                     }
 
-                    .toast-header {
+                    .compact-toast-header {
                         display: flex;
                         align-items: center;
                         justify-content: space-between;
-                        margin-bottom: 12px;
+                        margin-bottom: ${title ? '10px' : '0'};
                         position: relative;
                         z-index: 2;
                     }
 
-                    .toast-title-container {
+                    .compact-toast-title-container {
                         display: flex;
                         align-items: center;
-                        gap: 10px;
+                        gap: 8px;
+                        flex: 1;
                     }
 
-                    .toast-icon {
-                        font-size: 1.4rem;
+                    .compact-toast-icon {
+                        font-size: 1.2rem;
+                        flex-shrink: 0;
                     }
 
-                    .toast-title {
-                        font-size: 1.1rem;
-                        font-weight: 700;
+                    .compact-toast-title {
+                        font-size: 1rem;
+                        font-weight: 600;
                         color: rgba(255, 255, 255, 0.9);
                         margin: 0;
+                        line-height: 1.2;
                     }
 
-                    .toast-close {
+                    .compact-toast-close {
                         background: rgba(255, 255, 255, 0.1);
                         border: 1px solid rgba(255, 255, 255, 0.2);
                         border-radius: 50%;
-                        width: 28px;
-                        height: 28px;
+                        width: 24px;
+                        height: 24px;
                         display: flex;
                         align-items: center;
                         justify-content: center;
                         cursor: pointer;
                         color: rgba(255, 255, 255, 0.7);
                         transition: all 0.2s ease;
-                        font-size: 14px;
+                        font-size: 12px;
+                        flex-shrink: 0;
+                        margin-left: 8px;
                     }
 
-                    .toast-close:hover {
+                    .compact-toast-close:hover {
                         background: rgba(255, 255, 255, 0.2);
                         color: white;
                         transform: scale(1.1);
                     }
 
-                    .toast-content {
+                    .compact-toast-content {
                         position: relative;
                         z-index: 2;
                     }
 
-                    .toast-message {
+                    .compact-toast-message {
                         color: rgba(255, 255, 255, 0.85);
-                        font-size: 0.95rem;
-                        line-height: 1.5;
-                        margin: 0 0 15px 0;
+                        font-size: 0.9rem;
+                        line-height: 1.4;
+                        margin: 0 0 12px 0;
                     }
 
-                    .toast-countdown {
+                    .compact-toast-countdown {
                         color: rgba(255, 255, 255, 0.9);
-                        font-size: 1rem;
+                        font-size: 0.85rem;
                         font-weight: 600;
-                        margin: 10px 0;
+                        margin: 8px 0;
                         text-align: center;
-                        padding: 8px;
+                        padding: 6px 8px;
                         background: rgba(255, 255, 255, 0.1);
-                        border-radius: 8px;
+                        border-radius: 6px;
                     }
 
-                    .toast-actions {
+                    .compact-toast-actions {
                         display: flex;
-                        gap: 15px;
+                        gap: 10px;
                         align-items: center;
                         justify-content: space-between;
-                        margin-top: 15px;
+                        margin-top: 12px;
                         flex-wrap: wrap;
                     }
 
-                    .toast-button {
+                    .compact-toast-button {
                         background: ${colors.accent};
                         color: white;
                         border: none;
-                        border-radius: 8px;
-                        padding: 10px 16px;
-                        font-size: 0.9rem;
+                        border-radius: 6px;
+                        padding: 8px 12px;
+                        font-size: 0.8rem;
                         font-weight: 600;
                         cursor: pointer;
                         transition: all 0.2s ease;
@@ -243,31 +247,31 @@ const ToastNotification = ({
                         overflow: hidden;
                     }
 
-                    .toast-button:hover {
+                    .compact-toast-button:hover {
                         transform: translateY(-1px);
-                        box-shadow: 0 6px 20px ${colors.glow};
+                        box-shadow: 0 4px 15px ${colors.glow};
                     }
 
-                    .auto-refresh-container {
+                    .compact-auto-refresh-container {
                         display: flex;
                         align-items: center;
-                        gap: 8px;
+                        gap: 6px;
                         margin: 0;
-                        padding: 8px 12px;
+                        padding: 6px 8px;
                         background: rgba(255, 255, 255, 0.08);
-                        border-radius: 8px;
+                        border-radius: 6px;
                         border: 1px solid rgba(255, 255, 255, 0.1);
                         transition: all 0.2s ease;
                     }
 
-                    .auto-refresh-container:hover {
+                    .compact-auto-refresh-container:hover {
                         background: rgba(255, 255, 255, 0.12);
                     }
 
-                    .auto-refresh-checkbox {
-                        width: 18px;
-                        height: 18px;
-                        border-radius: 4px;
+                    .compact-auto-refresh-checkbox {
+                        width: 16px;
+                        height: 16px;
+                        border-radius: 3px;
                         border: 2px solid rgba(255, 255, 255, 0.4);
                         background: transparent;
                         cursor: pointer;
@@ -276,90 +280,91 @@ const ToastNotification = ({
                         position: relative;
                     }
 
-                    .auto-refresh-checkbox:checked {
+                    .compact-auto-refresh-checkbox:checked {
                         background: ${colors.accent};
                         border-color: transparent;
-                        box-shadow: 0 2px 8px ${colors.glow};
+                        box-shadow: 0 2px 6px ${colors.glow};
                     }
 
-                    .auto-refresh-checkbox:checked::after {
+                    .compact-auto-refresh-checkbox:checked::after {
                         content: '✓';
                         position: absolute;
                         top: 50%;
                         left: 50%;
                         transform: translate(-50%, -50%);
                         color: white;
-                        font-size: 12px;
+                        font-size: 10px;
                         font-weight: bold;
                     }
 
-                    .auto-refresh-label {
+                    .compact-auto-refresh-label {
                         color: rgba(255, 255, 255, 0.9);
-                        font-size: 0.85rem;
+                        font-size: 0.75rem;
                         cursor: pointer;
                         user-select: none;
                         font-weight: 500;
                     }
 
                     @media (max-width: 480px) {
-                        .toast-notification {
+                        .compact-toast {
                             top: 10px;
                             right: 10px;
                             left: 10px;
                             width: auto;
                             max-width: none;
+                            min-width: auto;
                         }
 
-                        .toast-actions {
+                        .compact-toast-actions {
                             flex-direction: column;
                             align-items: stretch;
                         }
 
-                        .toast-button {
+                        .compact-toast-button {
                             width: 100%;
                             justify-content: center;
                         }
                     }
                 `}
             </style>
-            <div className="toast-notification">
-                <div className="toast-header">
-                    <div className="toast-title-container">
-                        <span className="toast-icon">{getToastIcon()}</span>
-                        {title && <h4 className="toast-title">{title}</h4>}
+            <div className="compact-toast">
+                <div className="compact-toast-header">
+                    <div className="compact-toast-title-container">
+                        <span className="compact-toast-icon">{getToastIcon()}</span>
+                        {title && <h4 className="compact-toast-title">{title}</h4>}
                     </div>
-                    <button className="toast-close" onClick={handleClose}>
+                    <button className="compact-toast-close" onClick={handleClose}>
                         ✕
                     </button>
                 </div>
 
-                <div className="toast-content">
-                    {message && <p className="toast-message">{message}</p>}
+                <div className="compact-toast-content">
+                    {message && <p className="compact-toast-message">{message}</p>}
 
                     {showCountdown && countdown > 0 && (
-                        <div className="toast-countdown">
+                        <div className="compact-toast-countdown">
                             Η συνεδρία σας λήγει σε: {Math.floor(countdown / 60)}:{(countdown % 60).toString().padStart(2, '0')}
                         </div>
                     )}
 
                     {(actionLabel || onAutoRefreshToggle) && (
-                        <div className="toast-actions">
+                        <div className="compact-toast-actions">
                             {actionLabel && onAction && (
-                                <button className="toast-button" onClick={onAction}>
+                                <button className="compact-toast-button" onClick={onAction}>
                                     {actionLabel}
                                 </button>
                             )}
 
                             {onAutoRefreshToggle && (
-                                <div className="auto-refresh-container">
+                                <div className="compact-auto-refresh-container">
                                     <input
                                         type="checkbox"
                                         id="auto-refresh"
-                                        className="auto-refresh-checkbox"
+                                        className="compact-auto-refresh-checkbox"
                                         checked={autoRefresh}
                                         onChange={onAutoRefreshToggle}
                                     />
-                                    <label htmlFor="auto-refresh" className="auto-refresh-label">
+                                    <label htmlFor="auto-refresh" className="compact-auto-refresh-label">
                                         Αυτόματη ανανέωση
                                     </label>
                                 </div>
@@ -372,4 +377,4 @@ const ToastNotification = ({
     );
 };
 
-export default ToastNotification;
+export default CompactToast;

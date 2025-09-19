@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNotifications } from '../context/NotificationContext';
-import ToastNotification from './ToastNotification';
+import CompactToast from './CompactToast';
 import ConfirmationModal from './ConfirmationModal';
 
 const NotificationManager = () => {
@@ -15,7 +15,7 @@ const NotificationManager = () => {
         <>
             {/* Global Toast Notifications */}
             {toast && (
-                <ToastNotification
+                <CompactToast
                     type={toast.type}
                     title={toast.title}
                     message={toast.message}

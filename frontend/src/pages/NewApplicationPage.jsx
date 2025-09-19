@@ -169,10 +169,8 @@ const NewApplicationPage = () => {
         } catch (error) {
             console.error('Failed to send centralized toast:', error);
             // Fallback to local toast on error
-            if (type === 'system_success') showSuccessToast(title, message);
-            else if (type === 'system_error') showErrorToast(title, message);
-            else if (type === 'system_warning') showWarningToast(title, message);
-            else showInfoToast(title, message);
+            // Fallback handled by centralized system - should not reach here normally
+            console.warn('sendCentralizedToast fallback triggered for type:', type);
         }
     };
 
@@ -215,11 +213,11 @@ const NewApplicationPage = () => {
                 dispatch({ type: 'SET_CUSTOMER_STATUS', status: 'notFound' });
             }
 
-            showInfoToast('Draft Loaded', 'Τα δεδομένα της προσωρινής αίτησης φορτώθηκαν επιτυχώς');
+            await sendCentralizedToast('system_info', 'ℹ️ Προσωρινή Αποθήκευση', 'Τα δεδομένα της προσωρινής αίτησης φορτώθηκαν επιτυχώς');
 
         } catch (err) {
             console.error('Error loading draft:', err);
-            showErrorToast('Σφάλμα', 'Δεν ήταν δυνατή η φόρτωση της προσωρινής αίτησης');
+            await sendCentralizedToast('system_error', '❌ Σφάλμα', 'Δεν ήταν δυνατή η φόρτωση της προσωρινής αίτησης');
         }
     }, [token]);
 
@@ -289,7 +287,7 @@ const NewApplicationPage = () => {
             } catch (error) {
                 console.error('[NewApplication] Error fetching data:', error);
                 dispatch({ type: 'SET_ERROR', error: 'Αποτυχία φόρτωσης δεδομένων.' });
-                showErrorToast('Σφάλμα', 'Αποτυχία φόρτωσης δεδομένων');
+                await sendCentralizedToast('system_error', '❌ Σφάλμα', 'Αποτυχία φόρτωσης δεδομένων');
             } finally {
                 dispatch({ type: 'SET_LOADING', loading: false });
             }
@@ -310,7 +308,7 @@ const NewApplicationPage = () => {
             const res = await axios.get(apiUrl(`/api/customers/afm/${afm}`), config);
             dispatch({ type: 'SET_CUSTOMER_DETAILS', data: res.data });
             dispatch({ type: 'SET_CUSTOMER_STATUS', status: 'found' });
-            showSuccessToast('Πελάτης Βρέθηκε', `Ο πελάτης βρέθηκε! ${res.data.applications_count || 0} προηγούμενες αιτήσεις`);
+            await sendCentralizedToast('system_success', '✅ Πελάτης Βρέθηκε', `Ο πελάτης βρέθηκε! ${res.data.applications_count || 0} προηγούμενες αιτήσεις`);
         } catch (err) {
             if (err.response && err.response.status === 404) {
                 dispatch({ 
@@ -318,11 +316,11 @@ const NewApplicationPage = () => {
                     data: { id: null, afm: afm, full_name: '', phone: '', address: '' }
                 });
                 dispatch({ type: 'SET_CUSTOMER_STATUS', status: 'notFound' });
-                showInfoToast('Πελάτης δεν βρέθηκε', 'Συμπληρώστε τα στοιχεία.');
+                await sendCentralizedToast('system_info', 'ℹ️ Πελάτης δεν βρέθηκε', 'Συμπληρώστε τα στοιχεία.');
             } else {
                 dispatch({ type: 'SET_ERROR', error: 'Σφάλμα κατά τον έλεγχο ΑΦΜ.' });
                 dispatch({ type: 'SET_CUSTOMER_STATUS', status: 'idle' });
-                showErrorToast('Σφάλμα', 'Σφάλμα κατά τον έλεγχο ΑΦΜ');
+                await sendCentralizedToast('system_error', '❌ Σφάλμα', 'Σφάλμα κατά τον έλεγχο ΑΦΜ');
             }
         }
     }, [token]);
@@ -361,7 +359,7 @@ const NewApplicationPage = () => {
             const res = await axios.get(apiUrl(`/api/customers/afm/${state.afm}`), config);
             dispatch({ type: 'SET_CUSTOMER_DETAILS', data: res.data });
             dispatch({ type: 'SET_CUSTOMER_STATUS', status: 'found' });
-            showSuccessToast('Πελάτης Βρέθηκε', 'Ο πελάτης βρέθηκε επιτυχώς!');
+            await sendCentralizedToast('system_success', '✅ Πελάτης Βρέθηκε', 'Ο πελάτης βρέθηκε επιτυχώς!');
         } catch (err) {
             if (err.response && err.response.status === 404) {
                 dispatch({ 
@@ -369,34 +367,34 @@ const NewApplicationPage = () => {
                     data: { id: null, afm: state.afm, full_name: '', phone: '', address: '' }
                 });
                 dispatch({ type: 'SET_CUSTOMER_STATUS', status: 'notFound' });
-                showInfoToast('Πελάτης δεν βρέθηκε', 'Συμπληρώστε τα στοιχεία.');
+                await sendCentralizedToast('system_info', 'ℹ️ Πελάτης δεν βρέθηκε', 'Συμπληρώστε τα στοιχεία.');
             } else {
                 dispatch({ type: 'SET_ERROR', error: 'Σφάλμα κατά τον έλεγχο ΑΦΜ.' });
                 dispatch({ type: 'SET_CUSTOMER_STATUS', status: 'idle' });
-                showErrorToast('Σφάλμα', 'Σφάλμα κατά τον έλεγχο ΑΦΜ');
+                await sendCentralizedToast('system_error', '❌ Σφάλμα', 'Σφάλμα κατά τον έλεγχο ΑΦΜ');
             }
         }
     };
 
-    const validateStep = (step) => {
+    const validateStep = async (step) => {
         switch (step) {
             case 1:
                 if (!state.afm) {
-                    showErrorToast('Σφάλμα Επικύρωσης', 'Παρακαλώ εισάγετε ΑΦΜ');
+                    await sendCentralizedToast('system_error', '❌ Σφάλμα Επικύρωσης', 'Παρακαλώ εισάγετε ΑΦΜ');
                     return false;
                 }
                 if (state.customerStatus === 'idle' || state.customerStatus === 'checking') {
-                    showErrorToast('Σφάλμα Επικύρωσης', 'Παρακαλώ ελέγξτε πρώτα το ΑΦΜ');
+                    await sendCentralizedToast('system_error', '❌ Σφάλμα Επικύρωσης', 'Παρακαλώ ελέγξτε πρώτα το ΑΦΜ');
                     return false;
                 }
                 if (!state.customerDetails.full_name) {
-                    showErrorToast('Σφάλμα Επικύρωσης', 'Παρακαλώ εισάγετε ονοματεπώνυμο');
+                    await sendCentralizedToast('system_error', '❌ Σφάλμα Επικύρωσης', 'Παρακαλώ εισάγετε ονοματεπώνυμο');
                     return false;
                 }
                 return true;
             case 2:
                 if (!state.selectedCompanyId) {
-                    showErrorToast('Σφάλμα Επικύρωσης', 'Παρακαλώ επιλέξτε εταιρεία');
+                    await sendCentralizedToast('system_error', '❌ Σφάλμα Επικύρωσης', 'Παρακαλώ επιλέξτε εταιρεία');
                     return false;
                 }
                 return true;
@@ -405,8 +403,8 @@ const NewApplicationPage = () => {
         }
     };
 
-    const handleNextStep = () => {
-        if (validateStep(state.currentStep)) {
+    const handleNextStep = async () => {
+        if (await validateStep(state.currentStep)) {
             dispatch({ type: 'NEXT_STEP' });
         }
     };
@@ -419,18 +417,18 @@ const NewApplicationPage = () => {
         dispatch({ type: 'SET_FIELD_VALUE', fieldId, value });
     };
 
-    const handleFileUpload = (fileData) => {
+    const handleFileUpload = async (fileData) => {
         dispatch({ type: 'ADD_FILE', file: fileData });
-        showSuccessToast('Αρχείο', 'Αρχείο ανέβηκε επιτυχώς!');
+        await sendCentralizedToast('system_success', '✅ Αρχείο', 'Αρχείο ανέβηκε επιτυχώς!');
     };
     
     const handleFilesChange = (files) => {
         dispatch({ type: 'SET_FILES', files });
     };
 
-    const handleFileRemove = (index) => {
+    const handleFileRemove = async (index) => {
         dispatch({ type: 'REMOVE_FILE', index });
-        showInfoToast('Αρχείο', 'Αρχείο αφαιρέθηκε');
+        await sendCentralizedToast('system_info', 'ℹ️ Αρχείο', 'Αρχείο αφαιρέθηκε');
     };
 
     const handlePDFGenerate = async (template) => {
@@ -459,7 +457,7 @@ const NewApplicationPage = () => {
                     path: response.data.pdfPath
                 });
 
-                showSuccessToast('PDF', 'PDF δημιουργήθηκε επιτυχώς!');
+                await sendCentralizedToast('system_success', '✅ PDF', 'PDF δημιουργήθηκε επιτυχώς!');
 
                 // Auto-download the generated PDF
                 if (response.data.downloadUrl) {
@@ -469,19 +467,19 @@ const NewApplicationPage = () => {
         } catch (error) {
             console.error('Error generating PDF:', error);
             const errorMessage = error.response?.data?.message || 'Σφάλμα κατά τη δημιουργία του PDF';
-            showErrorToast('Σφάλμα', errorMessage);
+            await sendCentralizedToast('system_error', '❌ Σφάλμα PDF', errorMessage);
         } finally {
             dispatch({ type: 'SET_LOADING', loading: false });
         }
     };
 
-    const handleSignedPDFUpload = (data) => {
+    const handleSignedPDFUpload = async (data) => {
         if (data.signedPDFRemoved) {
             dispatch({ type: 'SET_SIGNED_PDF', pdf: null });
-            showInfoToast('PDF', 'Υπογεγραμμένο PDF αφαιρέθηκε');
+            await sendCentralizedToast('system_info', 'ℹ️ PDF', 'Υπογεγραμμένο PDF αφαιρέθηκε');
         } else {
             dispatch({ type: 'SET_SIGNED_PDF', pdf: data });
-            showSuccessToast('PDF', 'Υπογεγραμμένο PDF ανέβηκε επιτυχώς!');
+            await sendCentralizedToast('system_success', '✅ PDF', 'Υπογεγραμμένο PDF ανέβηκε επιτυχώς!');
         }
     };
 
@@ -504,11 +502,11 @@ const NewApplicationPage = () => {
             if (draftId) {
                 // Update existing draft
                 response = await axios.put(apiUrl(`/api/applications/drafts/${draftId}`), draftData, config);
-                showSuccessToast('Επιτυχία', 'Η προσωρινή αίτηση ενημερώθηκε επιτυχώς!');
+                await sendCentralizedToast('system_success', '✅ Επιτυχία', 'Η προσωρινή αίτηση ενημερώθηκε επιτυχώς!');
             } else {
                 // Create new draft
                 response = await axios.post(apiUrl('/api/applications/drafts'), draftData, config);
-                showSuccessToast('Επιτυχία', 'Η αίτηση αποθηκεύτηκε προσωρινά!');
+                await sendCentralizedToast('system_success', '✅ Επιτυχία', 'Η αίτηση αποθηκεύτηκε προσωρινά!');
             }
 
             setTimeout(() => {
@@ -519,7 +517,7 @@ const NewApplicationPage = () => {
             console.error('Error saving draft:', err);
             const errorMessage = err.response?.data?.message || 'Σφάλμα κατά την προσωρινή αποθήκευση';
             dispatch({ type: 'SET_ERROR', error: errorMessage });
-            showErrorToast('Σφάλμα', errorMessage);
+            await sendCentralizedToast('system_error', '❌ Σφάλμα Αποθήκευσης', errorMessage);
         } finally {
             dispatch({ type: 'SET_LOADING', loading: false });
         }
@@ -545,7 +543,7 @@ const NewApplicationPage = () => {
             
             // Then upload files if any exist
             if (state.uploadedFiles.length > 0) {
-                showInfoToast('Φόρτωση', 'Ανεβάζουν τα αρχεία...');
+                await sendCentralizedToast('system_info', 'ℹ️ Φόρτωση', 'Ανεβάζουν τα αρχεία...');
                 let uploadedCount = 0;
                 
                 for (const fileInfo of state.uploadedFiles) {
@@ -1041,7 +1039,7 @@ const NewApplicationPage = () => {
                                         applicationId={null} // Will be set after application is saved
                                         currentSignedPDF={state.signedPDF}
                                         onUploadSuccess={handleSignedPDFUpload}
-                                        onUploadError={(error) => showErrorToast('Σφάλμα', error)}
+                                        onUploadError={async (error) => await sendCentralizedToast('system_error', '❌ Σφάλμα', error)}
                                         disabled={!state.pdfGenerated}
                                     />
                                     </div>
@@ -1827,70 +1825,6 @@ const NewApplicationPage = () => {
                     font-weight: 500;
                 }
 
-                .toast {
-                    position: fixed;
-                    top: 20px;
-                    right: 20px;
-                    min-width: 300px;
-                    background: rgba(255, 255, 255, 0.1);
-                    border-radius: 8px;
-                    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
-                    z-index: 1000;
-                    animation: slideInRight 0.3s ease;
-                }
-
-                @keyframes slideInRight {
-                    from {
-                        transform: translateX(100%);
-                        opacity: 0;
-                    }
-                    to {
-                        transform: translateX(0);
-                        opacity: 1;
-                    }
-                }
-
-                .toast-success {
-                    border-left: 4px solid #10b981;
-                }
-
-                .toast-error {
-                    border-left: 4px solid #ef4444;
-                }
-
-                .toast-info {
-                    border-left: 4px solid #3b82f6;
-                }
-
-                .toast-content {
-                    display: flex;
-                    align-items: center;
-                    gap: 12px;
-                    padding: 16px 20px;
-                }
-
-                .toast-icon {
-                    font-size: 18px;
-                }
-
-                .toast-message {
-                    flex: 1;
-                    font-weight: 500;
-                    color: #1f2937;
-                }
-
-                .toast-close {
-                    background: none;
-                    border: none;
-                    font-size: 18px;
-                    cursor: pointer;
-                    color: #9ca3af;
-                    padding: 0 4px;
-                }
-
-                .toast-close:hover {
-                    color: #6b7280;
-                }
 
                 .checkbox-label {
                     display: flex;
@@ -2241,11 +2175,6 @@ const NewApplicationPage = () => {
                         display: none;
                     }
 
-                    .toast {
-                        right: 10px;
-                        left: 10px;
-                        min-width: auto;
-                    }
 
                     .submit-buttons {
                         display: flex;
