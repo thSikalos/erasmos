@@ -9,10 +9,15 @@ const {
     refreshToken,
     createUser,
     getAllUsers,
+    getAllTeamLeaders,
     getUserById,
     updateUser,
     deleteUser,
     getMyTeam,
+    toggleUserStatus,
+    toggleTeamStatus,
+    toggleSubTeamStatus,
+    getTeamHierarchy,
     forgotPassword,
     resetPassword,
     changePassword,
@@ -37,8 +42,15 @@ router.post('/change-password', changePassword);
 // --- ADMIN ONLY ROUTES ---
 router.post('/', adminMiddleware, createUser); // Admin creates all users
 router.get('/', adminMiddleware, getAllUsers); // Admin sees all users
+router.get('/team-leaders/all', adminMiddleware, getAllTeamLeaders); // Admin sees all team leaders with team info
 router.put('/:id', adminMiddleware, updateUser); // Admin updates any user
 router.delete('/:id', adminMiddleware, deleteUser); // Admin soft-deletes any user
+
+// --- TEAM MANAGEMENT ROUTES (ADMIN ONLY) ---
+router.put('/:id/toggle-status', adminMiddleware, toggleUserStatus); // Toggle individual user status
+router.put('/:id/toggle-team', adminMiddleware, toggleTeamStatus); // Toggle entire team status
+router.put('/:id/toggle-subteam', adminMiddleware, toggleSubTeamStatus); // Toggle sub-team status (user + direct children only)
+router.get('/:id/team-hierarchy', adminMiddleware, getTeamHierarchy); // Get team hierarchy
 
 // --- TEAM LEADER ROUTES ---
 router.get('/my-team', getMyTeam);

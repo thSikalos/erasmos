@@ -11,7 +11,7 @@ const EmailService = require('../services/emailService');
 // --- GET ALL USERS (FOR ADMIN) ---
 const getAllUsers = async (req, res) => {
     try {
-        const result = await pool.query('SELECT id, name, email, role, parent_user_id, is_vat_liable FROM users WHERE deleted_at IS NULL ORDER BY name ASC');
+        const result = await pool.query('SELECT id, name, email, role, parent_user_id, is_vat_liable, is_active FROM users WHERE deleted_at IS NULL ORDER BY name ASC');
         res.json(result.rows);
     } catch (err) {
         console.error(err.message);
@@ -137,6 +137,15 @@ const loginUser = async (req, res) => {
         const userResult = await pool.query('SELECT * FROM users WHERE email = $1 AND deleted_at IS NULL', [email]);
         if (userResult.rows.length === 0) { return res.status(400).json({ message: 'Invalid credentials' }); }
         const user = userResult.rows[0];
+
+        // Check if user is active
+        if (!user.is_active) {
+            return res.status(403).json({
+                message: 'Ο λογαριασμός σας έχει απενεργοποιηθεί. Επικοινωνήστε με τον διαχειριστή.',
+                code: 'ACCOUNT_DEACTIVATED'
+            });
+        }
+
         const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) { return res.status(400).json({ message: 'Invalid credentials' }); }
         
@@ -485,6 +494,321 @@ const changePassword = async (req, res) => {
     }
 };
 
+// --- GET ALL TEAM LEADERS WITH TEAM INFO ---
+const getAllTeamLeaders = async (req, res) => {
+    try {
+        const result = await pool.query(`
+            SELECT
+                u.id,
+                u.name,
+                u.email,
+                u.role,
+                u.parent_user_id,
+                u.is_active,
+                u.is_vat_liable,
+                COUNT(tm.id) as team_member_count,
+                COUNT(CASE WHEN tm.is_active = true THEN 1 END) as active_team_members,
+                ARRAY_AGG(
+                    CASE WHEN tm.id IS NOT NULL
+                    THEN json_build_object(
+                        'id', tm.id,
+                        'name', tm.name,
+                        'email', tm.email,
+                        'role', tm.role,
+                        'is_active', tm.is_active
+                    ) END
+                ) FILTER (WHERE tm.id IS NOT NULL) as team_members
+            FROM users u
+            LEFT JOIN users tm ON u.id = tm.parent_user_id AND tm.deleted_at IS NULL
+            WHERE u.role IN ('TeamLeader', 'Admin')
+            AND u.deleted_at IS NULL
+            GROUP BY u.id, u.name, u.email, u.role, u.parent_user_id, u.is_active, u.is_vat_liable
+            ORDER BY u.name ASC
+        `);
+        res.json(result.rows);
+    } catch (err) {
+        console.error('Get team leaders error:', err.message);
+        res.status(500).send('Server Error');
+    }
+};
+
+// --- TOGGLE USER ACTIVE STATUS ---
+const toggleUserStatus = async (req, res) => {
+    const { id } = req.params;
+    try {
+        // Get current user status
+        const userResult = await pool.query('SELECT id, name, email, role, is_active FROM users WHERE id = $1 AND deleted_at IS NULL', [id]);
+        if (userResult.rows.length === 0) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        const user = userResult.rows[0];
+        const newStatus = !user.is_active;
+
+        // Update user status
+        const result = await pool.query(
+            'UPDATE users SET is_active = $1 WHERE id = $2 RETURNING id, name, email, role, is_active',
+            [newStatus, id]
+        );
+
+        // Log the action
+        console.log(`User ${user.name} (${user.email}) status changed to: ${newStatus ? 'Active' : 'Inactive'}`);
+
+        // Create notification for admins about the status change
+        try {
+            await NotificationService.createNotification(
+                'USER_STATUS_CHANGE',
+                {
+                    user_id: user.id,
+                    user_name: user.name,
+                    user_email: user.email,
+                    new_status: newStatus ? 'Ενεργός' : 'Απενεργοποιημένος',
+                    changed_by: req.user.name || 'Admin'
+                }
+            );
+        } catch (notificationError) {
+            console.error('Failed to send status change notification:', notificationError);
+        }
+
+        res.json({
+            message: `User status updated successfully to ${newStatus ? 'Active' : 'Inactive'}`,
+            user: result.rows[0]
+        });
+    } catch (err) {
+        console.error('Toggle user status error:', err.message);
+        res.status(500).send('Server Error');
+    }
+};
+
+// --- TOGGLE TEAM STATUS (TEAM LEADER + ALL TEAM MEMBERS) ---
+const toggleTeamStatus = async (req, res) => {
+    const { id } = req.params;
+    const client = await pool.connect();
+
+    try {
+        await client.query('BEGIN');
+
+        // Get team leader info
+        const teamLeaderResult = await client.query(
+            'SELECT id, name, email, role, is_active FROM users WHERE id = $1 AND deleted_at IS NULL AND role IN (\'TeamLeader\', \'Admin\')',
+            [id]
+        );
+
+        if (teamLeaderResult.rows.length === 0) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({ message: 'Team Leader not found' });
+        }
+
+        const teamLeader = teamLeaderResult.rows[0];
+        const newStatus = !teamLeader.is_active;
+
+        // Get all team members (including nested team members)
+        const teamMembersResult = await client.query(`
+            WITH RECURSIVE team_hierarchy AS (
+                -- Base case: direct team members
+                SELECT id, name, email, role, parent_user_id, is_active, 1 as level
+                FROM users
+                WHERE parent_user_id = $1 AND deleted_at IS NULL
+
+                UNION ALL
+
+                -- Recursive case: team members of team members
+                SELECT u.id, u.name, u.email, u.role, u.parent_user_id, u.is_active, th.level + 1
+                FROM users u
+                INNER JOIN team_hierarchy th ON u.parent_user_id = th.id
+                WHERE u.deleted_at IS NULL AND th.level < 10 -- Prevent infinite recursion
+            )
+            SELECT id, name, email, role, is_active, level FROM team_hierarchy
+            ORDER BY level, name
+        `, [id]);
+
+        // Update team leader status
+        await client.query('UPDATE users SET is_active = $1 WHERE id = $2', [newStatus, id]);
+
+        // Update all team members status
+        const teamMemberIds = teamMembersResult.rows.map(member => member.id);
+        if (teamMemberIds.length > 0) {
+            await client.query(
+                `UPDATE users SET is_active = $1 WHERE id = ANY($2::int[])`,
+                [newStatus, teamMemberIds]
+            );
+        }
+
+        await client.query('COMMIT');
+
+        // Log the action
+        console.log(`Team Leader ${teamLeader.name} and ${teamMemberIds.length} team members status changed to: ${newStatus ? 'Active' : 'Inactive'}`);
+
+        // Create notification for admins about the team status change
+        try {
+            await NotificationService.createNotification(
+                'TEAM_STATUS_CHANGE',
+                {
+                    team_leader_id: teamLeader.id,
+                    team_leader_name: teamLeader.name,
+                    team_leader_email: teamLeader.email,
+                    affected_members_count: teamMemberIds.length,
+                    new_status: newStatus ? 'Ενεργή' : 'Απενεργοποιημένη',
+                    changed_by: req.user.name || 'Admin'
+                }
+            );
+        } catch (notificationError) {
+            console.error('Failed to send team status change notification:', notificationError);
+        }
+
+        res.json({
+            message: `Team status updated successfully to ${newStatus ? 'Active' : 'Inactive'}`,
+            team_leader: { ...teamLeader, is_active: newStatus },
+            affected_members: teamMemberIds.length,
+            team_members: teamMembersResult.rows.map(member => ({ ...member, is_active: newStatus }))
+        });
+    } catch (err) {
+        await client.query('ROLLBACK');
+        console.error('Toggle team status error:', err.message);
+        res.status(500).send('Server Error');
+    } finally {
+        client.release();
+    }
+};
+
+// --- GET TEAM HIERARCHY FOR A SPECIFIC TEAM LEADER ---
+const getTeamHierarchy = async (req, res) => {
+    const { id } = req.params;
+    try {
+        // Get team leader info
+        const teamLeaderResult = await pool.query(
+            'SELECT id, name, email, role, is_active, parent_user_id FROM users WHERE id = $1 AND deleted_at IS NULL',
+            [id]
+        );
+
+        if (teamLeaderResult.rows.length === 0) {
+            return res.status(404).json({ message: 'Team Leader not found' });
+        }
+
+        // Get recursive team hierarchy
+        const hierarchyResult = await pool.query(`
+            WITH RECURSIVE team_hierarchy AS (
+                -- Base case: the team leader
+                SELECT id, name, email, role, parent_user_id, is_active, 0 as level,
+                       ARRAY[id] as path, CAST(name AS TEXT) as hierarchy_path
+                FROM users
+                WHERE id = $1 AND deleted_at IS NULL
+
+                UNION ALL
+
+                -- Recursive case: team members
+                SELECT u.id, u.name, u.email, u.role, u.parent_user_id, u.is_active, th.level + 1,
+                       th.path || u.id, th.hierarchy_path || ' → ' || u.name
+                FROM users u
+                INNER JOIN team_hierarchy th ON u.parent_user_id = th.id
+                WHERE u.deleted_at IS NULL AND th.level < 10 -- Prevent infinite recursion
+            )
+            SELECT * FROM team_hierarchy
+            ORDER BY level, name
+        `, [id]);
+
+        res.json({
+            team_leader: teamLeaderResult.rows[0],
+            hierarchy: hierarchyResult.rows
+        });
+    } catch (err) {
+        console.error('Get team hierarchy error:', err.message);
+        res.status(500).send('Server Error');
+    }
+};
+
+// --- TOGGLE SUB-TEAM STATUS (USER + THEIR DIRECT SUBTREE ONLY) ---
+const toggleSubTeamStatus = async (req, res) => {
+    const { id } = req.params;
+    const client = await pool.connect();
+
+    try {
+        await client.query('BEGIN');
+
+        // Get user info (can be any user, not just team leaders)
+        const userResult = await client.query(
+            'SELECT id, name, email, role, is_active, parent_user_id FROM users WHERE id = $1 AND deleted_at IS NULL',
+            [id]
+        );
+
+        if (userResult.rows.length === 0) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        const user = userResult.rows[0];
+        const newStatus = !user.is_active;
+
+        // Check if user has a parent who is inactive (validation)
+        if (newStatus && user.parent_user_id) {
+            const parentResult = await client.query(
+                'SELECT is_active FROM users WHERE id = $1 AND deleted_at IS NULL',
+                [user.parent_user_id]
+            );
+
+            if (parentResult.rows.length > 0 && !parentResult.rows[0].is_active) {
+                await client.query('ROLLBACK');
+                return res.status(400).json({
+                    message: 'Δεν μπορείτε να ενεργοποιήσετε χρήστη όταν ο προϊστάμενός του είναι απενεργοποιημένος. Ενεργοποιήστε πρώτα τον προϊστάμενο.'
+                });
+            }
+        }
+
+        // Get only direct children (not recursive)
+        const directChildrenResult = await client.query(
+            'SELECT id, name, email, role, is_active FROM users WHERE parent_user_id = $1 AND deleted_at IS NULL',
+            [id]
+        );
+
+        // Update the user's status
+        await client.query('UPDATE users SET is_active = $1 WHERE id = $2', [newStatus, id]);
+
+        // If deactivating, also deactivate all direct children
+        const directChildrenIds = directChildrenResult.rows.map(child => child.id);
+        if (!newStatus && directChildrenIds.length > 0) {
+            await client.query(
+                'UPDATE users SET is_active = false WHERE id = ANY($1::int[])',
+                [directChildrenIds]
+            );
+        }
+
+        await client.query('COMMIT');
+
+        // Log the action
+        console.log(`User ${user.name} and ${directChildrenIds.length} direct children status changed to: ${newStatus ? 'Active' : 'Inactive'}`);
+
+        // Create notification for admins about the sub-team status change
+        try {
+            await NotificationService.createNotification(
+                'SUBTEAM_STATUS_CHANGE',
+                {
+                    user_id: user.id,
+                    user_name: user.name,
+                    user_email: user.email,
+                    affected_direct_children: directChildrenIds.length,
+                    new_status: newStatus ? 'Ενεργή' : 'Απενεργοποιημένη',
+                    changed_by: req.user.name || 'Admin'
+                }
+            );
+        } catch (notificationError) {
+            console.error('Failed to send sub-team status change notification:', notificationError);
+        }
+
+        res.json({
+            message: `Sub-team status updated successfully to ${newStatus ? 'Active' : 'Inactive'}`,
+            user: { ...user, is_active: newStatus },
+            affected_direct_children: directChildrenIds.length,
+            direct_children: directChildrenResult.rows.map(child => ({ ...child, is_active: newStatus ? child.is_active : false }))
+        });
+    } catch (err) {
+        await client.query('ROLLBACK');
+        console.error('Toggle sub-team status error:', err.message);
+        res.status(500).send('Server Error');
+    } finally {
+        client.release();
+    }
+};
+
 
 module.exports = {
     loginUser,
@@ -492,10 +816,15 @@ module.exports = {
     refreshToken,
     createUser,
     getAllUsers,
+    getAllTeamLeaders,
     getUserById,
     updateUser,
     deleteUser,
     getMyTeam,
+    toggleUserStatus,
+    toggleTeamStatus,
+    toggleSubTeamStatus,
+    getTeamHierarchy,
     forgotPassword,
     resetPassword,
     changePassword,

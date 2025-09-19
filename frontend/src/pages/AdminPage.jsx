@@ -52,6 +52,13 @@ const AdminPage = () => {
             link: '/admin/legal',
             color: 'from-red-500 to-purple-600'
         },
+        {
+            title: 'Διαχείριση Ομάδων',
+            description: 'Ενεργοποίηση/Απενεργοποίηση ομαδαρχών και των ομάδων τους. Έλεγχος πρόσβασης στο σύστημα.',
+            icon: '👥',
+            link: '/admin/team-management',
+            color: 'from-green-500 to-teal-600'
+        },
     ];
 
     return (
@@ -364,7 +371,7 @@ const AdminPage = () => {
             <div className="admin-stats">
                 <div className="stat-card">
                     <div className="stat-icon">📝</div>
-                    <div className="stat-number">7</div>
+                    <div className="stat-number">8</div>
                     <div className="stat-label">Διαθέσιμες Λειτουργίες</div>
                 </div>
                 <div className="stat-card">

@@ -42,6 +42,7 @@ const PrivacyPolicyPage = lazy(() => import('./pages/PrivacyPolicyPage'));
 const CookiePolicyPage = lazy(() => import('./pages/CookiePolicyPage'));
 const LegalVerificationPage = lazy(() => import('./pages/LegalVerificationPage'));
 const AdminLegalDashboard = lazy(() => import('./pages/AdminLegalDashboard'));
+const AdminTeamManagementPage = lazy(() => import('./pages/AdminTeamManagementPage'));
 const LegalAcceptanceModal = lazy(() => import('./components/LegalAcceptanceModal'));
 
 function App() {
@@ -123,6 +124,7 @@ function App() {
                     <Route path="/admin/billing-settings" element={<AdminBillingSettingsPage />} />
                     <Route path="/admin/invoicing" element={<AdminInvoicingPage />} />
                     <Route path="/admin/legal" element={<AdminLegalDashboard />} />
+                    <Route path="/admin/team-management" element={<AdminTeamManagementPage />} />
                     <Route path="/team-company-management" element={<TeamCompanyManagementPage />} />
                   </Route>
                 </Route>

@@ -83,6 +83,37 @@ export const NotificationProvider = ({ children }) => {
         );
     }, [showConfirmModal]);
 
+    const showTeamActionConfirm = useCallback((action, itemName, onConfirm, affectedCount = null) => {
+        const isActivating = action === 'activate';
+        const actionText = isActivating ? 'ενεργοποιήσετε' : 'απενεργοποιήσετε';
+        const title = isActivating ? 'Επιβεβαίωση Ενεργοποίησης' : 'Επιβεβαίωση Απενεργοποίησης';
+
+        let message = `Είστε σίγουροι ότι θέλετε να ${actionText} ${itemName}`;
+
+        if (affectedCount && affectedCount > 1) {
+            message += ` (${affectedCount} άτομα - θα τους ${actionText} όλους)`;
+        }
+
+        message += '?\n\nΑυτή η ενέργεια μπορεί να αναιρεθεί ανά πάσα στιγμή.';
+
+        if (!isActivating) {
+            message += ' Οι επηρεαζόμενοι χρήστες δεν θα μπορούν να συνδεθούν στο σύστημα.';
+        } else {
+            message += ' Οι επηρεαζόμενοι χρήστες θα αποκτήσουν ξανά πλήρη πρόσβαση.';
+        }
+
+        showConfirmModal(
+            title,
+            message,
+            isActivating ? "success" : "warning",
+            onConfirm,
+            {
+                confirmText: isActivating ? "✅ Ενεργοποίηση" : "⚠️ Απενεργοποίηση",
+                cancelText: "❌ Ακύρωση"
+            }
+        );
+    }, [showConfirmModal]);
+
     // Application-specific notification handlers
     const showApplicationStatusToast = useCallback((applicationId, status) => {
         const statusMessages = {
@@ -180,6 +211,7 @@ export const NotificationProvider = ({ children }) => {
         hideConfirmModal,
         showDeleteConfirm,
         showSaveConfirm,
+        showTeamActionConfirm,
 
         // Application-specific helpers
         showApplicationStatusToast,
