@@ -670,6 +670,14 @@ router.post('/verify-code', authMiddleware, async (req, res) => {
 // GET /api/legal/admin/dashboard - Comprehensive Legal Dashboard
 router.get('/admin/dashboard', authMiddleware, async (req, res) => {
     try {
+        const { from, to } = req.query;
+
+        // Set default date range if not provided
+        const fromDate = from || '2024-01-01';
+        const toDate = to || new Date().toISOString().split('T')[0];
+
+        console.log(`[LEGAL] Admin dashboard access with date range: ${fromDate} to ${toDate}`);
+
         await logLegalAction(req, 'ADMIN_DASHBOARD_ACCESS', 'Admin accessed legal compliance dashboard', true);
 
         // Get comprehensive legal compliance metrics
@@ -846,10 +854,18 @@ router.get('/admin/dashboard', authMiddleware, async (req, res) => {
 
     } catch (error) {
         console.error('Legal dashboard error:', error);
-        await logLegalAction(req, 'ADMIN_DASHBOARD_ERROR', `Dashboard access failed: ${error.message}`, true);
+        console.error('Error stack:', error.stack);
+
+        try {
+            await logLegalAction(req, 'ADMIN_DASHBOARD_ERROR', `Dashboard access failed: ${error.message}`, true);
+        } catch (logError) {
+            console.error('Failed to log dashboard error:', logError);
+        }
+
         res.status(500).json({
             error: 'Failed to load legal dashboard',
-            message: error.message
+            message: error.message,
+            details: process.env.NODE_ENV === 'development' ? error.stack : undefined
         });
     }
 });
