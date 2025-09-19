@@ -243,10 +243,8 @@ class LegalCompliancePdfTemplate {
     }
 
     async generateSignedContract(contractData, options = {}) {
-        const PDFDocument = require('pdfkit');
-
-        // Create new PDF document for signed contract
-        const doc = new PDFDocument({
+        // Use the document generator's infrastructure for proper font handling
+        const doc = this.documentGenerator.createPDFDocument({
             size: 'A4',
             margins: {
                 top: 60,
@@ -295,7 +293,7 @@ class LegalCompliancePdfTemplate {
            .fillColor('#374151')
            .text(`Contract ID: ${contractData.acceptance.id}`, 60, headerY + 65, { align: 'left' });
 
-        doc.text(`User: ${contractData.user.name} (${contractData.user.email})`, 60, headerY + 80, { align: 'left' });
+        doc.text(`User: ${contractData.user.name || 'N/A'} (${contractData.user.email || 'N/A'})`, 60, headerY + 80, { align: 'left' });
 
         doc.fontSize(10)
            .fillColor('#9ca3af')

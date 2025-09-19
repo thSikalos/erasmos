@@ -236,8 +236,14 @@ class DocumentGenerator {
     // ===============================
 
     async generatePDF(type, data, options = {}) {
+        // For contract generation, user data is already in the contract data
+        if (type === 'signed_legal_contract') {
+            return this.generateSignedLegalContractPDF(data, options);
+        }
+
+        // For other PDF types, fetch issuer data
         const issuerData = await this.fetchUserDetails(data.issuerId || data.userId);
-        
+
         switch (type) {
             case 'payment_statement':
                 return this.generatePaymentStatementPDF(data, issuerData, options);
@@ -247,8 +253,6 @@ class DocumentGenerator {
                 return this.generateReportsPDF(data, issuerData, options);
             case 'legal_compliance':
                 return this.generateLegalCompliancePDF(data, options);
-            case 'signed_legal_contract':
-                return this.generateSignedLegalContractPDF(data, options);
             default:
                 throw new Error(`Unknown PDF type: ${type}`);
         }

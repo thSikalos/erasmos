@@ -5,6 +5,7 @@ const authMiddleware = require('../middleware/authMiddleware');
 const { v4: uuidv4 } = require('uuid');
 const crypto = require('crypto');
 const EmailService = require('../services/emailService');
+const documentGenerator = require('../utils/documentGenerator');
 
 // =============================================
 // LEGAL COMPLIANCE API ROUTES
@@ -44,6 +45,12 @@ const logLegalAction = async (req, actionType, description, isSignificant = fals
 // =============================================
 // USER LEGAL COMPLIANCE ROUTES
 // =============================================
+
+// Test route to debug issues
+router.get('/test', (req, res) => {
+    console.log('🔥 TEST ROUTE CALLED');
+    res.json({ message: 'Test route working' });
+});
 
 // GET /api/legal/status - Check user's legal compliance status
 router.get('/status', authMiddleware, async (req, res) => {
@@ -928,6 +935,7 @@ function sendVerificationEmailPlaceholder(email, token, userName) {
 
 // GET /api/legal/contract/:acceptanceId - Export individual signed contract as PDF
 router.get('/contract/:acceptanceId', authMiddleware, async (req, res) => {
+    console.log(`🔍 [PDF_CONTRACT] Route called for acceptance ID: ${req.params.acceptanceId}, User: ${req.user?.email}`);
     try {
         const { acceptanceId } = req.params;
         const userId = req.user.id;
@@ -982,16 +990,15 @@ router.get('/contract/:acceptanceId', authMiddleware, async (req, res) => {
             });
         }
 
-        // Generate the signed contract PDF
-        const documentGenerator = require('../utils/documentGenerator');
+        // Prepare contract data with comprehensive null checks
         const contractData = {
             acceptance: acceptance,
             user: {
-                name: acceptance.user_name,
-                email: acceptance.user_email,
-                address: acceptance.user_address,
-                afm: acceptance.user_afm,
-                phone: acceptance.user_phone
+                name: acceptance.user_name || 'Δεν έχει οριστεί',
+                email: acceptance.user_email || 'Δεν έχει οριστεί',
+                address: acceptance.user_address || 'Δεν έχει οριστεί',
+                afm: acceptance.user_afm || 'Δεν έχει οριστεί',
+                phone: acceptance.user_phone || 'Δεν έχει οριστεί'
             },
             digitalSignature: {
                 timestamp: acceptance.acceptance_timestamp,
@@ -1002,24 +1009,33 @@ router.get('/contract/:acceptanceId', authMiddleware, async (req, res) => {
                 emailVerifiedAt: acceptance.email_verified_at
             },
             declarations: {
-                hasLegalAuthority: acceptance.has_legal_authority,
-                hasObtainedConsents: acceptance.has_obtained_consents,
-                hasInformedDataSubjects: acceptance.has_informed_data_subjects,
-                dataIsAccurate: acceptance.data_is_accurate,
-                acceptsLiability: acceptance.accepts_liability,
-                understandsObligations: acceptance.understands_obligations,
-                acceptsBilling: acceptance.accepts_billing,
-                confirmsLawfulBasis: acceptance.confirms_lawful_basis,
-                lawfulBasisType: acceptance.lawful_basis_type,
-                businessPurpose: acceptance.business_purpose,
-                retentionPeriodMonths: acceptance.retention_period_months,
-                dataSubjectCategories: acceptance.data_subject_categories,
-                personalDataCategories: acceptance.personal_data_categories,
-                specialCategoriesProcessed: acceptance.special_categories_processed
+                hasLegalAuthority: acceptance.has_legal_authority || false,
+                hasObtainedConsents: acceptance.has_obtained_consents || false,
+                hasInformedDataSubjects: acceptance.has_informed_data_subjects || false,
+                dataIsAccurate: acceptance.data_is_accurate || false,
+                acceptsLiability: acceptance.accepts_liability || false,
+                understandsObligations: acceptance.understands_obligations || false,
+                acceptsBilling: acceptance.accepts_billing || false,
+                confirmsLawfulBasis: acceptance.confirms_lawful_basis || false,
+                lawfulBasisType: acceptance.lawful_basis_type || 'Δεν έχει οριστεί',
+                businessPurpose: acceptance.business_purpose || 'Δεν έχει οριστεί',
+                retentionPeriodMonths: acceptance.retention_period_months || 0,
+                dataSubjectCategories: acceptance.data_subject_categories || [],
+                personalDataCategories: acceptance.personal_data_categories || [],
+                specialCategoriesProcessed: acceptance.special_categories_processed || false
             }
         };
 
+        console.log(`[LEGAL] Generating PDF for contract data:`, {
+            acceptanceId: acceptance.id,
+            userEmail: acceptance.user_email,
+            isComplete: acceptance.is_complete,
+            emailVerified: acceptance.email_verified
+        });
+
+        // Generate PDF
         const pdfDoc = await documentGenerator.generatePDF('signed_legal_contract', contractData);
+        console.log(`[LEGAL] PDF generation successful for contract ${acceptanceId}`);
 
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `attachment; filename="legal-contract-${acceptance.user_email}-${acceptanceId}.pdf"`);
@@ -1033,12 +1049,20 @@ router.get('/contract/:acceptanceId', authMiddleware, async (req, res) => {
 
     } catch (error) {
         console.error('Signed contract export error:', error);
+        console.error('Error stack:', error.stack);
+        console.error('Contract data that caused error:', {
+            acceptanceId: req.params.acceptanceId,
+            userId: req.user?.id,
+            userRole: req.user?.role
+        });
+
         await logLegalAction(req, 'SIGNED_CONTRACT_EXPORT_ERROR',
             `Failed to export signed contract: ${error.message}`, true);
         res.status(500).json({
             success: false,
             error: 'Failed to generate signed contract',
-            message: error.message
+            message: error.message,
+            details: process.env.NODE_ENV === 'development' ? error.stack : undefined
         });
     }
 });
@@ -1049,6 +1073,7 @@ router.get('/contract/:acceptanceId', authMiddleware, async (req, res) => {
 
 // GET /api/legal/admin/export - Export legal compliance report
 router.get('/admin/export', authMiddleware, async (req, res) => {
+    console.log(`🔍 [EXCEL_EXPORT] Route called with params:`, req.query, `User: ${req.user?.email}`);
     try {
         const { from, to, format = 'xlsx' } = req.query;
 
@@ -1062,7 +1087,6 @@ router.get('/admin/export', authMiddleware, async (req, res) => {
         const legalData = await gatherLegalComplianceData(fromDate, toDate);
 
         // Generate document using DocumentGenerator
-        const documentGenerator = require('../utils/documentGenerator');
 
         if (format === 'pdf') {
             const pdfDoc = await documentGenerator.generatePDF('legal_compliance', legalData);
