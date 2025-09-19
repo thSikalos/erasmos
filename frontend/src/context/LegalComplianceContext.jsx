@@ -404,7 +404,7 @@ export const LegalComplianceProvider = ({ children }) => {
     // Utilities
     getLegalStatus,
     hasAccepted,
-    isLegallyCompliant,
+    isLegallyCompliant: typeof isLegallyCompliant === 'function' ? isLegallyCompliant : () => false,
 
     // Constants
     CURRENT_LEGAL_VERSION

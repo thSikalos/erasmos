@@ -262,6 +262,11 @@ const EditApplicationPage = () => {
                         transform: translateY(-2px);
                     }
 
+                    .modern-select option {
+                        background: #4a5568;
+                        color: white;
+                    }
+
                     .modern-textarea {
                         resize: vertical;
                         min-height: 100px;
@@ -449,21 +454,50 @@ const EditApplicationPage = () => {
                                 <label>📝 {field.label}</label>
                                 {field.type === 'checkbox' ? (
                                     <div className="modern-checkbox-wrapper">
-                                        <input 
-                                            type="checkbox" 
+                                        <input
+                                            type="checkbox"
                                             className="modern-checkbox"
-                                            checked={fieldValues[field.id] === 'true'} 
-                                            onChange={e => handleFieldChange(field.id, e.target.checked)} 
+                                            checked={fieldValues[field.id] === 'true'}
+                                            onChange={e => handleFieldChange(field.id, e.target.checked)}
                                         />
                                         <span>Ναι</span>
                                     </div>
+                                ) : field.type === 'dropdown' ? (
+                                    <select
+                                        className="modern-select"
+                                        value={fieldValues[field.id] || ''}
+                                        onChange={e => handleFieldChange(field.id, e.target.value)}
+                                        required
+                                    >
+                                        <option value="">-- Επιλέξτε --</option>
+                                        {/* Show all active options */}
+                                        {field.options && field.options
+                                            .filter(option => option.is_active !== false)
+                                            .map(option => (
+                                                <option key={option.id || option.value} value={option.value}>
+                                                    {option.label}
+                                                </option>
+                                            ))
+                                        }
+                                        {/* If current value is inactive, show it as well with special styling */}
+                                        {fieldValues[field.id] && field.options &&
+                                            field.options.find(opt => opt.value === fieldValues[field.id] && opt.is_active === false) && (
+                                            <option
+                                                key={`inactive-${fieldValues[field.id]}`}
+                                                value={fieldValues[field.id]}
+                                                style={{ color: '#e74c3c', fontStyle: 'italic' }}
+                                            >
+                                                {field.options.find(opt => opt.value === fieldValues[field.id]).label} (Απενεργοποιημένο)
+                                            </option>
+                                        )}
+                                    </select>
                                 ) : (
-                                    <input 
-                                        type={field.type} 
+                                    <input
+                                        type={field.type}
                                         className="modern-input"
-                                        value={fieldValues[field.id] || ''} 
-                                        onChange={e => handleFieldChange(field.id, e.target.value)} 
-                                        required 
+                                        value={fieldValues[field.id] || ''}
+                                        onChange={e => handleFieldChange(field.id, e.target.value)}
+                                        required
                                     />
                                 )}
                             </div>
