@@ -327,13 +327,35 @@ class LegalCompliancePdfTemplate {
 
         doc.y += 25;
 
-        // Legal acceptances
+        // Terms of Service Section
+        if (acceptance.terms_accepted) {
+            this.addFullTermsSection(doc, 'TERMS OF SERVICE', this.getTermsOfServiceText(), acceptance.terms_accepted_at);
+        }
+
+        // Data Processing Agreement Section
+        if (acceptance.dpa_accepted) {
+            this.addFullTermsSection(doc, 'DATA PROCESSING AGREEMENT (DPA)', this.getDataProcessingAgreementText(), acceptance.dpa_accepted_at);
+        }
+
+        // Privacy Policy Section
+        if (acceptance.privacy_accepted) {
+            this.addFullTermsSection(doc, 'PRIVACY POLICY', this.getPrivacyPolicyText(), acceptance.privacy_accepted_at);
+        }
+
+        // Summary of acceptances
         const acceptances = [
             { name: 'Terms of Service', accepted: acceptance.terms_accepted, date: acceptance.terms_accepted_at },
             { name: 'Data Processing Agreement (DPA)', accepted: acceptance.dpa_accepted, date: acceptance.dpa_accepted_at },
             { name: 'Privacy Policy', accepted: acceptance.privacy_accepted, date: acceptance.privacy_accepted_at },
             { name: 'User Compliance Declarations', accepted: acceptance.declarations_accepted, date: acceptance.declarations_accepted_at }
         ];
+
+        doc.addPage();
+        doc.fontSize(16)
+           .fillColor('#1f2937')
+           .text('📊 ACCEPTANCE SUMMARY', 60, 80);
+
+        doc.y += 25;
 
         acceptances.forEach((item, index) => {
             const status = item.accepted ? '✅ ACCEPTED' : '❌ NOT ACCEPTED';
@@ -471,6 +493,127 @@ class LegalCompliancePdfTemplate {
 
         doc.text(`Document Hash: ${this.generateDocumentHash()}`,
                  80, footerY + 60, { align: 'center', width: doc.page.width - 160 });
+    }
+
+    addFullTermsSection(doc, title, content, acceptedAt) {
+        // Check if we need a new page
+        if (doc.y > doc.page.height - 200) {
+            doc.addPage();
+            doc.y = 60;
+        }
+
+        // Section header
+        doc.fontSize(16)
+           .fillColor('#1f2937')
+           .text(`📜 ${title}`, 60, doc.y);
+
+        doc.fontSize(10)
+           .fillColor('#10b981')
+           .text(`✅ Accepted on: ${new Date(acceptedAt).toLocaleString('el-GR')}`, 60, doc.y + 25);
+
+        doc.y += 50;
+
+        // Content box
+        const contentY = doc.y;
+        doc.roundedRect(60, contentY, doc.page.width - 120, 20, 8)
+           .fillColor('#f8f9fa')
+           .fill()
+           .strokeColor('#e5e7eb')
+           .lineWidth(1)
+           .stroke();
+
+        // Content text
+        doc.fillColor('#374151')
+           .fontSize(9)
+           .text(content, 80, contentY + 20, {
+               width: doc.page.width - 160,
+               align: 'justify'
+           });
+
+        doc.y += 40;
+    }
+
+    getTermsOfServiceText() {
+        return `ΌΡΟΙ ΧΡΉΣΗΣ ΠΛΑΤΦΌΡΜΑΣ ERASMOS
+
+1. ΓΕΝΙΚΟΙ ΟΡΟΙ
+Η πλατφόρμα ERASMOS παρέχει υπηρεσίες διαχείρισης και επεξεργασίας προσωπικών δεδομένων συμμορφούμενη πλήρως με τον Γενικό Κανονισμό Προστασίας Δεδομένων (GDPR) της Ευρωπαϊκής Ένωσης.
+
+2. ΑΠΟΔΟΧΗ ΟΡΩΝ
+Με τη χρήση της πλατφόρμας, συμφωνείτε πλήρως με τους παρόντες όρους χρήσης και δεσμεύεστε για την τήρησή τους.
+
+3. ΥΠΟΧΡΕΩΣΕΙΣ ΧΡΗΣΤΗ
+- Τήρηση της ισχύουσας νομοθεσίας περί προστασίας δεδομένων
+- Διασφάλιση της νομιμότητας των δεδομένων που επεξεργάζεστε
+- Λήψη της απαραίτητης συναίνεσης από τα υποκείμενα των δεδομένων
+
+4. ΠΕΡΙΟΡΙΣΜΟΙ ΚΑΙ ΑΠΑΓΟΡΕΥΣΕΙΣ
+Απαγορεύεται η χρήση της πλατφόρμας για παράνομες δραστηριότητες ή για επεξεργασία δεδομένων χωρίς νόμιμη βάση.
+
+5. ΠΕΡΙΟΡΙΣΜΟΣ ΕΥΘΥΝΗΣ
+Η εταιρεία περιορίζει την ευθύνη της στα όρια που προβλέπει ο νόμος για τις παρεχόμενες υπηρεσίες.`;
+    }
+
+    getDataProcessingAgreementText() {
+        return `ΣΥΜΦΩΝΙΑ ΕΠΕΞΕΡΓΑΣΙΑΣ ΔΕΔΟΜΕΝΩΝ (DPA)
+
+1. ΣΚΟΠΟΣ ΕΠΕΞΕΡΓΑΣΙΑΣ
+Η επεξεργασία προσωπικών δεδομένων μέσω της πλατφόρμας ERASMOS γίνεται αποκλειστικά για τους σκοπούς που έχετε δηλώσει και συμφωνείτε.
+
+2. ΚΑΤΗΓΟΡΙΕΣ ΔΕΔΟΜΕΝΩΝ
+- Στοιχεία ταυτότητας και επικοινωνίας
+- Επαγγελματικά δεδομένα
+- Οικονομικά στοιχεία (κατά περίπτωση)
+
+3. ΝΟΜΙΜΗ ΒΑΣΗ ΕΠΕΞΕΡΓΑΣΙΑΣ
+Η επεξεργασία βασίζεται στη συναίνεση του υποκειμένου ή/και στη νόμιμη βάση που έχετε δηλώσει.
+
+4. ΔΙΚΑΙΩΜΑΤΑ ΥΠΟΚΕΙΜΕΝΩΝ
+Διασφαλίζουμε την τήρηση όλων των δικαιωμάτων των υποκειμένων των δεδομένων σύμφωνα με το GDPR.
+
+5. ΜΕΤΡΑ ΑΣΦΑΛΕΙΑΣ
+Εφαρμόζουμε κατάλληλα τεχνικά και οργανωτικά μέτρα για τη διασφάλιση της ασφάλειας των δεδομένων.
+
+6. ΔΙΑΓΡΑΦΗ ΔΕΔΟΜΕΝΩΝ
+Τα δεδομένα διαγράφονται μετά τη λήξη της περιόδου διατήρησης που έχετε ορίσει.
+
+7. ΠΑΡΑΒΙΑΣΕΙΣ ΑΣΦΑΛΕΙΑΣ
+Σε περίπτωση παραβίασης, ενημερώνουμε άμεσα τις αρμόδιες αρχές και τα υποκείμενα των δεδομένων.`;
+    }
+
+    getPrivacyPolicyText() {
+        return `ΠΟΛΙΤΙΚΗ ΑΠΟΡΡΗΤΟΥ ERASMOS
+
+1. ΣΥΛΛΟΓΗ ΔΕΔΟΜΕΝΩΝ
+Συλλέγουμε μόνο τα απαραίτητα προσωπικά δεδομένα για την παροχή των υπηρεσιών μας.
+
+2. ΧΡΗΣΗ ΔΕΔΟΜΕΝΩΝ
+Τα δεδομένα χρησιμοποιούνται αποκλειστικά για:
+- Παροχή υπηρεσιών πλατφόρμας
+- Επικοινωνία με τους χρήστες
+- Τήρηση νομικών υποχρεώσεων
+- Βελτίωση υπηρεσιών
+
+3. ΚΟΙΝΟΠΟΙΗΣΗ ΣΕ ΤΡΙΤΟΥΣ
+Δεν κοινοποιούμε δεδομένα σε τρίτους χωρίς τη συναίνεσή σας, εκτός αν απαιτείται από το νόμο.
+
+4. ΑΣΦΑΛΕΙΑ ΔΕΔΟΜΕΝΩΝ
+Χρησιμοποιούμε σύγχρονες τεχνολογίες κρυπτογράφησης και ασφαλείας για την προστασία των δεδομένων.
+
+5. ΔΙΚΑΙΩΜΑΤΑ ΧΡΗΣΤΩΝ
+Έχετε δικαίωμα:
+- Πρόσβασης στα δεδομένα σας
+- Διόρθωσης ανακριβών στοιχείων
+- Διαγραφής των δεδομένων σας
+- Περιορισμού της επεξεργασίας
+- Φορητότητας των δεδομένων
+- Εναντίωσης στην επεξεργασία
+
+6. COOKIES ΚΑΙ ΤΕΧΝΟΛΟΓΙΕΣ ΠΑΡΑΚΟΛΟΥΘΗΣΗΣ
+Χρησιμοποιούμε cookies μόνο για τη βελτίωση της εμπειρίας χρήσης και την ασφάλεια της πλατφόρμας.
+
+7. ΕΠΙΚΟΙΝΩΝΙΑ
+Για οποιοδήποτε ερώτημα σχετικά με την προστασία δεδομένων, επικοινωνήστε μαζί μας στο privacy@erasmos.app.`;
     }
 }
 
