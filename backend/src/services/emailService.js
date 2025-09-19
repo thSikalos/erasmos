@@ -6,6 +6,28 @@ class EmailService {
     }
 
     /**
+     * Generate a 6-digit alphanumeric verification code
+     * Format: A1B2C3 (alternating letters and numbers)
+     */
+    generateVerificationCode() {
+        const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+        const numbers = '0123456789';
+
+        let code = '';
+        for (let i = 0; i < 6; i++) {
+            if (i % 2 === 0) {
+                // Even positions: letters
+                code += letters.charAt(Math.floor(Math.random() * letters.length));
+            } else {
+                // Odd positions: numbers
+                code += numbers.charAt(Math.floor(Math.random() * numbers.length));
+            }
+        }
+
+        return code;
+    }
+
+    /**
      * Send email using SendGrid
      * @param {Object} emailOptions - Email options (to, subject, text, html)
      */
@@ -25,16 +47,63 @@ class EmailService {
                 html: html || text
             };
 
+            console.log(`[EMAIL] ===== ENHANCED DEBUG LOGGING =====`);
+            console.log(`[EMAIL] Timestamp: ${new Date().toISOString()}`);
+            console.log(`[EMAIL] Attempting to send email to: ${to}`);
+            console.log(`[EMAIL] Subject: ${subject}`);
+            console.log(`[EMAIL] From: ${msg.from}`);
+            console.log(`[EMAIL] SendGrid API Key present: ${!!process.env.SENDGRID_API_KEY}`);
+            console.log(`[EMAIL] SendGrid API Key (first 10 chars): ${process.env.SENDGRID_API_KEY ? process.env.SENDGRID_API_KEY.substring(0, 10) + '...' : 'MISSING'}`);
+            console.log(`[EMAIL] Text length: ${text ? text.length : 0} characters`);
+            console.log(`[EMAIL] HTML length: ${html ? html.length : 0} characters`);
+            console.log(`[EMAIL] ========================================`);
+
             const result = await sgMail.send(msg);
 
-            console.log(`[EMAIL] Successfully sent to ${to}: ${subject}`);
-            return { success: true, result };
+            console.log(`[EMAIL] ===== SENDGRID SUCCESS RESPONSE =====`);
+            console.log(`[EMAIL] Successfully sent to ${to}`);
+            console.log(`[EMAIL] Response status: ${result[0]?.statusCode}`);
+            console.log(`[EMAIL] Response headers:`, JSON.stringify(result[0]?.headers, null, 2));
+            console.log(`[EMAIL] Response body:`, JSON.stringify(result[0]?.body, null, 2));
+            console.log(`[EMAIL] Message ID: ${result[0]?.headers?.['x-message-id']}`);
+            console.log(`[EMAIL] =========================================`);
+
+            return {
+                success: true,
+                result,
+                messageId: result[0]?.headers?.['x-message-id'],
+                statusCode: result[0]?.statusCode
+            };
         } catch (error) {
-            console.error('[EMAIL] Send failed:', error.message);
+            console.error(`[EMAIL] ===== SENDGRID ERROR RESPONSE =====`);
+            console.error(`[EMAIL] Send failed to ${emailOptions.to}`);
+            console.error(`[EMAIL] Error message: ${error.message}`);
+            console.error(`[EMAIL] Error code: ${error.code}`);
+
             if (error.response) {
-                console.error('[EMAIL] SendGrid error:', error.response.body);
+                console.error(`[EMAIL] HTTP Status: ${error.response.status}`);
+                console.error(`[EMAIL] Response headers:`, JSON.stringify(error.response.headers, null, 2));
+                console.error(`[EMAIL] Response body:`, JSON.stringify(error.response.body, null, 2));
+
+                // Detailed SendGrid error analysis
+                if (error.response.body?.errors) {
+                    console.error(`[EMAIL] SendGrid specific errors:`);
+                    error.response.body.errors.forEach((err, index) => {
+                        console.error(`[EMAIL]   Error ${index + 1}: ${err.message} (${err.field})`);
+                    });
+                }
             }
-            return { success: false, error: error.message };
+
+            console.error(`[EMAIL] Full error stack:`, error.stack);
+            console.error(`[EMAIL] ====================================`);
+
+            return {
+                success: false,
+                error: error.message,
+                errorCode: error.code,
+                httpStatus: error.response?.status,
+                sendGridErrors: error.response?.body?.errors
+            };
         }
     }
 
@@ -158,6 +227,13 @@ class EmailService {
                     html: this.createMonthlySummaryHtml(data, recipientName)
                 };
 
+            case 'LEGAL_EMAIL_VERIFICATION':
+                return {
+                    subject: '🔒 Επιβεβαίωση Νομικής Αποδοχής - ERASMOS',
+                    text: this.generateLegalVerificationText(data.verificationCode, data.acceptanceId),
+                    html: this.generateLegalVerificationHTML(data.verificationCode, data.acceptanceId)
+                };
+
             default:
                 return {
                     subject: 'Ειδοποίηση από το σύστημα Erasmos',
@@ -235,6 +311,209 @@ class EmailService {
                      <p>${data.message}</p>`,
             linkUrl: null
         });
+    }
+
+    /**
+     * Send legal verification email with manual code
+     */
+    async sendLegalVerificationEmail(userEmail, verificationCode, acceptanceId) {
+        try {
+            const emailContent = this.generateEmailContent('LEGAL_EMAIL_VERIFICATION', {
+                verificationCode: verificationCode,
+                acceptanceId: acceptanceId
+            }, 'χρήστη');
+
+            const result = await this.sendEmail({
+                to: userEmail,
+                subject: emailContent.subject,
+                text: emailContent.text,
+                html: emailContent.html
+            });
+
+            console.log(`[EMAIL] Legal verification email sent to ${userEmail} with code: ${verificationCode}`);
+            return result;
+        } catch (error) {
+            console.error('[EMAIL] Failed to send legal verification email:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Generate legal verification HTML content
+     */
+    generateLegalVerificationHTML(verificationCode, acceptanceId) {
+        return `
+        <!DOCTYPE html>
+        <html lang="el">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Επιβεβαίωση Νομικής Αποδοχής</title>
+            <style>
+                body {
+                    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                    line-height: 1.6;
+                    color: #333;
+                    max-width: 600px;
+                    margin: 0 auto;
+                    padding: 20px;
+                    background-color: #f5f5f5;
+                }
+                .container {
+                    background: white;
+                    padding: 40px;
+                    border-radius: 12px;
+                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+                }
+                .header {
+                    text-align: center;
+                    margin-bottom: 30px;
+                    border-bottom: 3px solid #10b981;
+                    padding-bottom: 20px;
+                }
+                .logo {
+                    font-size: 2rem;
+                    font-weight: bold;
+                    color: #10b981;
+                    margin-bottom: 10px;
+                }
+                .title {
+                    color: #1f2937;
+                    font-size: 1.5rem;
+                    margin: 0;
+                }
+                .warning-box {
+                    background: #fef2f2;
+                    border: 2px solid #ef4444;
+                    border-radius: 8px;
+                    padding: 20px;
+                    margin: 20px 0;
+                    text-align: center;
+                }
+                .warning-box h3 {
+                    color: #dc2626;
+                    margin: 0 0 10px 0;
+                    font-size: 1.1rem;
+                }
+                .verification-button {
+                    display: inline-block;
+                    background: #10b981;
+                    color: white;
+                    padding: 15px 30px;
+                    text-decoration: none;
+                    border-radius: 8px;
+                    font-weight: 600;
+                    font-size: 1.1rem;
+                    margin: 20px 0;
+                    text-align: center;
+                }
+                .info-box {
+                    background: #f0f9ff;
+                    border: 1px solid #0ea5e9;
+                    border-radius: 8px;
+                    padding: 15px;
+                    margin: 20px 0;
+                }
+                .footer {
+                    margin-top: 30px;
+                    padding-top: 20px;
+                    border-top: 1px solid #e5e7eb;
+                    font-size: 0.9rem;
+                    color: #6b7280;
+                }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="header">
+                    <div class="logo">🔒 ERASMOS</div>
+                    <h1 class="title">Επιβεβαίωση Νομικής Αποδοχής</h1>
+                </div>
+
+                <div class="content">
+                    <p>Αγαπητέ χρήστη,</p>
+                    <p>Λάβαμε την αίτησή σας για νομική αποδοχή των όρων και των συμφωνιών της πλατφόρμας ERASMOS. Για να ολοκληρώσετε τη διαδικασία, παρακαλούμε εισάγετε τον παρακάτω κωδικό επιβεβαίωσης στην εφαρμογή.</p>
+
+                    <div class="warning-box">
+                        <h3>⚠️ ΣΗΜΑΝΤΙΚΟ - ΝΟΜΙΚΗ ΕΠΙΒΕΒΑΙΩΣΗ</h3>
+                        <p><strong>Αυτό το email αποτελεί μέρος της νομικής διαδικασίας.</strong> Η επιβεβαίωση αποδεικνύει ότι έχετε πρόσβαση στη διεύθυνση email που δηλώσατε και ότι αποδέχεστε τους όρους χρήσης.</p>
+                    </div>
+
+                    <div style="text-align: center; margin: 30px 0;">
+                        <div style="background: #f8f9fa; border: 3px solid #10b981; border-radius: 12px; padding: 20px; display: inline-block;">
+                            <h2 style="margin: 0; color: #10b981; font-size: 2.5rem; letter-spacing: 0.2em; font-family: 'Courier New', monospace;">${verificationCode}</h2>
+                            <p style="margin: 10px 0 0 0; color: #666; font-size: 14px;">Κωδικός Επιβεβαίωσης</p>
+                        </div>
+                    </div>
+
+                    <div style="background: #e7f3ff; border: 1px solid #0ea5e9; border-radius: 8px; padding: 15px; margin: 20px 0;">
+                        <p style="margin: 0; color: #0066cc;"><strong>📝 Οδηγίες:</strong></p>
+                        <p style="margin: 5px 0 0 0; color: #0066cc;">Εισάγετε τον παραπάνω κωδικό στο πεδίο επιβεβαίωσης της εφαρμογής ERASMOS για να ολοκληρώσετε τη νομική διαδικασία.</p>
+                    </div>
+
+                    <div class="info-box">
+                        <p><strong>ID Αποδοχής:</strong> ${acceptanceId}</p>
+                        <p><strong>Ημερομηνία:</strong> ${new Date().toLocaleString('el-GR')}</p>
+                        <p><strong>Χρόνος Λήξης:</strong> 24 ώρες από την αποστολή</p>
+                    </div>
+
+                    <p><strong>Σε περίπτωση που δεν πραγματοποιήσατε εσείς αυτή την αίτηση:</strong></p>
+                    <p>Παρακαλούμε αγνοήστε αυτό το email και επικοινωνήστε μαζί μας άμεσα στο thsikalos@gmail.com</p>
+                </div>
+
+                <div class="footer">
+                    <p><strong>ERASMOS - Πλατφόρμα Επεξεργασίας Προσωπικών Δεδομένων</strong></p>
+                    <p>Αυτό το email στάλθηκε αυτόματα. Παρακαλούμε μην απαντήσετε σε αυτό το μήνυμα.</p>
+                    <p>Για υποστήριξη: thsikalos@gmail.com</p>
+                    <p style="font-size: 0.8rem; margin-top: 15px;">
+                        © ${new Date().getFullYear()} ERASMOS. Όλα τα δικαιώματα διατηρούνται.
+                        <br>Αυτό το email αποτελεί μέρος της νομικής διαδικασίας GDPR.
+                    </p>
+                </div>
+            </div>
+        </body>
+        </html>
+        `;
+    }
+
+    /**
+     * Generate legal verification text content
+     */
+    generateLegalVerificationText(verificationCode, acceptanceId) {
+        return `
+🔒 ΕΠΙΒΕΒΑΙΩΣΗ ΝΟΜΙΚΗΣ ΑΠΟΔΟΧΗΣ - ERASMOS
+
+Αγαπητέ χρήστη,
+
+Λάβαμε την αίτησή σας για νομική αποδοχή των όρων και των συμφωνιών της πλατφόρμας ERASMOS.
+
+⚠️ ΣΗΜΑΝΤΙΚΟ - ΝΟΜΙΚΗ ΕΠΙΒΕΒΑΙΩΣΗ
+Αυτό το email αποτελεί μέρος της νομικής διαδικασίας. Η επιβεβαίωση αποδεικνύει ότι έχετε πρόσβαση στη διεύθυνση email που δηλώσατε.
+
+ΚΩΔΙΚΟΣ ΕΠΙΒΕΒΑΙΩΣΗΣ: ${verificationCode}
+
+📝 ΟΔΗΓΙΕΣ:
+Εισάγετε τον παραπάνω κωδικό στο πεδίο επιβεβαίωσης της εφαρμογής ERASMOS για να ολοκληρώσετε τη νομική διαδικασία.
+
+ΣΤΟΙΧΕΙΑ ΑΠΟΔΟΧΗΣ:
+- ID Αποδοχής: ${acceptanceId}
+- Κωδικός Επιβεβαίωσης: ${verificationCode}
+- Ημερομηνία: ${new Date().toLocaleString('el-GR')}
+- Χρόνος Λήξης: 24 ώρες
+
+ΝΟΜΙΚΕΣ ΠΛΗΡΟΦΟΡΙΕΣ:
+- Αυτή η επιβεβαίωση απαιτείται σύμφωνα με το GDPR
+- Το email αυτό καταγράφεται για λόγους audit trail
+- Η επιβεβαίωση δεν μπορεί να ανακληθεί μετά την ολοκλήρωση
+
+Σε περίπτωση που δεν πραγματοποιήσατε εσείς αυτή την αίτηση, παρακαλούμε αγνοήστε αυτό το email και επικοινωνήστε μαζί μας στο thsikalos@gmail.com
+
+---
+ERASMOS - Πλατφόρμα Επεξεργασίας Προσωπικών Δεδομένων
+Για υποστήριξη: thsikalos@gmail.com
+
+© ${new Date().getFullYear()} ERASMOS. Αυτό το email αποτελεί μέρος της νομικής διαδικασίας GDPR.
+        `;
     }
 }
 

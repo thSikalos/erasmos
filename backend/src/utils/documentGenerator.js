@@ -8,10 +8,12 @@ const BRAND_CONFIG = require('./brandConfig');
 const PaymentStatementTemplate = require('./pdfTemplates/paymentStatement');
 const InvoiceTemplate = require('./pdfTemplates/invoice');
 const ReportsPdfTemplate = require('./pdfTemplates/reports');
+const LegalCompliancePdfTemplate = require('./pdfTemplates/legalCompliance');
 
 // Excel Templates
 const ReportsExcelTemplate = require('./excelTemplates/reports');
 const RenewalsTemplate = require('./excelTemplates/renewals');
+const LegalComplianceExcelTemplate = require('./excelTemplates/legalCompliance');
 
 class DocumentGenerator {
     constructor() {
@@ -23,7 +25,9 @@ class DocumentGenerator {
             invoice: new InvoiceTemplate(this),
             reportsPdf: new ReportsPdfTemplate(this),
             reportsExcel: new ReportsExcelTemplate(this),
-            renewals: new RenewalsTemplate(this)
+            renewals: new RenewalsTemplate(this),
+            legalCompliancePdf: new LegalCompliancePdfTemplate(this),
+            legalComplianceExcel: new LegalComplianceExcelTemplate(this)
         };
     }
 
@@ -241,6 +245,10 @@ class DocumentGenerator {
                 return this.generateInvoicePDF(data, issuerData, options);
             case 'reports':
                 return this.generateReportsPDF(data, issuerData, options);
+            case 'legal_compliance':
+                return this.generateLegalCompliancePDF(data, options);
+            case 'signed_legal_contract':
+                return this.generateSignedLegalContractPDF(data, options);
             default:
                 throw new Error(`Unknown PDF type: ${type}`);
         }
@@ -252,6 +260,8 @@ class DocumentGenerator {
                 return this.generateReportsExcel(data, options);
             case 'renewals':
                 return this.generateRenewalsExcel(data, options);
+            case 'legal_compliance':
+                return this.generateLegalComplianceExcel(data, options);
             default:
                 throw new Error(`Unknown Excel type: ${type}`);
         }
@@ -280,6 +290,20 @@ class DocumentGenerator {
 
     generateRenewalsExcel(data, options) {
         return this.templates.renewals.generate(data, options);
+    }
+
+    generateLegalCompliancePDF(data, options) {
+        return this.templates.legalCompliancePdf.generate(data, options);
+    }
+
+    generateLegalComplianceExcel(data, options) {
+        return this.templates.legalComplianceExcel.generate(data, options);
+    }
+
+    generateSignedLegalContractPDF(data, options) {
+        // For now, reuse the legal compliance PDF template with contract-specific data
+        // In the future, we can create a specialized signed contract template
+        return this.templates.legalCompliancePdf.generateSignedContract(data, options);
     }
 }
 

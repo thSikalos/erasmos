@@ -114,6 +114,34 @@ const AdminLegalDashboard = () => {
     }
   };
 
+  // Export signed contract PDF
+  const exportSignedContract = async (acceptanceId, userEmail) => {
+    try {
+      const response = await fetch(`/api/legal/contract/${acceptanceId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Αποτυχία εξαγωγής συμβολαίου');
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `legal-contract-${userEmail}-${acceptanceId}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error('Error exporting signed contract:', error);
+      setError('Αποτυχία εξαγωγής συμβολαίου');
+    }
+  };
+
   if (loading) {
     return (
       <div style={styles.container}>
@@ -294,6 +322,7 @@ const AdminLegalDashboard = () => {
                   <th style={styles.tableHeaderCell}>Ημερομηνία</th>
                   <th style={styles.tableHeaderCell}>Κατάσταση</th>
                   <th style={styles.tableHeaderCell}>Email Verified</th>
+                  <th style={styles.tableHeaderCell}>Ενέργειες</th>
                 </tr>
               </thead>
               <tbody>
@@ -320,6 +349,21 @@ const AdminLegalDashboard = () => {
                         {acceptance.email_verified ? '✅ Ναι' : '❌ Όχι'}
                       </span>
                     </td>
+                    <td style={styles.tableCell}>
+                      {acceptance.is_complete && acceptance.email_verified ? (
+                        <button
+                          onClick={() => exportSignedContract(acceptance.id, acceptance.user_email)}
+                          style={{...styles.actionButton, backgroundColor: '#dc2626'}}
+                          title="Εξαγωγή Υπογεγραμμένου Συμβολαίου"
+                        >
+                          📄 PDF
+                        </button>
+                      ) : (
+                        <span style={{fontSize: '0.8rem', color: '#6b7280'}}>
+                          {!acceptance.is_complete ? 'Ημιτελές' : 'Αναμονή Email'}
+                        </span>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -329,22 +373,22 @@ const AdminLegalDashboard = () => {
 
         {/* Pending Email Verifications */}
         <div style={styles.tableSection}>
-          <h2 style={styles.sectionTitle}>📧 Εκκρεμείς Επιβεβαιώσεις Email</h2>
+          <h2 style={styles.sectionTitle}>📧 Non-Compliant Users</h2>
           <div style={styles.tableContainer}>
             <table style={styles.table}>
               <thead>
                 <tr style={styles.tableHeader}>
                   <th style={styles.tableHeaderCell}>Χρήστης</th>
                   <th style={styles.tableHeaderCell}>Email</th>
-                  <th style={styles.tableHeaderCell}>Στάλθηκε</th>
-                  <th style={styles.tableHeaderCell}>Κατάσταση</th>
+                  <th style={styles.tableHeaderCell}>Ημερομηνία</th>
+                  <th style={styles.tableHeaderCell}>Τύπος Προβλήματος</th>
                   <th style={styles.tableHeaderCell}>Ενέργειες</th>
                 </tr>
               </thead>
               <tbody>
                 {pendingVerifications.map((verification, index) => (
                   <tr key={index} style={styles.tableRow}>
-                    <td style={styles.tableCell}>{verification.user_name}</td>
+                    <td style={styles.tableCell}>{verification.user_name || 'N/A'}</td>
                     <td style={styles.tableCell}>{verification.email}</td>
                     <td style={styles.tableCell}>
                       {new Date(verification.sent_at).toLocaleDateString('el-GR')}
@@ -352,18 +396,24 @@ const AdminLegalDashboard = () => {
                     <td style={styles.tableCell}>
                       <span style={{
                         ...styles.statusBadge,
-                        backgroundColor: verification.status === 'sent' ? '#f59e0b' : '#ef4444'
+                        backgroundColor: verification.status === 'pending_verification' ? '#f59e0b' : '#ef4444'
                       }}>
-                        {verification.status === 'sent' ? 'Αποστάλθηκε' : 'Αποτυχία'}
+                        {verification.status === 'pending_verification' ? 'Εκκρεμής Email' : 'Χωρίς Legal Acceptance'}
                       </span>
                     </td>
                     <td style={styles.tableCell}>
-                      <button
-                        onClick={() => resendVerificationEmail(verification.acceptance_id)}
-                        style={styles.actionButton}
-                      >
-                        🔄 Επαναποστολή
-                      </button>
+                      {verification.status === 'pending_verification' && verification.acceptance_id ? (
+                        <button
+                          onClick={() => resendVerificationEmail(verification.acceptance_id)}
+                          style={styles.actionButton}
+                        >
+                          🔄 Επαναποστολή
+                        </button>
+                      ) : (
+                        <span style={{fontSize: '0.8rem', color: '#6b7280'}}>
+                          Χρειάζεται Login
+                        </span>
+                      )}
                     </td>
                   </tr>
                 ))}

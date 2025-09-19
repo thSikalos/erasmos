@@ -1,9 +1,19 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { useLegalCompliance } from '../context/LegalComplianceContext';
+import { AuthContext } from '../context/AuthContext';
 import UserComplianceDeclarations from './UserComplianceDeclarations';
 
 const LegalAcceptanceModal = () => {
-  const { showLegalModal, setShowLegalModal, completeLegalAcceptance, loading } = useLegalCompliance();
+  const {
+    showLegalModal,
+    setShowLegalModal,
+    completeLegalAcceptance,
+    verifyCodeAcceptance,
+    resendVerificationEmail,
+    loading,
+    legalStatus
+  } = useLegalCompliance();
+  const { logout, legalComplianceStatus, checkLegalCompliance: authCheckCompliance } = useContext(AuthContext);
   const [currentStep, setCurrentStep] = useState(1);
   const [acceptances, setAcceptances] = useState({
     termsOfService: false,
@@ -13,20 +23,39 @@ const LegalAcceptanceModal = () => {
   });
   const [declarations, setDeclarations] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [verificationCode, setVerificationCode] = useState('');
+  const [verificationError, setVerificationError] = useState('');
+  const [emailSent, setEmailSent] = useState(false);
+  const [isVerifyingCode, setIsVerifyingCode] = useState(false);
 
-  // Reset state when modal opens
+  // Reset state when modal opens (but preserve step 5 state)
   useEffect(() => {
     if (showLegalModal) {
-      setCurrentStep(1);
-      setAcceptances({
-        termsOfService: false,
-        dataProcessingAgreement: false,
-        privacyPolicy: false,
-        userDeclarations: false
-      });
-      setDeclarations({});
+      // Check if we need to go directly to email verification
+      if (legalComplianceStatus?.complianceStatus === 'pending_email_verification') {
+        console.log('[MODAL] Going directly to Step 5 for email verification');
+        setCurrentStep(5);
+        setEmailSent(true);
+        // Set acceptances as completed since user already went through them
+        setAcceptances({
+          termsOfService: true,
+          dataProcessingAgreement: true,
+          privacyPolicy: true,
+          userDeclarations: true
+        });
+      } else if (!emailSent && currentStep !== 5) {
+        // Normal reset for new users
+        setCurrentStep(1);
+        setAcceptances({
+          termsOfService: false,
+          dataProcessingAgreement: false,
+          privacyPolicy: false,
+          userDeclarations: false
+        });
+        setDeclarations({});
+      }
     }
-  }, [showLegalModal]);
+  }, [showLegalModal, emailSent]);
 
   if (!showLegalModal) return null;
 
@@ -63,10 +92,22 @@ const LegalAcceptanceModal = () => {
 
     setIsSubmitting(true);
     try {
-      await completeLegalAcceptance({
+      console.log('[MODAL] Submitting legal acceptance...');
+      const result = await completeLegalAcceptance({
         ...acceptances,
         declarations
       });
+
+      console.log('[MODAL] Legal acceptance result:', result);
+
+      // After successful submission, move to email verification step
+      if (result && result.verificationCode) {
+        console.log('[MODAL] Moving to Step 5 for email verification');
+        setEmailSent(true);
+        setCurrentStep(5);
+      } else {
+        console.warn('[MODAL] No verificationCode in result, cannot proceed to Step 5');
+      }
     } catch (error) {
       console.error('Error completing legal acceptance:', error);
       alert('Σφάλμα κατά την αποθήκευση. Παρακαλούμε δοκιμάστε ξανά.');
@@ -75,11 +116,67 @@ const LegalAcceptanceModal = () => {
     }
   };
 
+  const handleCodeVerification = async () => {
+    if (!verificationCode || verificationCode.length !== 6) {
+      setVerificationError('Παρακαλούμε εισάγετε έναν έγκυρο 6-ψήφιο κωδικό');
+      return;
+    }
+
+    setIsVerifyingCode(true);
+    setVerificationError('');
+
+    try {
+      console.log('[MODAL] Starting email verification with code:', verificationCode);
+
+      await verifyCodeAcceptance(verificationCode);
+
+      console.log('[MODAL] Email verification successful');
+
+      // Close modal immediately
+      setShowLegalModal(false);
+
+      // Reset modal state to prevent re-opening
+      setCurrentStep(1);
+      setEmailSent(false);
+      setVerificationCode('');
+      setVerificationError('');
+
+      // Force a legal compliance re-check to update AuthContext
+      if (authCheckCompliance) {
+        console.log('[MODAL] Forcing legal compliance re-check...');
+        await authCheckCompliance();
+      }
+
+      // Navigate to dashboard after a brief delay
+      setTimeout(() => {
+        console.log('[MODAL] Navigating to dashboard');
+        window.location.href = '/dashboard';
+      }, 100);
+
+    } catch (error) {
+      console.error('[MODAL] Error verifying code:', error);
+      setVerificationError(error.message || 'Μη έγκυρος κωδικός επιβεβαίωσης');
+    } finally {
+      setIsVerifyingCode(false);
+    }
+  };
+
+  const handleResendEmail = async () => {
+    try {
+      await resendVerificationEmail();
+      alert('Το email επιβεβαίωσης στάλθηκε ξανά!');
+    } catch (error) {
+      console.error('Error resending email:', error);
+      alert('Σφάλμα κατά την αποστολή email. Παρακαλούμε δοκιμάστε ξανά.');
+    }
+  };
+
   const steps = [
     { number: 1, title: 'Όροι Χρήσης', key: 'termsOfService' },
     { number: 2, title: 'Συμφωνία Επεξεργασίας', key: 'dataProcessingAgreement' },
     { number: 3, title: 'Πολιτική Απορρήτου', key: 'privacyPolicy' },
-    { number: 4, title: 'Δηλώσεις Συμμόρφωσης', key: 'userDeclarations' }
+    { number: 4, title: 'Δηλώσεις Συμμόρφωσης', key: 'userDeclarations' },
+    { number: 5, title: 'Επιβεβαίωση Email', key: 'emailVerification' }
   ];
 
   return (
@@ -120,6 +217,16 @@ const LegalAcceptanceModal = () => {
             padding: 30px;
             text-align: center;
             position: relative;
+          }
+
+          .modal-button.logout {
+            background: #dc2626;
+            color: white;
+          }
+
+          .modal-button.logout:hover:not(:disabled) {
+            background: #b91c1c;
+            transform: translateY(-1px);
           }
 
           .legal-modal-title {
@@ -340,6 +447,104 @@ const LegalAcceptanceModal = () => {
             font-size: 0.9rem;
           }
 
+          .verification-code-container {
+            background: #f8f9fa;
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+            padding: 30px;
+            margin: 20px 0;
+            text-align: center;
+          }
+
+          .verification-code-input {
+            font-size: 2rem;
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            text-align: center;
+            letter-spacing: 0.5em;
+            padding: 15px;
+            border: 2px solid #10b981;
+            border-radius: 8px;
+            width: 200px;
+            margin: 15px 0;
+            text-transform: uppercase;
+          }
+
+          .verification-code-input:focus {
+            outline: none;
+            border-color: #059669;
+            box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+          }
+
+          .verification-code-input.error {
+            border-color: #ef4444;
+          }
+
+          .verification-actions {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-top: 20px;
+          }
+
+          .verification-button {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+          }
+
+          .verification-button.primary {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+          }
+
+          .verification-button.primary:hover:not(:disabled) {
+            background: linear-gradient(135deg, #059669, #047857);
+            transform: translateY(-1px);
+          }
+
+          .verification-button.secondary {
+            background: #e5e7eb;
+            color: #374151;
+          }
+
+          .verification-button.secondary:hover:not(:disabled) {
+            background: #d1d5db;
+          }
+
+          .verification-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+          }
+
+          .verification-error {
+            color: #ef4444;
+            margin-top: 10px;
+            font-size: 0.9rem;
+          }
+
+          .email-sent-notice {
+            background: #dbeafe;
+            border: 2px solid #3b82f6;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            text-align: center;
+          }
+
+          .email-sent-notice h4 {
+            color: #1d4ed8;
+            margin: 0 0 10px 0;
+          }
+
+          .email-sent-notice p {
+            color: #1e40af;
+            margin: 0;
+          }
+
           @media (max-width: 768px) {
             .legal-modal {
               margin: 10px;
@@ -368,6 +573,7 @@ const LegalAcceptanceModal = () => {
               width: 100%;
               justify-content: space-between;
             }
+
           }
         `}
       </style>
@@ -563,18 +769,72 @@ const LegalAcceptanceModal = () => {
             </div>
           )}
 
-          {currentStep === 5 && allRequirementsCompleted() && (
+          {currentStep === 5 && (
             <div className="step-content">
-              <div className="final-summary">
-                <h3>🎉 Νομική Συμφωνία Ολοκληρώθηκε</h3>
-                <p>Έχετε αποδεχθεί επιτυχώς όλους τους νομικούς όρους:</p>
-                <ul>
-                  <li>✅ Όροι Χρήσης</li>
-                  <li>✅ Συμφωνία Επεξεργασίας Δεδομένων</li>
-                  <li>✅ Πολιτική Απορρήτου</li>
-                  <li>✅ Δηλώσεις Συμμόρφωσης</li>
-                </ul>
-                <p>Θα λάβετε email επιβεβαίωσης για την νομική εγκυρότητα της συμφωνίας.</p>
+              <h2 className="step-title">📧 Επιβεβαίωση Email</h2>
+
+              {emailSent && (
+                <div className="email-sent-notice">
+                  <h4>📬 Email Στάλθηκε!</h4>
+                  <p>Ελέγξτε τα εισερχόμενά σας για τον κωδικό επιβεβαίωσης.</p>
+                </div>
+              )}
+
+              <div className="verification-code-container">
+                <h3>🔑 Εισάγετε τον Κωδικό Επιβεβαίωσης</h3>
+                <p>Εισάγετε τον 6-ψήφιο κωδικό που λάβατε στο email σας:</p>
+
+                <input
+                  type="text"
+                  className={`verification-code-input ${verificationError ? 'error' : ''}`}
+                  value={verificationCode}
+                  onChange={(e) => {
+                    const value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+                    if (value.length <= 6) {
+                      setVerificationCode(value);
+                      setVerificationError('');
+                    }
+                  }}
+                  placeholder="A1B2C3"
+                  maxLength="6"
+                  disabled={isVerifyingCode}
+                />
+
+                {verificationError && (
+                  <div className="verification-error">
+                    ⚠️ {verificationError}
+                  </div>
+                )}
+
+                <div className="verification-actions">
+                  <button
+                    className="verification-button secondary"
+                    onClick={handleResendEmail}
+                    disabled={isVerifyingCode}
+                  >
+                    📤 Αποστολή Ξανά
+                  </button>
+
+                  <button
+                    className="verification-button primary"
+                    onClick={handleCodeVerification}
+                    disabled={verificationCode.length !== 6 || isVerifyingCode}
+                  >
+                    {isVerifyingCode ? 'Επαλήθευση...' : '✅ Επιβεβαίωση'}
+                  </button>
+                </div>
+              </div>
+
+              <div className="document-container">
+                <div className="document-content">
+                  <h3>ℹ️ Οδηγίες</h3>
+                  <ul>
+                    <li>Ελέγξτε τα εισερχόμενά σας και το φάκελο spam</li>
+                    <li>Ο κωδικός αποτελείται από 6 χαρακτήρες (γράμματα και αριθμούς)</li>
+                    <li>Ο κωδικός λήγει σε 24 ώρες</li>
+                    <li>Μπορείτε να ζητήσετε νέο κωδικό αν χρειαστεί</li>
+                  </ul>
+                </div>
               </div>
             </div>
           )}
@@ -583,11 +843,23 @@ const LegalAcceptanceModal = () => {
         {/* Footer */}
         <div className="legal-modal-footer">
           <div className="step-info">
-            Βήμα {currentStep} από 4
+            {currentStep === 5 ? 'Επιβεβαίωση Email' : `Βήμα ${currentStep} από 4`}
           </div>
 
           <div className="modal-actions">
-            {currentStep > 1 && (
+            <button
+              className="modal-button logout"
+              onClick={() => {
+                setShowLegalModal(false);
+                setTimeout(() => logout(), 100);
+              }}
+              disabled={isSubmitting || isVerifyingCode}
+              title="Έξοδος από την εφαρμογή"
+            >
+              🚪 Έξοδος
+            </button>
+
+            {currentStep > 1 && currentStep < 5 && (
               <button
                 className="modal-button secondary"
                 onClick={() => setCurrentStep(currentStep - 1)}
@@ -605,15 +877,15 @@ const LegalAcceptanceModal = () => {
               >
                 Επόμενο
               </button>
-            ) : (
+            ) : currentStep === 4 ? (
               <button
                 className="modal-button primary"
                 onClick={handleFinalSubmit}
                 disabled={!allRequirementsCompleted() || isSubmitting || loading}
               >
-                {isSubmitting ? 'Αποθήκευση...' : 'Ολοκλήρωση Συμφωνίας'}
+                {isSubmitting ? 'Αποθήκευση...' : 'Αποστολή Email Επιβεβαίωσης'}
               </button>
-            )}
+            ) : null}
           </div>
         </div>
       </div>

@@ -12,6 +12,8 @@ export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(localStorage.getItem('token'));
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [legalComplianceStatus, setLegalComplianceStatus] = useState(null);
+  const [legalLoading, setLegalLoading] = useState(false);
   const [sessionState, setSessionState] = useState({
     redirectInProgress: false,
     lastTokenCheck: null
@@ -41,18 +43,63 @@ export const AuthProvider = ({ children }) => {
     }
   }, [token]);
 
+  // Check legal compliance status
+  const checkLegalCompliance = useCallback(async (forceCheck = false) => {
+    if (!token || !user) {
+      setLegalComplianceStatus({ complianceStatus: 'not_started', requiresAction: true });
+      return false;
+    }
+
+    // Skip if we already have a recent status and not forcing check
+    if (!forceCheck && legalComplianceStatus && legalComplianceStatus.lastChecked &&
+        (Date.now() - legalComplianceStatus.lastChecked < 60000)) { // 1 minute cache
+      return legalComplianceStatus.complianceStatus === 'compliant';
+    }
+
+    try {
+      setLegalLoading(true);
+      console.log('[AUTH] Checking legal compliance status...');
+
+      const response = await axios.get(apiUrl('/api/legal/status'), {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      const statusData = {
+        ...response.data,
+        lastChecked: Date.now()
+      };
+
+      setLegalComplianceStatus(statusData);
+      console.log('[AUTH] Legal compliance status:', statusData.complianceStatus);
+
+      return statusData.complianceStatus === 'compliant';
+    } catch (error) {
+      console.error('[AUTH] Legal compliance check failed:', error);
+      setLegalComplianceStatus({
+        complianceStatus: 'not_started',
+        requiresAction: true,
+        lastChecked: Date.now()
+      });
+      return false;
+    } finally {
+      setLegalLoading(false);
+    }
+  }, [token, user, legalComplianceStatus]);
+
   const logout = useCallback(() => {
     console.log('[AUTH] User logout initiated');
     localStorage.removeItem('token');
     setAuthToken(null);
     setToken(null);
     setUser(null);
+    setLegalComplianceStatus(null);
     setSessionState({
       redirectInProgress: false,
       lastTokenCheck: null
     });
-    navigate('/login');
-  }, [navigate]);
+    // Use window.location for more reliable logout navigation
+    window.location.href = '/login';
+  }, []);
 
   useEffect(() => {
     const interceptor = axios.interceptors.response.use(
@@ -93,7 +140,7 @@ export const AuthProvider = ({ children }) => {
     return () => { axios.interceptors.response.eject(interceptor); };
   }, [logout]); // Add logout dependency to prevent stale closures
 
-  const login = useCallback((newToken) => {
+  const login = useCallback(async (newToken) => {
     console.log('[AUTH] Login initiated with new token');
     localStorage.setItem('token', newToken);
     setAuthToken(newToken);
@@ -107,8 +154,37 @@ export const AuthProvider = ({ children }) => {
       lastTokenCheck: Date.now()
     });
 
-    console.log('[AUTH] Redirecting to /dashboard');
-    navigate('/dashboard');
+    // Check legal compliance after login
+    try {
+      setLegalLoading(true);
+      const response = await axios.get(apiUrl('/api/legal/status'), {
+        headers: { Authorization: `Bearer ${newToken}` }
+      });
+
+      const statusData = {
+        ...response.data,
+        lastChecked: Date.now()
+      };
+
+      setLegalComplianceStatus(statusData);
+      console.log('[AUTH] Post-login legal compliance status:', statusData.complianceStatus);
+
+      // Navigate based on compliance status
+      if (statusData.complianceStatus === 'compliant') {
+        console.log('[AUTH] Legal compliance OK, redirecting to /dashboard');
+        navigate('/dashboard');
+      } else {
+        console.log('[AUTH] Legal compliance required, staying on current page for modal trigger');
+        // Don't navigate - let the ProtectedRoute handle the legal compliance flow
+        navigate('/dashboard'); // Will be intercepted by ProtectedRoute
+      }
+    } catch (error) {
+      console.error('[AUTH] Post-login legal compliance check failed:', error);
+      // Default to dashboard, ProtectedRoute will handle compliance
+      navigate('/dashboard');
+    } finally {
+      setLegalLoading(false);
+    }
   }, [navigate]);
 
 
@@ -122,8 +198,13 @@ export const AuthProvider = ({ children }) => {
     login,
     logout,
     sessionState,
-    sessionTimeout
-  }), [token, user, loading, login, logout, sessionState, sessionTimeout]);
+    sessionTimeout,
+    // Legal compliance state
+    legalComplianceStatus,
+    legalLoading,
+    checkLegalCompliance,
+    isLegallyCompliant: legalComplianceStatus?.complianceStatus === 'compliant'
+  }), [token, user, loading, login, logout, sessionState, sessionTimeout, legalComplianceStatus, legalLoading, checkLegalCompliance]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
