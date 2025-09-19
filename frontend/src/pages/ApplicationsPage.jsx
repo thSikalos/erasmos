@@ -2,14 +2,12 @@ import React, { useState, useEffect, useContext } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
-import { useNotifications } from '../context/NotificationContext';
 import ClawbackModal from '../components/ClawbackModal';
 import { apiUrl } from '../utils/api';
 
 const ApplicationsPage = () => {
     const { token, user } = useContext(AuthContext);
     const navigate = useNavigate();
-    const { showErrorToast } = useNotifications();
     const [applications, setApplications] = useState([]);
     const [pendingApplications, setPendingApplications] = useState([]);
     const [onHoldApplications, setOnHoldApplications] = useState([]);
@@ -30,6 +28,21 @@ const ApplicationsPage = () => {
         commissionAmount: 0
     });
     const [clawbackLoading, setClawbackLoading] = useState(false);
+
+    // Centralized toast notification function
+    const sendCentralizedToast = async (type, title, message, duration = 5000) => {
+        try {
+            const config = { headers: { Authorization: `Bearer ${token}` } };
+            await axios.post(apiUrl('/api/notifications/toast'), {
+                type,
+                title,
+                message,
+                duration
+            }, config);
+        } catch (error) {
+            console.error('Failed to send centralized toast:', error);
+        }
+    };
 
     // Search function for applications
     const searchFunction = (app, searchTerm) => {
@@ -178,7 +191,7 @@ const ApplicationsPage = () => {
         } catch (error) {
             console.error("Failed to create field clawback", error);
             const errorMessage = error.response?.data?.message || 'Σφάλμα κατά τη δημιουργία του clawback';
-            showErrorToast('Σφάλμα Clawback', errorMessage);
+            await sendCentralizedToast('system_error', '❌ Σφάλμα Clawback', errorMessage);
         } finally {
             setClawbackLoading(false);
         }

@@ -106,13 +106,13 @@ const CompactToast = ({
                         top: 20px;
                         right: 20px;
                         width: auto;
-                        max-width: 350px;
-                        min-width: 280px;
+                        max-width: 380px;
+                        min-width: 300px;
                         background: rgba(255, 255, 255, 0.15);
                         backdrop-filter: blur(20px);
                         border: 1px solid ${colors.border};
-                        border-radius: 12px;
-                        padding: 16px;
+                        border-radius: 8px;
+                        padding: 10px;
                         box-shadow: 0 15px 35px ${colors.glow};
                         z-index: 10000;
                         transform: translateX(${isVisible ? '0' : '400px'});
@@ -153,7 +153,7 @@ const CompactToast = ({
                         display: flex;
                         align-items: center;
                         justify-content: space-between;
-                        margin-bottom: ${title ? '10px' : '0'};
+                        margin-bottom: ${title && message ? '6px' : '0'};
                         position: relative;
                         z-index: 2;
                     }
@@ -161,17 +161,17 @@ const CompactToast = ({
                     .compact-toast-title-container {
                         display: flex;
                         align-items: center;
-                        gap: 8px;
+                        gap: 6px;
                         flex: 1;
                     }
 
                     .compact-toast-icon {
-                        font-size: 1.2rem;
+                        font-size: 1.1rem;
                         flex-shrink: 0;
                     }
 
                     .compact-toast-title {
-                        font-size: 1rem;
+                        font-size: 0.9rem;
                         font-weight: 600;
                         color: rgba(255, 255, 255, 0.9);
                         margin: 0;
@@ -208,9 +208,9 @@ const CompactToast = ({
 
                     .compact-toast-message {
                         color: rgba(255, 255, 255, 0.85);
-                        font-size: 0.9rem;
-                        line-height: 1.4;
-                        margin: 0 0 12px 0;
+                        font-size: 0.85rem;
+                        line-height: 1.3;
+                        margin: 0;
                     }
 
                     .compact-toast-countdown {

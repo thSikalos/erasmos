@@ -2,7 +2,6 @@ import React, { useState, useEffect, useContext, useReducer, useCallback } from 
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
-import { useNotifications } from '../context/NotificationContext';
 import FileUpload from '../components/FileUpload';
 import PDFReadinessIndicator from '../components/PDFReadinessIndicator';
 import SignedPDFUpload from '../components/SignedPDFUpload';
@@ -140,7 +139,6 @@ const NewApplicationPage = () => {
     const { token, user } = useContext(AuthContext);
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
-    const { showSuccessToast, showErrorToast, showInfoToast, showWarningToast } = useNotifications();
 
     // Get draftId from URL params
     const draftId = searchParams.get('draftId');

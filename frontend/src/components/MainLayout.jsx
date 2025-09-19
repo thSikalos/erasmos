@@ -402,7 +402,8 @@ const MainLayout = () => {
                             bottom: 0;
                             margin-left: 10px;
                             margin-bottom: 0;
-                            width: 300px;
+                            width: 280px;
+                            max-width: 320px;
                         }
                     }
                     

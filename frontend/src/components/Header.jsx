@@ -196,7 +196,8 @@ const Header = () => {
                         top: 100%;
                         right: 0;
                         margin-top: 10px;
-                        width: 350px;
+                        width: 280px;
+                        max-width: 320px;
                         background: white;
                         border: 1px solid rgba(0, 0, 0, 0.1);
                         border-radius: 12px;

@@ -2,16 +2,36 @@ import React, { useState, useEffect, useContext } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
-import { useNotifications } from '../context/NotificationContext';
 import { apiUrl } from '../utils/api';
 import '../App.css';
 
 const EnhancedTeamHierarchyModal = ({ teamLeader, onClose, onRefresh }) => {
     const { token } = useContext(AuthContext);
-    const { showTeamActionConfirm, showSuccessToast, showErrorToast } = useNotifications();
     const [hierarchy, setHierarchy] = useState([]);
     const [loading, setLoading] = useState(true);
     const [updating, setUpdating] = useState({});
+
+    // Centralized toast notification function
+    const sendCentralizedToast = async (type, title, message, duration = 5000) => {
+        try {
+            const config = { headers: { Authorization: `Bearer ${token}` } };
+            await axios.post(apiUrl('/api/notifications/toast'), {
+                type,
+                title,
+                message,
+                duration
+            }, config);
+        } catch (error) {
+            console.error('Failed to send centralized toast:', error);
+        }
+    };
+
+    // Confirm action function - simplified without dialog
+    const confirmAction = async (title, message, onConfirm) => {
+        if (window.confirm(`${title}: ${message}`)) {
+            await onConfirm();
+        }
+    };
 
     useEffect(() => {
         if (teamLeader?.id && token) {
@@ -27,7 +47,7 @@ const EnhancedTeamHierarchyModal = ({ teamLeader, onClose, onRefresh }) => {
             setHierarchy(response.data.hierarchy);
         } catch (err) {
             console.error('Error fetching team hierarchy:', err);
-            showErrorToast('Σφάλμα', 'Αποτυχία φόρτωσης ιεραρχίας');
+            await sendCentralizedToast('system_error', '❌ Σφάλμα', 'Αποτυχία φόρτωσης ιεραρχίας');
         } finally {
             setLoading(false);
         }
@@ -43,31 +63,33 @@ const EnhancedTeamHierarchyModal = ({ teamLeader, onClose, onRefresh }) => {
             const parentId = userInHierarchy.parent_user_id || teamLeader.id;
             const parent = hierarchy.find(h => h.id === parentId) || teamLeader;
             if (!parent.is_active) {
-                showErrorToast(
-                    'Σφάλμα',
+                await sendCentralizedToast(
+                    'system_error',
+                    '❌ Σφάλμα',
                     `Δεν μπορείτε να ενεργοποιήσετε τον χρήστη "${userName}" όταν ο προϊστάμενός του "${parent.name}" είναι απενεργοποιημένος.`
                 );
                 return;
             }
         }
 
-        showTeamActionConfirm(
-            action,
-            `τον χρήστη "${userName}" και τα άμεσα μέλη του`,
+        await confirmAction(
+            `${action.charAt(0).toUpperCase() + action.slice(1)} χρήστη`,
+            `Είστε σίγουροι ότι θέλετε να ${action === 'activate' ? 'ενεργοποιήσετε' : 'απενεργοποιήσετε'} τον χρήστη "${userName}" και τα άμεσα μέλη του;`,
             async () => {
                 setUpdating(prev => ({ ...prev, [userId]: true }));
                 try {
                     const config = { headers: { Authorization: `Bearer ${token}` } };
                     await axios.put(apiUrl(`/api/users/${userId}/toggle-subteam`), {}, config);
-                    showSuccessToast(
-                        'Επιτυχία',
+                    await sendCentralizedToast(
+                        'system_success',
+                        '✅ Επιτυχία',
                         `Ο χρήστης "${userName}" ${currentStatus ? 'απενεργοποιήθηκε' : 'ενεργοποιήθηκε'} επιτυχώς!`
                     );
                     await fetchTeamHierarchy();
                     onRefresh(); // Refresh the main table
                 } catch (err) {
                     const errorMessage = err.response?.data?.message || 'Failed to toggle sub-team status';
-                    showErrorToast('Σφάλμα', errorMessage);
+                    await sendCentralizedToast('system_error', '❌ Σφάλμα', errorMessage);
                 } finally {
                     setUpdating(prev => ({ ...prev, [userId]: false }));
                 }
@@ -80,16 +102,17 @@ const EnhancedTeamHierarchyModal = ({ teamLeader, onClose, onRefresh }) => {
         const action = teamLeader.is_active ? 'deactivate' : 'activate';
         const totalMembers = hierarchy.length + 1; // +1 for team leader
 
-        showTeamActionConfirm(
-            action,
-            `ολόκληρη την ομάδα του "${teamLeader?.name}"`,
+        await confirmAction(
+            `${action.charAt(0).toUpperCase() + action.slice(1)} ομάδα`,
+            `Είστε σίγουροι ότι θέλετε να ${action === 'activate' ? 'ενεργοποιήσετε' : 'απενεργοποιήσετε'} ολόκληρη την ομάδα του "${teamLeader?.name}";`,
             async () => {
                 setUpdating(prev => ({ ...prev, 'team_leader': true }));
                 try {
                     const config = { headers: { Authorization: `Bearer ${token}` } };
                     await axios.put(apiUrl(`/api/users/${teamLeader.id}/toggle-team`), {}, config);
-                    showSuccessToast(
-                        'Επιτυχία',
+                    await sendCentralizedToast(
+                        'system_success',
+                        '✅ Επιτυχία',
                         `Η ομάδα ${teamLeader.is_active ? 'απενεργοποιήθηκε' : 'ενεργοποιήθηκε'} επιτυχώς!`
                     );
                     await fetchTeamHierarchy();
@@ -98,7 +121,7 @@ const EnhancedTeamHierarchyModal = ({ teamLeader, onClose, onRefresh }) => {
                     teamLeader.is_active = !teamLeader.is_active;
                 } catch (err) {
                     const errorMessage = err.response?.data?.message || 'Failed to toggle team status';
-                    showErrorToast('Σφάλμα', errorMessage);
+                    await sendCentralizedToast('system_error', '❌ Σφάλμα', errorMessage);
                 } finally {
                     setUpdating(prev => ({ ...prev, 'team_leader': false }));
                 }
@@ -235,7 +258,6 @@ const EnhancedTeamHierarchyModal = ({ teamLeader, onClose, onRefresh }) => {
 
 const AdminTeamManagementPage = () => {
     const { token } = useContext(AuthContext);
-    const { showTeamActionConfirm, showSuccessToast, showErrorToast } = useNotifications();
     const [teamLeaders, setTeamLeaders] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -243,6 +265,28 @@ const AdminTeamManagementPage = () => {
     const [showHierarchy, setShowHierarchy] = useState(false);
     const [filter, setFilter] = useState('all'); // all, active, inactive
     const [searchTerm, setSearchTerm] = useState('');
+
+    // Centralized toast notification function
+    const sendCentralizedToast = async (type, title, message, duration = 5000) => {
+        try {
+            const config = { headers: { Authorization: `Bearer ${token}` } };
+            await axios.post(apiUrl('/api/notifications/toast'), {
+                type,
+                title,
+                message,
+                duration
+            }, config);
+        } catch (error) {
+            console.error('Failed to send centralized toast:', error);
+        }
+    };
+
+    // Confirm action function - simplified without dialog
+    const confirmAction = async (title, message, onConfirm) => {
+        if (window.confirm(`${title}: ${message}`)) {
+            await onConfirm();
+        }
+    };
 
     const fetchTeamLeaders = async () => {
         if (!token) return;
@@ -253,7 +297,7 @@ const AdminTeamManagementPage = () => {
             setTeamLeaders(response.data);
         } catch (err) {
             setError('Failed to fetch team leaders');
-            showErrorToast('Σφάλμα', 'Αποτυχία φόρτωσης ομαδαρχών');
+            await sendCentralizedToast('system_error', '❌ Σφάλμα', 'Αποτυχία φόρτωσης ομαδαρχών');
         } finally {
             setLoading(false);
         }
@@ -267,19 +311,19 @@ const AdminTeamManagementPage = () => {
         const user = teamLeaders.find(tl => tl.id === userId);
         const action = currentStatus ? 'deactivate' : 'activate';
 
-        showTeamActionConfirm(
-            action,
-            `τον χρήστη "${user?.name}"`,
+        await confirmAction(
+            `${action.charAt(0).toUpperCase() + action.slice(1)} χρήστη`,
+            `Είστε σίγουροι ότι θέλετε να ${action === 'activate' ? 'ενεργοποιήσετε' : 'απενεργοποιήσετε'} τον χρήστη "${user?.name}";`,
             async () => {
                 try {
                     const config = { headers: { Authorization: `Bearer ${token}` } };
                     await axios.put(apiUrl(`/api/users/${userId}/toggle-status`), {}, config);
-                    showSuccessToast('Επιτυχία', `Ο χρήστης ${currentStatus ? 'απενεργοποιήθηκε' : 'ενεργοποιήθηκε'} επιτυχώς!`);
+                    await sendCentralizedToast('system_success', '✅ Επιτυχία', `Ο χρήστης ${currentStatus ? 'απενεργοποιήθηκε' : 'ενεργοποιήθηκε'} επιτυχώς!`);
                     fetchTeamLeaders();
                 } catch (err) {
                     const errorMessage = err.response?.data?.message || 'Failed to toggle user status';
                     setError(errorMessage);
-                    showErrorToast('Σφάλμα', errorMessage);
+                    await sendCentralizedToast('system_error', '❌ Σφάλμα', errorMessage);
                 }
             },
             1
@@ -292,22 +336,23 @@ const AdminTeamManagementPage = () => {
         const totalAffected = memberCount + 1;
         const action = currentStatus ? 'deactivate' : 'activate';
 
-        showTeamActionConfirm(
-            action,
-            `ολόκληρη την ομάδα του "${teamLeader?.name}"`,
+        await confirmAction(
+            `${action.charAt(0).toUpperCase() + action.slice(1)} ομάδα`,
+            `Είστε σίγουροι ότι θέλετε να ${action === 'activate' ? 'ενεργοποιήσετε' : 'απενεργοποιήσετε'} ολόκληρη την ομάδα του "${teamLeader?.name}";`,
             async () => {
                 try {
                     const config = { headers: { Authorization: `Bearer ${token}` } };
                     const response = await axios.put(apiUrl(`/api/users/${teamLeaderId}/toggle-team`), {}, config);
-                    showSuccessToast(
-                        'Επιτυχία',
+                    await sendCentralizedToast(
+                        'system_success',
+                        '✅ Επιτυχία',
                         `Η ομάδα ${currentStatus ? 'απενεργοποιήθηκε' : 'ενεργοποιήθηκε'} επιτυχώς! Επηρεάστηκαν ${response.data.affected_members + 1} άτομα.`
                     );
                     fetchTeamLeaders();
                 } catch (err) {
                     const errorMessage = err.response?.data?.message || 'Failed to toggle team status';
                     setError(errorMessage);
-                    showErrorToast('Σφάλμα', errorMessage);
+                    await sendCentralizedToast('system_error', '❌ Σφάλμα', errorMessage);
                 }
             },
             totalAffected
