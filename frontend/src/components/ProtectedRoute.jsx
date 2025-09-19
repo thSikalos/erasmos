@@ -28,10 +28,13 @@ const ProtectedRoute = React.forwardRef(({ children }, ref) => {
     });
 
     useEffect(() => {
-        if (!legalLoading && legalComplianceStatus) {
+        // Mark compliance as checked when:
+        // 1. Legal loading is done AND we have a status, OR
+        // 2. Legal loading is done AND we explicitly don't need compliance (no token/user)
+        if (!legalLoading && (legalComplianceStatus || !token || !user)) {
             setComplianceChecked(true);
         }
-    }, [legalLoading, legalComplianceStatus]);
+    }, [legalLoading, legalComplianceStatus, token, user]);
 
     if (!token) {
         console.log('[PROTECTED_ROUTE] No token, redirecting to login');
@@ -39,7 +42,8 @@ const ProtectedRoute = React.forwardRef(({ children }, ref) => {
     }
 
     // Show loading while checking legal compliance
-    if (legalLoading || (token && user && !complianceChecked)) {
+    // Only show loading if we have token+user but are still loading or haven't checked yet
+    if (token && user && (legalLoading || !complianceChecked)) {
         return (
             <div style={{
                 display: 'flex',

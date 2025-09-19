@@ -120,6 +120,116 @@ const AdminFieldsPage = () => {
         setFieldOptions(fieldOptions.filter(opt => opt.id !== optionId));
     };
 
+    // Toggle field option active state
+    const toggleFieldOptionActive = async (optionId) => {
+        try {
+            const config = { headers: { Authorization: `Bearer ${token}` } };
+            const response = await axios.patch(
+                apiUrl(`/api/fields/options/${optionId}/toggle-active`),
+                {},
+                config
+            );
+
+            showSuccessToast('Επιτυχία', response.data.message);
+
+            // Refresh the field data
+            fetchData();
+        } catch (err) {
+            const errorMessage = err.response?.data?.message || 'Failed to toggle option state';
+            showErrorToast('Σφάλμα', errorMessage);
+        }
+    };
+
+    // Hard delete field option (permanent removal)
+    const hardDeleteFieldOption = async (optionId) => {
+        try {
+            const config = { headers: { Authorization: `Bearer ${token}` } };
+            const response = await axios.delete(
+                apiUrl(`/api/fields/options/${optionId}`),
+                config
+            );
+
+            showSuccessToast('Επιτυχία', response.data.message);
+
+            // Refresh the field data
+            fetchData();
+        } catch (err) {
+            const errorMessage = err.response?.data?.message || 'Failed to delete option';
+            showErrorToast('Σφάλμα', errorMessage);
+        }
+    };
+
+    // Confirm hard delete with usage checking
+    const confirmHardDelete = async (optionId) => {
+        try {
+            const config = { headers: { Authorization: `Bearer ${token}` } };
+            const response = await axios.get(
+                apiUrl(`/api/fields/options/${optionId}/usage`),
+                config
+            );
+
+            const { option, usage } = response.data;
+
+            if (usage.total_applications > 0) {
+                showErrorToast(
+                    'Δεν είναι δυνατή η διαγραφή',
+                    `Αυτή η επιλογή χρησιμοποιείται σε ${usage.total_applications} αιτήσεις. Δεν μπορεί να διαγραφεί μόνιμα. Μπορείτε να την απενεργοποιήσετε αντί αυτού.`
+                );
+                return;
+            }
+
+            const message = `Θέλετε να διαγράψετε ΜΟΝΙΜΑ την επιλογή "${option.label}"?\n\n` +
+                `⚠️ ΠΡΟΣΟΧΗ: Αυτή η ενέργεια είναι μη αναστρέψιμη!\n\n` +
+                `Αν θέλετε απλώς να την αποκρύψετε από τα νέα dropdown menus, ` +
+                `χρησιμοποιήστε το κουμπί απενεργοποίησης (❌) αντί αυτού.`;
+
+            if (window.confirm(message)) {
+                hardDeleteFieldOption(optionId);
+            }
+        } catch (err) {
+            const errorMessage = err.response?.data?.message || 'Failed to check option usage';
+            showErrorToast('Σφάλμα', errorMessage);
+        }
+    };
+
+    // Check field option usage before toggling
+    const checkFieldOptionUsage = async (optionId) => {
+        try {
+            const config = { headers: { Authorization: `Bearer ${token}` } };
+            const response = await axios.get(
+                apiUrl(`/api/fields/options/${optionId}/usage`),
+                config
+            );
+
+            const { option, usage, can_safely_deactivate } = response.data;
+
+            if (!option.is_active) {
+                // If option is inactive, we can safely reactivate it
+                toggleFieldOptionActive(optionId);
+                return;
+            }
+
+            // If option is active and has usage, show confirmation
+            if (!can_safely_deactivate) {
+                const message = `Αυτή η επιλογή χρησιμοποιείται σε ${usage.total_applications} αιτήσεις ` +
+                    `(${usage.approved_applications} εγκεκριμένες, ${usage.pending_applications} σε εκκρεμότητα).\n\n` +
+                    `Αν την απενεργοποιήσετε, δεν θα εμφανίζεται πλέον ως επιλογή στα νέα dropdown menus, ` +
+                    `αλλά οι υπάρχουσες αιτήσεις θα διατηρήσουν την τιμή τους.\n\n` +
+                    `Θέλετε να συνεχίσετε;`;
+
+                if (window.confirm(message)) {
+                    toggleFieldOptionActive(optionId);
+                }
+            } else {
+                // Safe to deactivate
+                toggleFieldOptionActive(optionId);
+            }
+        } catch (err) {
+            const errorMessage = err.response?.data?.message || 'Failed to check option usage';
+            showErrorToast('Σφάλμα', errorMessage);
+        }
+    };
+
 
     const handleEditClick = (field) => {
         setIsEditing(true);
@@ -136,7 +246,8 @@ const AdminFieldsPage = () => {
                 id: option.id,
                 value: option.value,
                 label: option.label,
-                order: option.order
+                order: option.order,
+                is_active: option.is_active !== undefined ? option.is_active : true
             })));
         } else {
             setFieldOptions([]);
@@ -502,6 +613,18 @@ const AdminFieldsPage = () => {
                     border-radius: 8px;
                     padding: 12px;
                     margin-bottom: 8px;
+                    transition: all 0.3s ease;
+                }
+
+                .option-item.inactive {
+                    background: rgba(255, 255, 255, 0.05);
+                    border: 1px solid rgba(255, 255, 255, 0.1);
+                    opacity: 0.6;
+                }
+
+                .option-item.inactive .option-info {
+                    text-decoration: line-through;
+                    color: rgba(255, 255, 255, 0.7);
                 }
 
                 .option-info {
@@ -518,7 +641,7 @@ const AdminFieldsPage = () => {
                     gap: 8px;
                 }
 
-                .move-btn, .remove-btn, .pdf-upload-btn {
+                .move-btn, .remove-btn, .pdf-upload-btn, .toggle-active-btn, .hard-delete-btn {
                     border: none;
                     border-radius: 6px;
                     padding: 6px 10px;
@@ -567,6 +690,39 @@ const AdminFieldsPage = () => {
                     color: rgba(155, 89, 182, 0.4);
                     cursor: not-allowed;
                     opacity: 0.5;
+                }
+
+                .toggle-active-btn {
+                    background: rgba(46, 204, 113, 0.3);
+                    color: #2ecc71;
+                }
+
+                .toggle-active-btn:hover {
+                    background: #2ecc71;
+                    color: white;
+                }
+
+                .toggle-active-btn.inactive {
+                    background: rgba(231, 76, 60, 0.3);
+                    color: #e74c3c;
+                }
+
+                .toggle-active-btn.inactive:hover {
+                    background: #e74c3c;
+                    color: white;
+                }
+
+                .hard-delete-btn {
+                    background: rgba(192, 57, 43, 0.2);
+                    color: #c0392b;
+                    border: 1px solid rgba(192, 57, 43, 0.4);
+                }
+
+                .hard-delete-btn:hover {
+                    background: #c0392b;
+                    color: white;
+                    transform: scale(1.05);
+                    box-shadow: 0 2px 8px rgba(192, 57, 43, 0.4);
                 }
 
                 .no-options-message {
@@ -879,7 +1035,7 @@ const AdminFieldsPage = () => {
                         gap: 0.5rem;
                     }
 
-                    .move-btn, .remove-btn, .pdf-upload-btn {
+                    .move-btn, .remove-btn, .pdf-upload-btn, .toggle-active-btn, .hard-delete-btn {
                         flex: 1;
                         min-width: 60px;
                     }
@@ -1028,18 +1184,58 @@ const AdminFieldsPage = () => {
                                     {fieldOptions.length > 0 && (
                                         <div className="options-list">
                                             {fieldOptions.map((option, index) => (
-                                                <div key={option.id} className="option-item">
+                                                <div
+                                                    key={option.id}
+                                                    className={`option-item ${option.is_active === false ? 'inactive' : ''}`}
+                                                >
                                                     <span className="option-info">
                                                         <strong>{option.label}</strong> ({option.value})
+                                                        {option.is_active === false && (
+                                                            <span style={{
+                                                                marginLeft: '8px',
+                                                                fontSize: '0.7rem',
+                                                                color: '#e74c3c',
+                                                                background: 'rgba(231, 76, 60, 0.2)',
+                                                                padding: '2px 6px',
+                                                                borderRadius: '4px'
+                                                            }}>
+                                                                ΑΠΕΝΕΡΓΟΠΟΙΗΜΕΝΟ
+                                                            </span>
+                                                        )}
                                                     </span>
                                                     <div className="option-actions">
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => removeFieldOption(option.id)}
-                                                            className="remove-btn"
-                                                        >
-                                                            🗑️
-                                                        </button>
+                                                        {/* Only show toggle button for existing options (with real IDs) */}
+                                                        {option.id > 0 && (
+                                                            <>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => checkFieldOptionUsage(option.id)}
+                                                                    className={`toggle-active-btn ${option.is_active === false ? 'inactive' : ''}`}
+                                                                    title={option.is_active === false ? 'Επανενεργοποίηση επιλογής' : 'Απενεργοποίηση επιλογής (δεν θα διαγραφεί)'}
+                                                                >
+                                                                    {option.is_active === false ? '🔄' : '❌'}
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => confirmHardDelete(option.id)}
+                                                                    className="hard-delete-btn"
+                                                                    title="ΜΟΝΙΜΗ διαγραφή επιλογής (μη αναστρέψιμο)"
+                                                                >
+                                                                    🗑️
+                                                                </button>
+                                                            </>
+                                                        )}
+                                                        {/* Only show remove button for new options (negative IDs) */}
+                                                        {option.id < 0 && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => removeFieldOption(option.id)}
+                                                                className="remove-btn"
+                                                                title="Αφαίρεση νέας επιλογής"
+                                                            >
+                                                                🗑️
+                                                            </button>
+                                                        )}
                                                     </div>
                                                 </div>
                                             ))}
@@ -1105,8 +1301,20 @@ const AdminFieldsPage = () => {
                                     {field.type === 'dropdown' && field.options && field.options.length > 0 && (
                                         <div className="dropdown-options-preview">
                                             {field.options.slice(0, 3).map(option => (
-                                                <span key={option.id} className="option-preview">
+                                                <span
+                                                    key={option.id}
+                                                    className={`option-preview ${option.is_active === false ? 'inactive' : ''}`}
+                                                    style={option.is_active === false ? {
+                                                        opacity: 0.5,
+                                                        textDecoration: 'line-through',
+                                                        background: 'rgba(231, 76, 60, 0.1)',
+                                                        borderColor: 'rgba(231, 76, 60, 0.3)'
+                                                    } : {}}
+                                                >
                                                     {option.label}
+                                                    {option.is_active === false && (
+                                                        <span style={{ fontSize: '0.6rem', marginLeft: '4px' }}>❌</span>
+                                                    )}
                                                 </span>
                                             ))}
                                             {field.options.length > 3 && (
