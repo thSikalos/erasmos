@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useContext } from 'react';
 import { AuthContext } from '../context/AuthContext';
+import { API_BASE_URL } from '../config/api';
 
 const AdminLegalDashboard = () => {
   const { token } = useContext(AuthContext);
@@ -35,7 +36,7 @@ const AdminLegalDashboard = () => {
       setLoading(true);
       setError(null);
 
-      const response = await fetch(`/api/legal/admin/dashboard?from=${dateRange.from}&to=${dateRange.to}`, {
+      const response = await fetch(`${API_BASE_URL}/api/legal/admin/dashboard?from=${dateRange.from}&to=${dateRange.to}`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -67,7 +68,7 @@ const AdminLegalDashboard = () => {
   // Export compliance report
   const exportComplianceReport = async () => {
     try {
-      const response = await fetch(`/api/legal/admin/export?from=${dateRange.from}&to=${dateRange.to}`, {
+      const response = await fetch(`${API_BASE_URL}/api/legal/admin/export?from=${dateRange.from}&to=${dateRange.to}`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -95,7 +96,7 @@ const AdminLegalDashboard = () => {
   // Verify pending email
   const resendVerificationEmail = async (acceptanceId) => {
     try {
-      const response = await fetch(`/api/legal/admin/resend-verification/${acceptanceId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/legal/admin/resend-verification/${acceptanceId}`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -117,7 +118,7 @@ const AdminLegalDashboard = () => {
   // Export signed contract PDF
   const exportSignedContract = async (acceptanceId, userEmail) => {
     try {
-      const response = await fetch(`/api/legal/contract/${acceptanceId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/legal/contract/${acceptanceId}`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }

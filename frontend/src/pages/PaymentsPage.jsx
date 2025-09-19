@@ -120,6 +120,8 @@ const PaymentsPage = () => {
         window.open(url, '_blank');
     };
 
+    // Bulk export functions
+
     if (loading) return (
         <div className="modern-payments-container">
             <div className="modern-loading">
@@ -354,11 +356,65 @@ const PaymentsPage = () => {
                     .card-header {
                         display: flex;
                         align-items: center;
+                        justify-content: space-between;
                         gap: 12px;
                         margin-bottom: 25px;
                         padding-bottom: 15px;
                         border-bottom: 2px solid rgba(102, 126, 234, 0.1);
+                        flex-wrap: wrap;
                     }
+
+                    .export-controls {
+                        display: flex;
+                        align-items: center;
+                        gap: 15px;
+                        flex-wrap: wrap;
+                    }
+
+                    .export-filters {
+                        display: flex;
+                        align-items: center;
+                        gap: 10px;
+                        flex-wrap: wrap;
+                    }
+
+
+                    .modern-date-input {
+                        padding: 8px 12px;
+                        border: 2px solid rgba(102, 126, 234, 0.1);
+                        border-radius: 8px;
+                        font-size: 0.9rem;
+                        background: rgba(255, 255, 255, 0.15);
+                        backdrop-filter: blur(10px);
+                        transition: all 0.3s ease;
+                        min-width: 140px;
+                    }
+
+                    .modern-date-input:focus {
+                        outline: none;
+                        border-color: #667eea;
+                        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+                        background: rgba(255, 255, 255, 1);
+                    }
+
+                    .modern-filter-select {
+                        padding: 8px 12px;
+                        border: 2px solid rgba(102, 126, 234, 0.1);
+                        border-radius: 8px;
+                        font-size: 0.9rem;
+                        background: rgba(255, 255, 255, 0.15);
+                        backdrop-filter: blur(10px);
+                        transition: all 0.3s ease;
+                        min-width: 160px;
+                    }
+
+                    .modern-filter-select:focus {
+                        outline: none;
+                        border-color: #667eea;
+                        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+                        background: rgba(255, 255, 255, 1);
+                    }
+
 
                     .card-title {
                         font-size: 1.4rem;

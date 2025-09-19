@@ -321,6 +321,7 @@ class DocumentGenerator {
         // In the future, we can create a specialized signed contract template
         return this.templates.legalCompliancePdf.generateSignedContract(data, options);
     }
+
 }
 
 module.exports = new DocumentGenerator();
