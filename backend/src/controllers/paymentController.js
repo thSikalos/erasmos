@@ -16,7 +16,7 @@ const getStatementItems = async (statementId) => {
                 ELSE 'Αίτηση'
             END as item_type,
             CASE
-                WHEN si.field_id IS NOT NULL THEN COALESCE(cf.commission_amount, 0)
+                WHEN si.field_id IS NOT NULL THEN COALESCE(ufc.amount, 0)
                 ELSE COALESCE(a.total_commission, 0)
             END as commission_amount,
             a.id as sort_application_id,
@@ -43,7 +43,7 @@ const getStatementItems = async (statementId) => {
         JOIN customers c ON a.customer_id = c.id
         JOIN companies comp ON a.company_id = comp.id
         LEFT JOIN fields f ON si.field_id = f.id
-        LEFT JOIN company_fields cf ON si.field_id = cf.field_id AND a.company_id = cf.company_id
+        LEFT JOIN user_field_commissions ufc ON si.field_id = ufc.field_id AND a.user_id = ufc.associate_id
         WHERE si.statement_id = $1
         ORDER BY sort_application_id, sort_field_label
     `;
@@ -116,10 +116,10 @@ const createPaymentStatement = async (req, res) => {
         for (const app of appsCheckResult.rows) {
             // Check for field-level payments first
             const fieldPaymentsQuery = `
-                SELECT SUM(cf.commission_amount) as field_commission_total
+                SELECT SUM(ufc.amount) as field_commission_total
                 FROM field_payments fp
-                JOIN company_fields cf ON fp.field_id = cf.field_id 
-                JOIN applications a ON fp.application_id = a.id AND a.company_id = cf.company_id
+                JOIN user_field_commissions ufc ON fp.field_id = ufc.field_id 
+                JOIN applications a ON fp.application_id = a.id AND a.creator_id = ufc.associate_id
                 WHERE fp.application_id = $1 AND fp.is_paid_by_company = TRUE
             `;
             const fieldPaymentsResult = await client.query(fieldPaymentsQuery, [app.id]);
@@ -220,11 +220,10 @@ const createPaymentStatement = async (req, res) => {
         for (const appId of application_ids) {
             // First check if application has field-level payments
             const fieldPaymentsQuery = `
-                SELECT fp.field_id, cf.commission_amount
+                SELECT fp.field_id, ufc.amount
                 FROM field_payments fp
-                JOIN company_fields cf ON fp.field_id = cf.field_id AND fp.application_id IN (
-                    SELECT id FROM applications WHERE id = $1 AND company_id = cf.company_id
-                )
+                JOIN user_field_commissions ufc ON fp.field_id = ufc.field_id
+                JOIN applications a ON fp.application_id = a.id AND a.creator_id = ufc.associate_id
                 WHERE fp.application_id = $1 AND fp.is_paid_by_company = TRUE
             `;
             const fieldPaymentsResult = await client.query(fieldPaymentsQuery, [appId]);
@@ -428,10 +427,10 @@ const editPaymentStatement = async (req, res) => {
         let commissionsTotal = 0;
         for (const app of appsCheckResult.rows) {
             const fieldPaymentsQuery = `
-                SELECT SUM(cf.commission_amount) as field_commission_total
+                SELECT SUM(ufc.amount) as field_commission_total
                 FROM field_payments fp
-                JOIN company_fields cf ON fp.field_id = cf.field_id
-                JOIN applications a ON fp.application_id = a.id AND a.company_id = cf.company_id
+                JOIN user_field_commissions ufc ON fp.field_id = ufc.field_id
+                JOIN applications a ON fp.application_id = a.id AND a.creator_id = ufc.associate_id
                 WHERE fp.application_id = $1 AND fp.is_paid_by_company = TRUE
             `;
             const fieldPaymentsResult = await client.query(fieldPaymentsQuery, [app.id]);
@@ -474,11 +473,10 @@ const editPaymentStatement = async (req, res) => {
         // Add new items
         for (const appId of application_ids) {
             const fieldPaymentsQuery = `
-                SELECT fp.field_id, cf.commission_amount
+                SELECT fp.field_id, ufc.amount
                 FROM field_payments fp
-                JOIN company_fields cf ON fp.field_id = cf.field_id AND fp.application_id IN (
-                    SELECT id FROM applications WHERE id = $1 AND company_id = cf.company_id
-                )
+                JOIN user_field_commissions ufc ON fp.field_id = ufc.field_id
+                JOIN applications a ON fp.application_id = a.id AND a.creator_id = ufc.associate_id
                 WHERE fp.application_id = $1 AND fp.is_paid_by_company = TRUE
             `;
             const fieldPaymentsResult = await client.query(fieldPaymentsQuery, [appId]);
@@ -713,6 +711,7 @@ const generateStatementExcel = async (req, res) => {
         res.status(500).send('Could not generate Excel file');
     }
 };
+
 
 module.exports = {
     createPaymentStatement,
