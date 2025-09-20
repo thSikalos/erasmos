@@ -9,6 +9,7 @@ const {
     getDraftEmailNotifications,
     sendNotification,
     createToastNotification,
+    getPushNotificationStatus,
     subscribeToPush,
     unsubscribeFromPush,
     getVAPIDPublicKey,
@@ -31,6 +32,7 @@ router.post('/:id/send', sendNotification);
 router.post('/toast', createToastNotification);
 
 // Push notifications functionality
+router.get('/push/status', getPushNotificationStatus);
 router.get('/push/vapid-public-key', getVAPIDPublicKey);
 router.post('/push/subscribe', subscribeToPush);
 router.delete('/push/subscribe', unsubscribeFromPush);

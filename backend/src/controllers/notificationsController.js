@@ -255,6 +255,61 @@ const createToastNotification = async (req, res) => {
     }
 };
 
+// --- GET PUSH NOTIFICATION STATUS FOR USER ---
+const getPushNotificationStatus = async (req, res) => {
+    try {
+        const userId = req.user.id;
+
+        // Get user's push notification preference and subscription count
+        const client = await pool.connect();
+        try {
+            const userQuery = `
+                SELECT push_notifications_enabled
+                FROM users
+                WHERE id = $1`;
+
+            const subscriptionsQuery = `
+                SELECT COUNT(*) as subscription_count
+                FROM push_subscriptions
+                WHERE user_id = $1`;
+
+            const [userResult, subscriptionsResult] = await Promise.all([
+                client.query(userQuery, [userId]),
+                client.query(subscriptionsQuery, [userId])
+            ]);
+
+            if (userResult.rows.length === 0) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'User not found'
+                });
+            }
+
+            const pushEnabled = userResult.rows[0].push_notifications_enabled;
+            const subscriptionCount = parseInt(subscriptionsResult.rows[0].subscription_count);
+
+            res.json({
+                success: true,
+                pushNotificationsEnabled: pushEnabled,
+                hasActiveSubscriptions: subscriptionCount > 0,
+                subscriptionCount: subscriptionCount,
+                isSupported: true // Will be checked on client-side
+            });
+
+        } finally {
+            client.release();
+        }
+
+    } catch (error) {
+        console.error('Get push notification status error:', error.message);
+        res.status(500).json({
+            success: false,
+            message: 'Server Error',
+            error: error.message
+        });
+    }
+};
+
 // --- GET VAPID PUBLIC KEY FOR CLIENT-SIDE SUBSCRIPTION ---
 const getVAPIDPublicKey = async (req, res) => {
     try {
@@ -336,9 +391,30 @@ const subscribeToPush = async (req, res) => {
 
             await client.query('COMMIT');
 
+            // Get updated status to return
+            const statusQuery = `
+                SELECT push_notifications_enabled
+                FROM users
+                WHERE id = $1`;
+
+            const subscriptionCountQuery = `
+                SELECT COUNT(*) as subscription_count
+                FROM push_subscriptions
+                WHERE user_id = $1`;
+
+            const [statusResult, countResult] = await Promise.all([
+                client.query(statusQuery, [userId]),
+                client.query(subscriptionCountQuery, [userId])
+            ]);
+
             res.status(201).json({
                 success: true,
-                message: 'Successfully subscribed to push notifications'
+                message: 'Successfully subscribed to push notifications',
+                status: {
+                    pushNotificationsEnabled: statusResult.rows[0].push_notifications_enabled,
+                    hasActiveSubscriptions: parseInt(countResult.rows[0].subscription_count) > 0,
+                    subscriptionCount: parseInt(countResult.rows[0].subscription_count)
+                }
             });
 
         } catch (error) {
@@ -393,10 +469,22 @@ const unsubscribeFromPush = async (req, res) => {
 
             await client.query('COMMIT');
 
+            // Get updated status to return
+            const statusQuery = `
+                SELECT push_notifications_enabled
+                FROM users
+                WHERE id = $1`;
+
+            const statusResult = await client.query(statusQuery, [userId]);
+
             res.json({
                 success: true,
                 message: removed ? 'Successfully unsubscribed from push notifications' : 'Subscription not found',
-                hasRemainingSubscriptions: subscriptions.length > 0
+                status: {
+                    pushNotificationsEnabled: statusResult.rows[0].push_notifications_enabled,
+                    hasActiveSubscriptions: subscriptions.length > 0,
+                    subscriptionCount: subscriptions.length
+                }
             });
 
         } catch (error) {
@@ -474,6 +562,7 @@ module.exports = {
     getDraftEmailNotifications,
     sendNotification,
     createToastNotification,
+    getPushNotificationStatus,
     getVAPIDPublicKey,
     subscribeToPush,
     unsubscribeFromPush,
