@@ -12,6 +12,17 @@ const CustomersPage = () => {
     const navigate = useNavigate();
     const [customers, setCustomers] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [showNewCustomerModal, setShowNewCustomerModal] = useState(false);
+    const [newCustomerData, setNewCustomerData] = useState({
+        afm: '',
+        full_name: '',
+        phone: '',
+        address: '',
+        email: '',
+        notes: ''
+    });
+    const [modalLoading, setModalLoading] = useState(false);
+    const [modalError, setModalError] = useState('');
 
     // Search function for customers
     const searchFunction = (customer, searchTerm) => {
@@ -35,24 +46,86 @@ const CustomersPage = () => {
         goToPage
     } = useSearchWithPagination(customers, searchFunction, 15);
 
-    useEffect(() => {
-        const fetchCustomers = async () => {
-            if (!token) return;
-            try {
-                const config = {
-                    headers: { Authorization: `Bearer ${token}` }
-                };
-                const res = await axios.get(apiUrl('/api/customers'), config);
-                setCustomers(res.data);
-            } catch (err) {
-                console.error('Failed to fetch customers', err);
-            } finally {
-                setLoading(false);
-            }
-        };
+    const fetchCustomers = async () => {
+        if (!token) return;
+        try {
+            const config = {
+                headers: { Authorization: `Bearer ${token}` }
+            };
+            const res = await axios.get(apiUrl('/api/customers'), config);
+            setCustomers(res.data);
+        } catch (err) {
+            console.error('Failed to fetch customers', err);
+        } finally {
+            setLoading(false);
+        }
+    };
 
+    useEffect(() => {
         fetchCustomers();
     }, [token]);
+
+    const handleNewCustomerChange = (field, value) => {
+        setNewCustomerData(prev => ({
+            ...prev,
+            [field]: value
+        }));
+        if (modalError) setModalError('');
+    };
+
+    const handleCreateCustomer = async () => {
+        if (!newCustomerData.afm.trim() || !newCustomerData.full_name.trim()) {
+            setModalError('Το ΑΦΜ και το πλήρες όνομα είναι υποχρεωτικά');
+            return;
+        }
+
+        setModalLoading(true);
+        setModalError('');
+
+        try {
+            const config = {
+                headers: { Authorization: `Bearer ${token}` }
+            };
+
+            await axios.post(apiUrl('/api/customers'), newCustomerData, config);
+
+            // Refresh customers list
+            await fetchCustomers();
+
+            // Reset form and close modal
+            setNewCustomerData({
+                afm: '',
+                full_name: '',
+                phone: '',
+                address: '',
+                email: '',
+                notes: ''
+            });
+            setShowNewCustomerModal(false);
+
+        } catch (err) {
+            if (err.response?.data?.message) {
+                setModalError(err.response.data.message);
+            } else {
+                setModalError('Σφάλμα κατά τη δημιουργία του πελάτη');
+            }
+        } finally {
+            setModalLoading(false);
+        }
+    };
+
+    const closeModal = () => {
+        setShowNewCustomerModal(false);
+        setNewCustomerData({
+            afm: '',
+            full_name: '',
+            phone: '',
+            address: '',
+            email: '',
+            notes: ''
+        });
+        setModalError('');
+    };
 
     if (loading) {
         return (
@@ -463,13 +536,219 @@ const CustomersPage = () => {
                         .modern-customers-table td:nth-child(3) {
                             display: none;
                         }
-                        
+
                         .customers-header {
                             padding: 20px;
                         }
-                        
+
                         .customers-content {
                             padding: 20px;
+                        }
+                    }
+
+                    /* Modal Styles */
+                    .modal-overlay {
+                        position: fixed;
+                        top: 0;
+                        left: 0;
+                        right: 0;
+                        bottom: 0;
+                        background: rgba(0, 0, 0, 0.5);
+                        display: flex;
+                        justify-content: center;
+                        align-items: center;
+                        z-index: 1000;
+                        backdrop-filter: blur(5px);
+                    }
+
+                    .modal-content {
+                        background: white;
+                        border-radius: 20px;
+                        max-width: 600px;
+                        width: 90%;
+                        max-height: 90vh;
+                        overflow-y: auto;
+                        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+                        border: 1px solid rgba(255, 255, 255, 0.2);
+                    }
+
+                    .modal-header {
+                        padding: 25px 30px 20px;
+                        border-bottom: 1px solid #e5e7eb;
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                        border-radius: 20px 20px 0 0;
+                    }
+
+                    .modal-header h2 {
+                        margin: 0;
+                        color: white;
+                        font-size: 1.5rem;
+                        font-weight: 600;
+                    }
+
+                    .close-button {
+                        background: none;
+                        border: none;
+                        color: white;
+                        font-size: 1.5rem;
+                        cursor: pointer;
+                        padding: 5px;
+                        line-height: 1;
+                        transition: all 0.2s ease;
+                        border-radius: 50%;
+                        width: 35px;
+                        height: 35px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                    }
+
+                    .close-button:hover {
+                        background: rgba(255, 255, 255, 0.2);
+                        transform: scale(1.1);
+                    }
+
+                    .modal-body {
+                        padding: 30px;
+                    }
+
+                    .form-row {
+                        display: grid;
+                        grid-template-columns: 1fr 1fr;
+                        gap: 20px;
+                        margin-bottom: 20px;
+                    }
+
+                    .form-group {
+                        display: flex;
+                        flex-direction: column;
+                    }
+
+                    .form-group.required label::after {
+                        content: ' *';
+                        color: #ef4444;
+                    }
+
+                    .form-group label {
+                        font-weight: 600;
+                        color: #374151;
+                        margin-bottom: 8px;
+                        font-size: 0.9rem;
+                    }
+
+                    .form-group input,
+                    .form-group textarea {
+                        padding: 12px 15px;
+                        border: 2px solid #e5e7eb;
+                        border-radius: 8px;
+                        font-size: 0.95rem;
+                        transition: all 0.2s ease;
+                        background: white;
+                    }
+
+                    .form-group input:focus,
+                    .form-group textarea:focus {
+                        outline: none;
+                        border-color: #667eea;
+                        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+                    }
+
+                    .form-group input:disabled,
+                    .form-group textarea:disabled {
+                        background: #f9fafb;
+                        color: #6b7280;
+                        cursor: not-allowed;
+                    }
+
+                    .error-message {
+                        background: #fef2f2;
+                        border: 1px solid #fecaca;
+                        color: #dc2626;
+                        padding: 12px 15px;
+                        border-radius: 8px;
+                        margin-bottom: 20px;
+                        font-size: 0.9rem;
+                        display: flex;
+                        align-items: center;
+                        gap: 8px;
+                    }
+
+                    .modal-footer {
+                        padding: 20px 30px 30px;
+                        display: flex;
+                        gap: 15px;
+                        justify-content: flex-end;
+                    }
+
+                    .cancel-button,
+                    .create-button {
+                        padding: 12px 24px;
+                        border: none;
+                        border-radius: 8px;
+                        font-weight: 600;
+                        font-size: 0.95rem;
+                        cursor: pointer;
+                        transition: all 0.2s ease;
+                        min-width: 120px;
+                    }
+
+                    .cancel-button {
+                        background: #f3f4f6;
+                        color: #374151;
+                        border: 1px solid #d1d5db;
+                    }
+
+                    .cancel-button:hover:not(:disabled) {
+                        background: #e5e7eb;
+                        transform: translateY(-1px);
+                    }
+
+                    .create-button {
+                        background: linear-gradient(135deg, #10b981, #059669);
+                        color: white;
+                        box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
+                    }
+
+                    .create-button:hover:not(:disabled) {
+                        background: linear-gradient(135deg, #059669, #047857);
+                        transform: translateY(-1px);
+                        box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4);
+                    }
+
+                    .create-button:disabled {
+                        background: #9ca3af;
+                        cursor: not-allowed;
+                        transform: none;
+                        box-shadow: none;
+                    }
+
+                    @media (max-width: 768px) {
+                        .modal-content {
+                            width: 95%;
+                            margin: 20px;
+                        }
+
+                        .form-row {
+                            grid-template-columns: 1fr;
+                            gap: 15px;
+                        }
+
+                        .modal-header,
+                        .modal-body,
+                        .modal-footer {
+                            padding: 20px;
+                        }
+
+                        .modal-footer {
+                            flex-direction: column;
+                        }
+
+                        .cancel-button,
+                        .create-button {
+                            width: 100%;
                         }
                     }
                 `}
@@ -483,9 +762,9 @@ const CustomersPage = () => {
                         <p>Διαχείριση και αναζήτηση πελατών</p>
                     </div>
                 </div>
-                <Link to="/application/new" className="new-app-button">
-                    ➕ Νέα Αίτηση
-                </Link>
+                <button onClick={() => setShowNewCustomerModal(true)} className="new-app-button">
+                    👤 Νέος Πελάτης
+                </button>
             </div>
             
             <div className="search-section">
@@ -566,6 +845,111 @@ const CustomersPage = () => {
                     showInfo={true}
                 />
             </div>
+
+            {/* New Customer Modal */}
+            {showNewCustomerModal && (
+                <div className="modal-overlay" onClick={closeModal}>
+                    <div className="modal-content" onClick={e => e.stopPropagation()}>
+                        <div className="modal-header">
+                            <h2>👤 Νέος Πελάτης</h2>
+                            <button className="close-button" onClick={closeModal}>✕</button>
+                        </div>
+
+                        <div className="modal-body">
+                            {modalError && (
+                                <div className="error-message">
+                                    ⚠️ {modalError}
+                                </div>
+                            )}
+
+                            <div className="form-row">
+                                <div className="form-group required">
+                                    <label>ΑΦΜ *</label>
+                                    <input
+                                        type="text"
+                                        value={newCustomerData.afm}
+                                        onChange={e => handleNewCustomerChange('afm', e.target.value)}
+                                        placeholder="Εισάγετε ΑΦΜ"
+                                        disabled={modalLoading}
+                                    />
+                                </div>
+                                <div className="form-group required">
+                                    <label>Πλήρες Όνομα *</label>
+                                    <input
+                                        type="text"
+                                        value={newCustomerData.full_name}
+                                        onChange={e => handleNewCustomerChange('full_name', e.target.value)}
+                                        placeholder="Εισάγετε πλήρες όνομα"
+                                        disabled={modalLoading}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="form-row">
+                                <div className="form-group">
+                                    <label>Τηλέφωνο</label>
+                                    <input
+                                        type="text"
+                                        value={newCustomerData.phone}
+                                        onChange={e => handleNewCustomerChange('phone', e.target.value)}
+                                        placeholder="Εισάγετε τηλέφωνο"
+                                        disabled={modalLoading}
+                                    />
+                                </div>
+                                <div className="form-group">
+                                    <label>Email</label>
+                                    <input
+                                        type="email"
+                                        value={newCustomerData.email}
+                                        onChange={e => handleNewCustomerChange('email', e.target.value)}
+                                        placeholder="Εισάγετε email"
+                                        disabled={modalLoading}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="form-group">
+                                <label>Διεύθυνση</label>
+                                <input
+                                    type="text"
+                                    value={newCustomerData.address}
+                                    onChange={e => handleNewCustomerChange('address', e.target.value)}
+                                    placeholder="Εισάγετε διεύθυνση"
+                                    disabled={modalLoading}
+                                />
+                            </div>
+
+                            <div className="form-group">
+                                <label>Σημειώσεις</label>
+                                <textarea
+                                    value={newCustomerData.notes}
+                                    onChange={e => handleNewCustomerChange('notes', e.target.value)}
+                                    placeholder="Προαιρετικές σημειώσεις"
+                                    rows="3"
+                                    disabled={modalLoading}
+                                />
+                            </div>
+                        </div>
+
+                        <div className="modal-footer">
+                            <button
+                                className="cancel-button"
+                                onClick={closeModal}
+                                disabled={modalLoading}
+                            >
+                                Ακύρωση
+                            </button>
+                            <button
+                                className="create-button"
+                                onClick={handleCreateCustomer}
+                                disabled={modalLoading || !newCustomerData.afm.trim() || !newCustomerData.full_name.trim()}
+                            >
+                                {modalLoading ? 'Δημιουργία...' : 'Δημιουργία Πελάτη'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
