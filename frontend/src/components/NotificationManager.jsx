@@ -39,7 +39,10 @@ const NotificationManager = () => {
                     type={confirmModal.type}
                     confirmText={confirmModal.confirmText}
                     cancelText={confirmModal.cancelText}
-                    onConfirm={confirmModal.onConfirm}
+                    onConfirm={() => {
+                        confirmModal.onConfirm();
+                        hideConfirmModal();
+                    }}
                     onCancel={hideConfirmModal}
                 />
             )}
