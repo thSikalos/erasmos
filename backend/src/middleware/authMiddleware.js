@@ -1,6 +1,25 @@
 const jwt = require('jsonwebtoken');
 const pool = require('../config/db');
 
+// Simple in-memory cache for user data (expires after 5 minutes)
+const userCache = new Map();
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+function getCachedUser(userId) {
+  const cached = userCache.get(userId);
+  if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+    return cached.user;
+  }
+  return null;
+}
+
+function setCachedUser(userId, user) {
+  userCache.set(userId, {
+    user,
+    timestamp: Date.now()
+  });
+}
+
 const authMiddleware = async (req, res, next) => {
   let token;
 
@@ -21,24 +40,32 @@ const authMiddleware = async (req, res, next) => {
   try {
     // Επιβεβαίωση του token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    console.log('Auth middleware - decoded token:', decoded);
+    if (process.env.NODE_ENV === 'development') {
+      console.log('Auth middleware - decoded token:', decoded);
+    }
 
-    // Get the user from database to check current status
+    // Get the user from cache or database
     const userId = decoded.user ? decoded.user.id : decoded.id;
     if (!userId) {
       return res.status(401).json({ message: 'Invalid token structure' });
     }
 
-    const userResult = await pool.query(
-      'SELECT id, name, email, role, parent_user_id, is_active, deleted_at FROM users WHERE id = $1',
-      [userId]
-    );
+    let user = getCachedUser(userId);
 
-    if (userResult.rows.length === 0) {
-      return res.status(401).json({ message: 'User not found' });
+    if (!user) {
+      // User not in cache, fetch from database
+      const userResult = await pool.query(
+        'SELECT id, name, email, role, parent_user_id, is_active, deleted_at FROM users WHERE id = $1',
+        [userId]
+      );
+
+      if (userResult.rows.length === 0) {
+        return res.status(401).json({ message: 'User not found' });
+      }
+
+      user = userResult.rows[0];
+      setCachedUser(userId, user);
     }
-
-    const user = userResult.rows[0];
 
     // Check if user is deleted
     if (user.deleted_at) {
@@ -63,7 +90,9 @@ const authMiddleware = async (req, res, next) => {
       is_active: user.is_active
     };
 
-    console.log('Auth middleware - req.user set to:', req.user);
+    if (process.env.NODE_ENV === 'development') {
+      console.log('Auth middleware - req.user set to:', req.user);
+    }
     next(); // Προχώρα στην επόμενη συνάρτηση
   } catch (err) {
     console.log('Auth middleware - error:', err.message);

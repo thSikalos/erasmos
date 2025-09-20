@@ -41,14 +41,16 @@ app.use((req, res, next) => {
 });
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
-// Debug middleware to log all requests
-app.use((req, res, next) => {
-    console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
-    if (req.url.includes('renewals')) {
-        console.log('RENEWALS REQUEST DETECTED:', req.method, req.url, req.query);
-    }
-    next();
-});
+// Request logging middleware (only in development)
+if (process.env.NODE_ENV === 'development') {
+    app.use((req, res, next) => {
+        // Only log non-SSE and non-heartbeat requests to reduce noise
+        if (!req.url.includes('/api/sse/') && !req.url.includes('heartbeat')) {
+            console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
+        }
+        next();
+    });
+}
 
 pool.query('SELECT NOW()', (err, res) => { if(err) { console.error('Database connection error:', err.stack); } else { console.log('Successfully connected to the database.'); } });
 

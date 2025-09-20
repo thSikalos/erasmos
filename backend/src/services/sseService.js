@@ -2,6 +2,7 @@ class SSEService {
     constructor() {
         // Map of user_id -> Set of SSE response objects
         this.connections = new Map();
+        this.heartbeatInterval = null;
     }
 
     /**
@@ -132,10 +133,26 @@ class SSEService {
      * Start heartbeat interval to keep connections alive
      */
     startHeartbeat(intervalMs = 30000) {
-        setInterval(() => {
+        // Clear existing interval if any to prevent duplicates
+        if (this.heartbeatInterval) {
+            clearInterval(this.heartbeatInterval);
+        }
+
+        this.heartbeatInterval = setInterval(() => {
             this.sendHeartbeat();
         }, intervalMs);
         console.log(`📡 SSE heartbeat started (${intervalMs}ms interval)`);
+    }
+
+    /**
+     * Stop heartbeat interval
+     */
+    stopHeartbeat() {
+        if (this.heartbeatInterval) {
+            clearInterval(this.heartbeatInterval);
+            this.heartbeatInterval = null;
+            console.log('📡 SSE heartbeat stopped');
+        }
     }
 }
 

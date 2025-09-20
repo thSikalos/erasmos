@@ -54,7 +54,9 @@ router.get('/test', (req, res) => {
 
 // GET /api/legal/status - Check user's legal compliance status
 router.get('/status', authMiddleware, async (req, res) => {
-    console.log('🔍 [LEGAL_STATUS] API call received for user:', req.user?.id, req.user?.email);
+    if (process.env.NODE_ENV === 'development') {
+        console.log('🔍 [LEGAL_STATUS] API call received for user:', req.user?.id, req.user?.email);
+    }
     try {
         const userId = req.user.id;
 
