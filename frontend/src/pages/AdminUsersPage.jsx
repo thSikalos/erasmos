@@ -123,21 +123,6 @@ const AdminUsersPage = () => {
         }
     };
 
-    const handleDeleteUser = async (userId) => {
-        const user = users.find(u => u.id === userId);
-        showDeleteConfirm(`τον χρήστη "${user?.name || 'Unknown'}" (θα μεταφερθεί στον κάδο ανακύκλωσης)`, async () => {
-            try {
-                const config = { headers: { Authorization: `Bearer ${token}` } };
-                await axios.delete(apiUrl(`/api/users/${userId}`), config);
-                showSuccessToast('Επιτυχία', 'Ο χρήστης μεταφέρθηκε στον κάδο ανακύκλωσης!');
-                fetchData();
-            } catch (err) {
-                const errorMessage = err.response?.data?.message || 'Failed to delete user';
-                setError(errorMessage);
-                showErrorToast('Σφάλμα', errorMessage);
-            }
-        });
-    };
 
     const openCreateForm = () => {
         setEditingUser({});
@@ -440,23 +425,6 @@ const AdminUsersPage = () => {
                     box-shadow: 0 8px 25px rgba(245, 158, 11, 0.3);
                 }
 
-                .delete-button {
-                    background: linear-gradient(135deg, #ef4444, #dc2626);
-                    color: white;
-                    border: none;
-                    padding: 8px 16px;
-                    border-radius: 12px;
-                    font-weight: 600;
-                    cursor: pointer;
-                    transition: all 0.3s ease;
-                    font-size: 0.85rem;
-                    min-width: 80px;
-                }
-
-                .delete-button:hover {
-                    transform: translateY(-2px);
-                    box-shadow: 0 8px 25px rgba(239, 68, 68, 0.3);
-                }
 
                 .modal-backdrop-modern {
                     position: fixed;
@@ -679,8 +647,7 @@ const AdminUsersPage = () => {
                         flex-direction: column;
                     }
 
-                    .edit-button,
-                    .delete-button {
+                    .edit-button {
                         min-width: auto;
                         width: 100%;
                     }
@@ -772,9 +739,6 @@ const AdminUsersPage = () => {
                                                 <div className="action-buttons">
                                                     <button onClick={() => openEditForm(u)} className="edit-button">
                                                         ✏️ Edit
-                                                    </button>
-                                                    <button onClick={() => handleDeleteUser(u.id)} className="delete-button">
-                                                        🗑️ Delete
                                                     </button>
                                                 </div>
                                             </td>

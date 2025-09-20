@@ -18,13 +18,6 @@ const AdminPage = () => {
             color: 'from-emerald-500 to-cyan-600'
         },
         {
-            title: 'Κάδος Ανακύκλωσης',
-            description: 'Δες τους διεγραμμένους πελάτες και κάνε επαναφορά ή οριστική διαγραφή.',
-            icon: '🗑️',
-            link: '/admin/recycle-bin',
-            color: 'from-orange-500 to-red-600'
-        },
-        {
             title: 'Διαχείριση Χρηστών',
             description: 'Δημιούργησε, επεξεργάσου και διαχειρίσου όλους τους χρήστες και τους ρόλους τους.',
             icon: '👥',
@@ -371,7 +364,7 @@ const AdminPage = () => {
             <div className="admin-stats">
                 <div className="stat-card">
                     <div className="stat-icon">📝</div>
-                    <div className="stat-number">8</div>
+                    <div className="stat-number">7</div>
                     <div className="stat-label">Διαθέσιμες Λειτουργίες</div>
                 </div>
                 <div className="stat-card">

@@ -103,21 +103,6 @@ const CustomerDetailPage = () => {
         }
     };
 
-    const handleDelete = async () => {
-        showDeleteConfirm(`τον πελάτη "${customer?.full_name || 'Unknown'}"`, async () => {
-            setError('');
-            try {
-                const config = { headers: { Authorization: `Bearer ${token}` } };
-                await axios.delete(apiUrl(`/api/customers/${id}`), config);
-                showSuccessToast('Επιτυχία', 'Ο πελάτης μετακινήθηκε στον κάδο ανακύκλωσης');
-                navigate('/customers');
-            } catch (err) {
-                const errorMessage = err.response?.data?.message || 'Αποτυχία διαγραφής πελάτη';
-                setError(errorMessage);
-                showErrorToast('Σφάλμα', errorMessage);
-            }
-        });
-    };
 
     const handleAddNote = async (e) => {
         e.preventDefault();
@@ -719,33 +704,6 @@ const CustomerDetailPage = () => {
                         font-style: italic;
                     }
                     
-                    .danger-zone {
-                        background: rgba(255, 255, 255, 0.15);
-                        backdrop-filter: blur(10px);
-                        border-radius: 20px;
-                        padding: 30px;
-                        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
-                        border: 1px solid rgba(239, 68, 68, 0.2);
-                        margin-top: 25px;
-                    }
-                    
-                    .delete-button {
-                        background: linear-gradient(135deg, #ef4444, #dc2626);
-                        color: white;
-                        border: none;
-                        padding: 12px 20px;
-                        border-radius: 12px;
-                        font-weight: 600;
-                        cursor: pointer;
-                        transition: all 0.3s ease;
-                        box-shadow: 0 4px 15px rgba(239, 68, 68, 0.3);
-                    }
-                    
-                    .delete-button:hover {
-                        background: linear-gradient(135deg, #dc2626, #b91c1c);
-                        transform: translateY(-2px);
-                        box-shadow: 0 6px 20px rgba(239, 68, 68, 0.4);
-                    }
                     
                     .error-container {
                         display: flex;
@@ -1287,17 +1245,6 @@ const CustomerDetailPage = () => {
                     </div>
                 </div>
 
-                {!isEditing && (
-                    <div className="danger-zone">
-                        <h3 className="section-title">⚠️ Επικίνδυνη Ζώνη</h3>
-                        <p style={{color: '#6b7280', marginBottom: '15px'}}>
-                            Η διαγραφή θα μετακινήσει τον πελάτη στον κάδο ανακύκλωσης
-                        </p>
-                        <button onClick={handleDelete} className="delete-button">
-                            🗑️ Διαγραφή Πελάτη
-                        </button>
-                    </div>
-                )}
             </div>
         </div>
     );
