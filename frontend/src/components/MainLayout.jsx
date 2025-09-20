@@ -1,6 +1,7 @@
-import React, { useContext, useState } from 'react';
+import React, { useContext, useState, useEffect } from 'react';
 import { Outlet, NavLink, Link } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
+import { useNotifications } from '../context/NotificationContext';
 import Header from './Header';
 import NotificationManager from './NotificationManager';
 import CookieConsentBanner from './CookieConsentBanner';
@@ -8,8 +9,30 @@ import '../App.css';
 
 const MainLayout = () => {
     const { user, sessionTimeout } = useContext(AuthContext);
+    const { showToast } = useNotifications();
     const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
+    // Handle session timeout warnings
+    useEffect(() => {
+        if (sessionTimeout?.sessionWarning) {
+            const warning = sessionTimeout.sessionWarning;
+
+            showToast(
+                'warning',
+                '⏰ Η συνεδρία σας λήγει',
+                'Η συνεδρία σας θα λήξει σύντομα. Μπορείτε να την παρατείνετε πατώντας το κουμπί παρακάτω.',
+                0, // No auto-hide duration
+                {
+                    showCountdown: true,
+                    countdownTime: warning.remainingTime,
+                    actionLabel: '🔄 Παράταση Συνεδρίας',
+                    onAction: warning.onRefresh,
+                    autoRefresh: sessionTimeout.autoRefresh,
+                    onAutoRefreshToggle: warning.onAutoRefreshToggle
+                }
+            );
+        }
+    }, [sessionTimeout?.sessionWarning, sessionTimeout?.autoRefresh, showToast]);
 
     return (
         <div className="modern-app-layout">
