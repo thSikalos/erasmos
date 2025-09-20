@@ -1,6 +1,7 @@
-import React, { useContext, useState } from 'react';
+import React, { useContext, useState, useEffect } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import CookieSettingsWidget from '../components/CookieSettingsWidget';
+import pushService from '../services/pushService';
 
 const ProfilePage = () => {
     const { user } = useContext(AuthContext);
@@ -11,6 +12,12 @@ const ProfilePage = () => {
         phone: user?.phone || '',
         role: user?.role || ''
     });
+
+    // Push notification states
+    const [pushSupported, setPushSupported] = useState(false);
+    const [pushSubscribed, setPushSubscribed] = useState(false);
+    const [pushLoading, setPushLoading] = useState(false);
+    const [pushError, setPushError] = useState('');
 
     const handleInputChange = (e) => {
         setFormData({
@@ -34,6 +41,65 @@ const ProfilePage = () => {
         });
         setIsEditing(false);
     };
+
+    // Initialize push notification status
+    useEffect(() => {
+        const initializePushStatus = async () => {
+            try {
+                const supported = pushService.isNotificationSupported();
+                setPushSupported(supported);
+
+                if (supported) {
+                    await pushService.initialize();
+                    const subscribed = await pushService.isSubscribed();
+                    setPushSubscribed(subscribed);
+                }
+            } catch (error) {
+                console.error('Failed to initialize push status:', error);
+                setPushError('Σφάλμα κατά την αρχικοποίηση των push notifications');
+            }
+        };
+
+        initializePushStatus();
+    }, []);
+
+    // Handle push notification toggle
+    const handlePushToggle = async (e) => {
+        const enabled = e.target.checked;
+        setPushLoading(true);
+        setPushError('');
+
+        try {
+            if (enabled) {
+                console.log('🔔 Enabling push notifications...');
+                await pushService.subscribeToPush();
+                setPushSubscribed(true);
+                console.log('✅ Push notifications enabled successfully');
+            } else {
+                console.log('📵 Disabling push notifications...');
+                await pushService.unsubscribeFromPush();
+                setPushSubscribed(false);
+                console.log('✅ Push notifications disabled successfully');
+            }
+        } catch (error) {
+            console.error('Push toggle error:', error);
+
+            let errorMessage = 'Σφάλμα κατά την ενημέρωση των push notifications';
+
+            if (error.message.includes('permission')) {
+                errorMessage = 'Δεν έχετε δώσει άδεια για notifications. Ενεργοποιήστε τα από τις ρυθμίσεις του browser.';
+            } else if (error.message.includes('not supported')) {
+                errorMessage = 'Ο browser σας δεν υποστηρίζει push notifications.';
+            }
+
+            setPushError(errorMessage);
+            // Revert checkbox state
+            e.target.checked = pushSubscribed;
+        } finally {
+            setPushLoading(false);
+        }
+    };
+
 
     return (
         <div className="profile-page">
@@ -255,6 +321,92 @@ const ProfilePage = () => {
                             display: block;
                         }
                     }
+
+                    /* Notification Settings Styles */
+                    .notification-settings {
+                        margin-top: 20px;
+                    }
+
+                    .notification-setting {
+                        margin-bottom: 15px;
+                        padding: 15px;
+                        background: rgba(255, 255, 255, 0.1);
+                        border-radius: 10px;
+                        border: 1px solid rgba(102, 126, 234, 0.2);
+                    }
+
+                    .checkbox-label {
+                        display: flex;
+                        align-items: center;
+                        gap: 12px;
+                        cursor: pointer;
+                        font-size: 1rem;
+                        color: #374151;
+                        font-weight: 500;
+                    }
+
+                    .checkbox-label input[type="checkbox"] {
+                        width: 18px;
+                        height: 18px;
+                        accent-color: #667eea;
+                        cursor: pointer;
+                    }
+
+                    .checkbox-label input[type="checkbox"]:disabled {
+                        opacity: 0.5;
+                        cursor: not-allowed;
+                    }
+
+                    .push-status {
+                        margin-top: 8px;
+                        font-size: 0.85rem;
+                        padding: 5px 10px;
+                        border-radius: 5px;
+                    }
+
+                    .push-status.supported {
+                        background: rgba(16, 185, 129, 0.1);
+                        color: #059669;
+                        border: 1px solid rgba(16, 185, 129, 0.2);
+                    }
+
+                    .push-status.unsupported {
+                        background: rgba(239, 68, 68, 0.1);
+                        color: #dc2626;
+                        border: 1px solid rgba(239, 68, 68, 0.2);
+                    }
+
+                    .push-status.loading {
+                        background: rgba(251, 191, 36, 0.1);
+                        color: #d97706;
+                        border: 1px solid rgba(251, 191, 36, 0.2);
+                    }
+
+                    .push-error {
+                        margin-top: 8px;
+                        font-size: 0.85rem;
+                        color: #dc2626;
+                        background: rgba(239, 68, 68, 0.1);
+                        padding: 8px 12px;
+                        border-radius: 5px;
+                        border: 1px solid rgba(239, 68, 68, 0.2);
+                    }
+
+                    .loading-spinner {
+                        display: inline-block;
+                        width: 16px;
+                        height: 16px;
+                        border: 2px solid rgba(102, 126, 234, 0.3);
+                        border-radius: 50%;
+                        border-top-color: #667eea;
+                        animation: spin 1s linear infinite;
+                    }
+
+                    @keyframes spin {
+                        to {
+                            transform: rotate(360deg);
+                        }
+                    }
                 `}
             </style>
 
@@ -341,6 +493,79 @@ const ProfilePage = () => {
                         <label>Τελευταία Σύνδεση</label>
                         <div className="profile-field-readonly">
                             {new Date().toLocaleDateString('el-GR')} - Τώρα
+                        </div>
+                    </div>
+                </div>
+
+                {/* Notifications Settings Section */}
+                <div className="profile-section">
+                    <h3>🔔 Ειδοποιήσεις</h3>
+
+                    <div className="notification-settings">
+                        <div className="notification-setting">
+                            <label className="checkbox-label">
+                                <input
+                                    type="checkbox"
+                                    checked={pushSubscribed}
+                                    onChange={handlePushToggle}
+                                    disabled={!pushSupported || pushLoading}
+                                />
+                                🖥️ Desktop notifications για νέες αιτήσεις
+                                {pushLoading && <div className="loading-spinner"></div>}
+                            </label>
+
+                            {/* Status indicators */}
+                            {!pushSupported && (
+                                <div className="push-status unsupported">
+                                    ❌ Ο browser σας δεν υποστηρίζει push notifications
+                                </div>
+                            )}
+
+                            {pushSupported && !pushLoading && (
+                                <div className={`push-status ${pushSubscribed ? 'supported' : ''}`}>
+                                    {pushSubscribed ? '✅ Ενεργοποιημένες' : '⚪ Απενεργοποιημένες'}
+                                </div>
+                            )}
+
+                            {pushLoading && (
+                                <div className="push-status loading">
+                                    ⏳ Ενημέρωση ρυθμίσεων...
+                                </div>
+                            )}
+
+                            {pushError && (
+                                <div className="push-error">
+                                    ⚠️ {pushError}
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="notification-setting">
+                            <label className="checkbox-label">
+                                <input
+                                    type="checkbox"
+                                    checked={true}
+                                    disabled={true}
+                                />
+                                📧 Email notifications
+                            </label>
+                            <div className="push-status supported">
+                                ✅ Πάντα ενεργοποιημένες
+                            </div>
+                        </div>
+
+                        <div className="notification-setting">
+                            <label className="checkbox-label">
+                                <input
+                                    type="checkbox"
+                                    checked={true}
+                                    disabled={true}
+                                />
+                                💬 In-app notifications (Toast)
+                            </label>
+                            <div className="push-status supported">
+                                ✅ Πάντα ενεργοποιημένες
+                            </div>
                         </div>
                     </div>
                 </div>

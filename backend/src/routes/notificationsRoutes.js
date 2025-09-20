@@ -8,7 +8,11 @@ const {
     prepareEmailSummary,
     getDraftEmailNotifications,
     sendNotification,
-    createToastNotification
+    createToastNotification,
+    subscribeToPush,
+    unsubscribeFromPush,
+    getVAPIDPublicKey,
+    testPushNotification
 } = require('../controllers/notificationsController');
 
 router.use(authMiddleware);
@@ -25,5 +29,11 @@ router.post('/:id/send', sendNotification);
 
 // Toast notifications functionality
 router.post('/toast', createToastNotification);
+
+// Push notifications functionality
+router.get('/push/vapid-public-key', getVAPIDPublicKey);
+router.post('/push/subscribe', subscribeToPush);
+router.delete('/push/subscribe', unsubscribeFromPush);
+router.post('/push/test', testPushNotification);
 
 module.exports = router;

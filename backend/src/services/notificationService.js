@@ -1,6 +1,7 @@
 const pool = require('../config/db');
 const EmailService = require('./emailService');
 const sseService = require('./sseService');
+const pushNotificationService = require('./pushNotificationService');
 
 class NotificationService {
     static NOTIFICATION_TYPES = {
@@ -25,7 +26,8 @@ class NotificationService {
     static CHANNELS = {
         IN_APP: 'in-app',
         EMAIL: 'email',
-        TOAST: 'toast'
+        TOAST: 'toast',
+        PUSH: 'push'
     };
 
     static emailService = new EmailService();
@@ -50,8 +52,12 @@ class NotificationService {
                  this.NOTIFICATION_TYPES.SYSTEM_WARNING, this.NOTIFICATION_TYPES.SYSTEM_INFO].includes(type)) {
                 // Toast notifications only create TOAST channel (real-time only, not stored in DB)
                 channels = [this.CHANNELS.TOAST];
+            } else if ([this.NOTIFICATION_TYPES.NEW_APPLICATION,
+                       this.NOTIFICATION_TYPES.APPLICATION_STATUS_CHANGE].includes(type)) {
+                // Application notifications create in-app, email, and push notifications
+                channels = [this.CHANNELS.IN_APP, this.CHANNELS.EMAIL, this.CHANNELS.PUSH];
             } else {
-                // Regular notifications create both in-app and email notifications
+                // Other notifications create both in-app and email notifications
                 channels = [this.CHANNELS.IN_APP, this.CHANNELS.EMAIL];
             }
             const createdNotifications = [];
@@ -85,8 +91,27 @@ class NotificationService {
 
                         createdNotifications.push(toastNotification);
 
-                        // TODO: Send toast notification via WebSocket/SSE to frontend
+                        // Send toast notification via WebSocket/SSE to frontend
                         await this.sendToastNotification(toastNotification, recipientId, data);
+
+                    } else if (channel === this.CHANNELS.PUSH) {
+                        // Push notifications are sent via push service
+                        const pushNotification = {
+                            id: `push-${Date.now()}-${recipientId}`,
+                            user_id: recipientId,
+                            message,
+                            channel,
+                            link_url: linkUrl,
+                            notification_type: type,
+                            metadata,
+                            status: 'sent',
+                            created_at: new Date().toISOString()
+                        };
+
+                        createdNotifications.push(pushNotification);
+
+                        // Send push notification
+                        await this.sendPushNotification(pushNotification, recipientId, type, data);
 
                     } else {
                         // Regular notifications are stored in database
@@ -497,6 +522,32 @@ class NotificationService {
             return { success: sent };
         } catch (error) {
             console.error('Failed to send toast notification:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+    /**
+     * Send push notification to user
+     */
+    static async sendPushNotification(pushNotification, recipientId, type, data) {
+        try {
+            // Generate notification payload using push service
+            const payload = pushNotificationService.generateNotificationPayload(type, data);
+
+            console.log(`📱 Sending push notification to user ${recipientId}:`, payload);
+
+            // Send push notification
+            const result = await pushNotificationService.sendPushNotification(recipientId, payload);
+
+            if (result.success) {
+                console.log(`✅ Push notification sent successfully to user ${recipientId}`);
+            } else {
+                console.log(`📵 Push notification failed for user ${recipientId}:`, result.error);
+            }
+
+            return result;
+        } catch (error) {
+            console.error('Failed to send push notification:', error);
             return { success: false, error: error.message };
         }
     }

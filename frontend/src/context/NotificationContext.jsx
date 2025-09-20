@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import NotificationManager from '../components/NotificationManager';
 import sseService from '../services/sseService';
+import pushService from '../services/pushService';
 
 const NotificationContext = createContext();
 
@@ -16,6 +17,8 @@ export const NotificationProvider = ({ children }) => {
     const [toast, setToast] = useState(null);
     const [confirmModal, setConfirmModal] = useState(null);
     const [sseConnected, setSseConnected] = useState(false);
+    const [pushSupported, setPushSupported] = useState(false);
+    const [pushSubscribed, setPushSubscribed] = useState(false);
 
     // Toast utility functions - consistent with PaymentsPage pattern
     const showToast = useCallback((type, title, message, duration = 5000, options = {}) => {
@@ -266,6 +269,70 @@ export const NotificationProvider = ({ children }) => {
         };
     }, [showToast]); // Add showToast as dependency
 
+    // Initialize push notifications
+    useEffect(() => {
+        const initializePushService = async () => {
+            try {
+                const supported = pushService.isNotificationSupported();
+                setPushSupported(supported);
+
+                if (supported) {
+                    const subscribed = await pushService.initialize();
+                    setPushSubscribed(subscribed);
+                    console.log('📱 Push service initialized:', { supported, subscribed });
+                }
+            } catch (error) {
+                console.error('📱 Failed to initialize push service:', error);
+            }
+        };
+
+        initializePushService();
+    }, []);
+
+    // Push notification helper functions
+    const enablePushNotifications = useCallback(async () => {
+        try {
+            await pushService.subscribeToPush();
+            setPushSubscribed(true);
+            console.log('✅ Push notifications enabled successfully');
+            return true;
+        } catch (error) {
+            console.error('❌ Failed to enable push notifications:', error);
+            throw error;
+        }
+    }, []);
+
+    const disablePushNotifications = useCallback(async () => {
+        try {
+            await pushService.unsubscribeFromPush();
+            setPushSubscribed(false);
+            console.log('✅ Push notifications disabled successfully');
+            return true;
+        } catch (error) {
+            console.error('❌ Failed to disable push notifications:', error);
+            throw error;
+        }
+    }, []);
+
+    const getPushStatus = useCallback(() => {
+        return {
+            supported: pushSupported,
+            subscribed: pushSubscribed,
+            permission: pushService.getPermissionStatus()
+        };
+    }, [pushSupported, pushSubscribed]);
+
+    const sendTestPushNotification = useCallback(async () => {
+        try {
+            await pushService.sendTestNotification();
+            console.log('🧪 Test push notification sent');
+            return true;
+        } catch (error) {
+            console.error('❌ Failed to send test push notification:', error);
+            throw error;
+        }
+    }, []);
+
     const contextValue = {
         // Toast state and functions
         toast,
@@ -292,7 +359,16 @@ export const NotificationProvider = ({ children }) => {
 
         // SSE connection status
         sseConnected,
-        sseService
+        sseService,
+
+        // Push notification functions and status
+        pushSupported,
+        pushSubscribed,
+        enablePushNotifications,
+        disablePushNotifications,
+        getPushStatus,
+        sendTestPushNotification,
+        pushService
     };
 
     return (

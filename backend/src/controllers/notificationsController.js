@@ -1,5 +1,6 @@
 const pool = require('../config/db');
 const NotificationService = require('../services/notificationService');
+const pushNotificationService = require('../services/pushNotificationService');
 
 // --- GET UNREAD IN-APP NOTIFICATIONS FOR LOGGED-IN USER ---
 const getMyNotifications = async (req, res) => {
@@ -254,6 +255,217 @@ const createToastNotification = async (req, res) => {
     }
 };
 
+// --- GET VAPID PUBLIC KEY FOR CLIENT-SIDE SUBSCRIPTION ---
+const getVAPIDPublicKey = async (req, res) => {
+    try {
+        const publicKey = pushNotificationService.getVAPIDPublicKey();
+
+        if (!publicKey) {
+            return res.status(503).json({
+                success: false,
+                message: 'Push notifications not configured on server'
+            });
+        }
+
+        res.json({
+            success: true,
+            publicKey: publicKey
+        });
+    } catch (error) {
+        console.error('Get VAPID public key error:', error.message);
+        res.status(500).json({
+            success: false,
+            message: 'Server Error',
+            error: error.message
+        });
+    }
+};
+
+// --- SUBSCRIBE TO PUSH NOTIFICATIONS ---
+const subscribeToPush = async (req, res) => {
+    try {
+        const { subscription } = req.body;
+        const userId = req.user.id;
+        const userAgent = req.get('User-Agent');
+
+        // Validate subscription object
+        if (!subscription || !subscription.endpoint || !subscription.keys) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid subscription object',
+                required: {
+                    subscription: {
+                        endpoint: 'string',
+                        keys: {
+                            p256dh: 'string',
+                            auth: 'string'
+                        }
+                    }
+                }
+            });
+        }
+
+        // Save subscription and enable push notifications for user
+        const client = await pool.connect();
+        try {
+            await client.query('BEGIN');
+
+            // Save subscription using current transaction
+            const { endpoint, keys } = subscription;
+            const { p256dh, auth } = keys;
+
+            const saveQuery = `
+                INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth, user_agent, updated_at)
+                VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)
+                ON CONFLICT (user_id, endpoint)
+                DO UPDATE SET
+                    p256dh = EXCLUDED.p256dh,
+                    auth = EXCLUDED.auth,
+                    user_agent = EXCLUDED.user_agent,
+                    updated_at = CURRENT_TIMESTAMP
+                RETURNING id`;
+
+            const saveResult = await client.query(saveQuery, [userId, endpoint, p256dh, auth, userAgent]);
+            console.log(`📱 Push subscription saved for user ${userId}, subscription ID: ${saveResult.rows[0].id}`);
+
+            // Enable push notifications for user if not already enabled
+            await client.query(
+                'UPDATE users SET push_notifications_enabled = true WHERE id = $1',
+                [userId]
+            );
+
+            await client.query('COMMIT');
+
+            res.status(201).json({
+                success: true,
+                message: 'Successfully subscribed to push notifications'
+            });
+
+        } catch (error) {
+            await client.query('ROLLBACK');
+            throw error;
+        } finally {
+            client.release();
+        }
+
+    } catch (error) {
+        console.error('Subscribe to push error:', error.message);
+        res.status(500).json({
+            success: false,
+            message: 'Server Error',
+            error: error.message
+        });
+    }
+};
+
+// --- UNSUBSCRIBE FROM PUSH NOTIFICATIONS ---
+const unsubscribeFromPush = async (req, res) => {
+    try {
+        const { endpoint } = req.body;
+        const userId = req.user.id;
+
+        // Validate endpoint
+        if (!endpoint) {
+            return res.status(400).json({
+                success: false,
+                message: 'Endpoint is required',
+                required: ['endpoint']
+            });
+        }
+
+        const client = await pool.connect();
+        try {
+            await client.query('BEGIN');
+
+            // Remove specific subscription
+            const removed = await pushNotificationService.removeSubscription(userId, endpoint);
+
+            // Check if user has any remaining subscriptions
+            const subscriptions = await pushNotificationService.getUserSubscriptions(userId);
+
+            // If no subscriptions left, disable push notifications for user
+            if (subscriptions.length === 0) {
+                await client.query(
+                    'UPDATE users SET push_notifications_enabled = false WHERE id = $1',
+                    [userId]
+                );
+            }
+
+            await client.query('COMMIT');
+
+            res.json({
+                success: true,
+                message: removed ? 'Successfully unsubscribed from push notifications' : 'Subscription not found',
+                hasRemainingSubscriptions: subscriptions.length > 0
+            });
+
+        } catch (error) {
+            await client.query('ROLLBACK');
+            throw error;
+        } finally {
+            client.release();
+        }
+
+    } catch (error) {
+        console.error('Unsubscribe from push error:', error.message);
+        res.status(500).json({
+            success: false,
+            message: 'Server Error',
+            error: error.message
+        });
+    }
+};
+
+// --- TEST PUSH NOTIFICATION ---
+const testPushNotification = async (req, res) => {
+    try {
+        const userId = req.user.id;
+
+        // Create test notification payload
+        const testPayload = {
+            title: '🔔 Test Erasmos Notification',
+            body: 'Αυτό είναι ένα test push notification! Δουλεύει τέλεια! 🎉',
+            icon: '/vite.svg',
+            badge: '/vite.svg',
+            tag: 'erasmos-test',
+            requireInteraction: true,
+            data: {
+                url: '/dashboard',
+                timestamp: Date.now(),
+                type: 'TEST'
+            },
+            actions: [
+                {
+                    action: 'view',
+                    title: 'Προβολή Dashboard'
+                },
+                {
+                    action: 'dismiss',
+                    title: 'Απόρριψη'
+                }
+            ]
+        };
+
+        // Send push notification to current user
+        const result = await pushNotificationService.sendPushNotification(userId, testPayload);
+
+        res.json({
+            success: result.success,
+            message: result.success ? 'Test push notification sent successfully!' : 'Failed to send push notification',
+            payload: testPayload,
+            details: result
+        });
+
+    } catch (error) {
+        console.error('Test push notification error:', error.message);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to send test push notification',
+            error: error.message
+        });
+    }
+};
+
 module.exports = {
     getMyNotifications,
     markAsRead,
@@ -261,5 +473,9 @@ module.exports = {
     prepareEmailSummary,
     getDraftEmailNotifications,
     sendNotification,
-    createToastNotification
+    createToastNotification,
+    getVAPIDPublicKey,
+    subscribeToPush,
+    unsubscribeFromPush,
+    testPushNotification
 };
