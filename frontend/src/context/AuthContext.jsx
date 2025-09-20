@@ -14,6 +14,7 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [legalComplianceStatus, setLegalComplianceStatus] = useState(null);
   const [legalLoading, setLegalLoading] = useState(false);
+  const [pushNotificationStatus, setPushNotificationStatus] = useState(null);
   const [sessionState, setSessionState] = useState({
     redirectInProgress: false,
     lastTokenCheck: null
@@ -42,6 +43,45 @@ export const AuthProvider = ({ children }) => {
       return false;
     }
   }, [token]);
+
+  // Load push notification status
+  const loadPushNotificationStatus = useCallback(async (forceCheck = false) => {
+    if (!token || !user) {
+      setPushNotificationStatus(null);
+      return null;
+    }
+
+    // Skip if we already have a recent status and not forcing check
+    if (!forceCheck && pushNotificationStatus && pushNotificationStatus.lastChecked &&
+        (Date.now() - pushNotificationStatus.lastChecked < 30000)) { // 30 second cache
+      return pushNotificationStatus;
+    }
+
+    try {
+      console.log('[AUTH] Loading push notification status...');
+
+      const response = await axios.get(apiUrl('/api/notifications/push/status'), {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (response.data.success) {
+        const statusData = {
+          ...response.data,
+          lastChecked: Date.now()
+        };
+
+        setPushNotificationStatus(statusData);
+        console.log('[AUTH] Push notification status loaded:', statusData);
+        return statusData;
+      } else {
+        console.warn('[AUTH] Failed to load push notification status:', response.data.message);
+        return null;
+      }
+    } catch (error) {
+      console.error('[AUTH] Push notification status load failed:', error);
+      return null;
+    }
+  }, [token, user, pushNotificationStatus]);
 
   // Check legal compliance status
   const checkLegalCompliance = useCallback(async (forceCheck = false) => {
@@ -93,6 +133,7 @@ export const AuthProvider = ({ children }) => {
     setToken(null);
     setUser(null);
     setLegalComplianceStatus(null);
+    setPushNotificationStatus(null);
     setSessionState({
       redirectInProgress: false,
       lastTokenCheck: null
@@ -141,13 +182,21 @@ export const AuthProvider = ({ children }) => {
     return () => { axios.interceptors.response.eject(interceptor); };
   }, [logout]); // Remove checkLegalCompliance dependency to avoid infinite loop
 
-  // Separate useEffect to check legal compliance when user is loaded
+  // Separate useEffect to check legal compliance and load push status when user is loaded
   useEffect(() => {
     if (token && user && !loading && !legalComplianceStatus) {
       console.log('[AUTH] User and token available, checking legal compliance...');
       checkLegalCompliance(true);
     }
   }, [token, user, loading, legalComplianceStatus, checkLegalCompliance]);
+
+  // Load push notification status when user is authenticated
+  useEffect(() => {
+    if (token && user && !loading && !pushNotificationStatus) {
+      console.log('[AUTH] User authenticated, loading push notification status...');
+      loadPushNotificationStatus(true);
+    }
+  }, [token, user, loading, pushNotificationStatus, loadPushNotificationStatus]);
 
   const login = useCallback(async (newToken) => {
     console.log('[AUTH] Login initiated with new token');
@@ -177,6 +226,13 @@ export const AuthProvider = ({ children }) => {
 
       setLegalComplianceStatus(statusData);
       console.log('[AUTH] Post-login legal compliance status:', statusData.complianceStatus);
+
+      // Load push notification status after legal compliance check
+      loadPushNotificationStatus(true).then(() => {
+        console.log('[AUTH] Push notification status loaded after login');
+      }).catch(error => {
+        console.warn('[AUTH] Failed to load push notification status after login:', error);
+      });
 
       // Navigate based on compliance status
       if (statusData.complianceStatus === 'compliant') {
@@ -212,8 +268,12 @@ export const AuthProvider = ({ children }) => {
     legalComplianceStatus,
     legalLoading,
     checkLegalCompliance,
-    isLegallyCompliant: legalComplianceStatus?.complianceStatus === 'compliant'
-  }), [token, user, loading, login, logout, sessionState, sessionTimeout, legalComplianceStatus, legalLoading, checkLegalCompliance]);
+    isLegallyCompliant: legalComplianceStatus?.complianceStatus === 'compliant',
+    // Push notification state
+    pushNotificationStatus,
+    loadPushNotificationStatus,
+    isPushNotificationsEnabled: pushNotificationStatus?.pushNotificationsEnabled || false
+  }), [token, user, loading, login, logout, sessionState, sessionTimeout, legalComplianceStatus, legalLoading, checkLegalCompliance, pushNotificationStatus, loadPushNotificationStatus]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

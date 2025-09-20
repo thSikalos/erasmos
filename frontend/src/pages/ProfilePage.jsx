@@ -1,10 +1,18 @@
 import React, { useContext, useState, useEffect } from 'react';
 import { AuthContext } from '../context/AuthContext';
+import { useNotifications } from '../context/NotificationContext';
 import CookieSettingsWidget from '../components/CookieSettingsWidget';
-import pushService from '../services/pushService';
 
 const ProfilePage = () => {
-    const { user } = useContext(AuthContext);
+    const { user, pushNotificationStatus, isPushNotificationsEnabled } = useContext(AuthContext);
+    const {
+        pushSupported,
+        pushSubscribed,
+        enablePushNotifications,
+        disablePushNotifications,
+        getPushStatus
+    } = useNotifications();
+
     const [isEditing, setIsEditing] = useState(false);
     const [formData, setFormData] = useState({
         name: user?.name || '',
@@ -14,8 +22,6 @@ const ProfilePage = () => {
     });
 
     // Push notification states
-    const [pushSupported, setPushSupported] = useState(false);
-    const [pushSubscribed, setPushSubscribed] = useState(false);
     const [pushLoading, setPushLoading] = useState(false);
     const [pushError, setPushError] = useState('');
 
@@ -42,27 +48,6 @@ const ProfilePage = () => {
         setIsEditing(false);
     };
 
-    // Initialize push notification status
-    useEffect(() => {
-        const initializePushStatus = async () => {
-            try {
-                const supported = pushService.isNotificationSupported();
-                setPushSupported(supported);
-
-                if (supported) {
-                    await pushService.initialize();
-                    const subscribed = await pushService.isSubscribed();
-                    setPushSubscribed(subscribed);
-                }
-            } catch (error) {
-                console.error('Failed to initialize push status:', error);
-                setPushError('Σφάλμα κατά την αρχικοποίηση των push notifications');
-            }
-        };
-
-        initializePushStatus();
-    }, []);
-
     // Handle push notification toggle
     const handlePushToggle = async (e) => {
         const enabled = e.target.checked;
@@ -72,13 +57,11 @@ const ProfilePage = () => {
         try {
             if (enabled) {
                 console.log('🔔 Enabling push notifications...');
-                await pushService.subscribeToPush();
-                setPushSubscribed(true);
+                await enablePushNotifications();
                 console.log('✅ Push notifications enabled successfully');
             } else {
                 console.log('📵 Disabling push notifications...');
-                await pushService.unsubscribeFromPush();
-                setPushSubscribed(false);
+                await disablePushNotifications();
                 console.log('✅ Push notifications disabled successfully');
             }
         } catch (error) {
@@ -94,7 +77,7 @@ const ProfilePage = () => {
 
             setPushError(errorMessage);
             // Revert checkbox state
-            e.target.checked = pushSubscribed;
+            e.target.checked = isPushNotificationsEnabled;
         } finally {
             setPushLoading(false);
         }
@@ -506,7 +489,7 @@ const ProfilePage = () => {
                             <label className="checkbox-label">
                                 <input
                                     type="checkbox"
-                                    checked={pushSubscribed}
+                                    checked={isPushNotificationsEnabled}
                                     onChange={handlePushToggle}
                                     disabled={!pushSupported || pushLoading}
                                 />
@@ -522,8 +505,16 @@ const ProfilePage = () => {
                             )}
 
                             {pushSupported && !pushLoading && (
-                                <div className={`push-status ${pushSubscribed ? 'supported' : ''}`}>
-                                    {pushSubscribed ? '✅ Ενεργοποιημένες' : '⚪ Απενεργοποιημένες'}
+                                <div className={`push-status ${isPushNotificationsEnabled ? 'supported' : ''}`}>
+                                    {isPushNotificationsEnabled ? '✅ Ενεργοποιημένες' : '⚪ Απενεργοποιημένες'}
+                                    {pushNotificationStatus && (
+                                        <small style={{display: 'block', fontSize: '0.75rem', marginTop: '4px', opacity: 0.7}}>
+                                            {pushNotificationStatus.hasActiveSubscriptions ?
+                                                `${pushNotificationStatus.subscriptionCount} ενεργές συνδέσεις` :
+                                                'Καμία ενεργή σύνδεση'
+                                            }
+                                        </small>
+                                    )}
                                 </div>
                             )}
 

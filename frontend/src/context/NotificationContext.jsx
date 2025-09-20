@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useCallback, useEffect } fr
 import NotificationManager from '../components/NotificationManager';
 import sseService from '../services/sseService';
 import pushService from '../services/pushService';
+import { AuthContext } from './AuthContext';
 
 const NotificationContext = createContext();
 
@@ -14,6 +15,7 @@ export const useNotifications = () => {
 };
 
 export const NotificationProvider = ({ children }) => {
+    const { pushNotificationStatus, loadPushNotificationStatus, isPushNotificationsEnabled } = useContext(AuthContext);
     const [toast, setToast] = useState(null);
     const [confirmModal, setConfirmModal] = useState(null);
     const [sseConnected, setSseConnected] = useState(false);
@@ -269,7 +271,7 @@ export const NotificationProvider = ({ children }) => {
         };
     }, [showToast]); // Add showToast as dependency
 
-    // Initialize push notifications
+    // Initialize push notifications using server-side preference
     useEffect(() => {
         const initializePushService = async () => {
             try {
@@ -277,9 +279,32 @@ export const NotificationProvider = ({ children }) => {
                 setPushSupported(supported);
 
                 if (supported) {
-                    const subscribed = await pushService.initialize();
-                    setPushSubscribed(subscribed);
-                    console.log('📱 Push service initialized:', { supported, subscribed });
+                    // Initialize browser subscription status
+                    const browserSubscribed = await pushService.initialize();
+
+                    // Use server-side preference as the primary source of truth
+                    let actualSubscribed = false;
+                    if (pushNotificationStatus) {
+                        actualSubscribed = pushNotificationStatus.pushNotificationsEnabled &&
+                                         pushNotificationStatus.hasActiveSubscriptions;
+                        console.log('📱 Using server-side push preference:', {
+                            enabled: pushNotificationStatus.pushNotificationsEnabled,
+                            hasSubscriptions: pushNotificationStatus.hasActiveSubscriptions,
+                            actualSubscribed
+                        });
+                    } else {
+                        // Fallback to browser status if server status not loaded yet
+                        actualSubscribed = browserSubscribed;
+                        console.log('📱 Using browser-side push status (server not loaded):', browserSubscribed);
+                    }
+
+                    setPushSubscribed(actualSubscribed);
+                    console.log('📱 Push service initialized:', {
+                        supported,
+                        browserSubscribed,
+                        actualSubscribed,
+                        serverStatus: pushNotificationStatus
+                    });
                 }
             } catch (error) {
                 console.error('📱 Failed to initialize push service:', error);
@@ -287,40 +312,55 @@ export const NotificationProvider = ({ children }) => {
         };
 
         initializePushService();
-    }, []);
+    }, [pushNotificationStatus]); // Re-run when server status changes
 
     // Push notification helper functions
     const enablePushNotifications = useCallback(async () => {
         try {
             await pushService.subscribeToPush();
             setPushSubscribed(true);
+
+            // Refresh server status after successful subscription
+            if (loadPushNotificationStatus) {
+                await loadPushNotificationStatus(true);
+            }
+
             console.log('✅ Push notifications enabled successfully');
             return true;
         } catch (error) {
             console.error('❌ Failed to enable push notifications:', error);
             throw error;
         }
-    }, []);
+    }, [loadPushNotificationStatus]);
 
     const disablePushNotifications = useCallback(async () => {
         try {
             await pushService.unsubscribeFromPush();
             setPushSubscribed(false);
+
+            // Refresh server status after successful unsubscription
+            if (loadPushNotificationStatus) {
+                await loadPushNotificationStatus(true);
+            }
+
             console.log('✅ Push notifications disabled successfully');
             return true;
         } catch (error) {
             console.error('❌ Failed to disable push notifications:', error);
             throw error;
         }
-    }, []);
+    }, [loadPushNotificationStatus]);
 
     const getPushStatus = useCallback(() => {
         return {
             supported: pushSupported,
             subscribed: pushSubscribed,
-            permission: pushService.getPermissionStatus()
+            permission: pushService.getPermissionStatus(),
+            serverStatus: pushNotificationStatus,
+            enabled: isPushNotificationsEnabled,
+            hasActiveSubscriptions: pushNotificationStatus?.hasActiveSubscriptions || false
         };
-    }, [pushSupported, pushSubscribed]);
+    }, [pushSupported, pushSubscribed, pushNotificationStatus, isPushNotificationsEnabled]);
 
     const sendTestPushNotification = useCallback(async () => {
         try {
