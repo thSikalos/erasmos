@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { useNotifications } from '../context/NotificationContext';
 import { apiUrl } from '../utils/api';
 
 const InfoPortalEditor = ({
@@ -11,6 +12,7 @@ const InfoPortalEditor = ({
     isEditMode,
     setIsEditMode
 }) => {
+    const { showConfirmModal } = useNotifications();
     const [editingContent, setEditingContent] = useState('');
     const [editingTitle, setEditingTitle] = useState('');
     const [isCreating, setIsCreating] = useState(false);
@@ -89,11 +91,11 @@ const InfoPortalEditor = ({
     const handleDeleteSection = async () => {
         if (!activeSection?.id) return;
 
-        if (!window.confirm(`Είστε σίγουροι ότι θέλετε να διαγράψετε την ενότητα "${activeSection.title}";`)) {
-            return;
-        }
-
-        setLoading(true);
+        showConfirmModal({
+            title: 'Διαγραφή Ενότητας',
+            message: `Είστε σίγουροι ότι θέλετε να διαγράψετε την ενότητα "${activeSection.title}";`,
+            onConfirm: async () => {
+                setLoading(true);
         try {
             const token = localStorage.getItem('token');
             const config = { headers: { Authorization: `Bearer ${token}` } };
@@ -101,13 +103,18 @@ const InfoPortalEditor = ({
             if (onSectionDelete) {
                 onSectionDelete(activeSection.id);
             }
-        } catch (error) {
-            console.error('Error deleting section:', error);
-            const message = error.response?.data?.error || 'Σφάλμα κατά τη διαγραφή της ενότητας';
-            alert(message);
-        } finally {
-            setLoading(false);
-        }
+                } catch (error) {
+                    console.error('Error deleting section:', error);
+                    const message = error.response?.data?.error || 'Σφάλμα κατά τη διαγραφή της ενότητας';
+                    alert(message);
+                } finally {
+                    setLoading(false);
+                }
+            },
+            type: 'danger',
+            confirmText: 'Διαγραφή',
+            cancelText: 'Ακύρωση'
+        });
     };
 
     const cancelEdit = () => {

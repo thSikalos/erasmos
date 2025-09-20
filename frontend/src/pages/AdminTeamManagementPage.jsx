@@ -2,11 +2,13 @@ import React, { useState, useEffect, useContext } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
+import { useNotifications } from '../context/NotificationContext';
 import { apiUrl } from '../utils/api';
 import '../App.css';
 
 const EnhancedTeamHierarchyModal = ({ teamLeader, onClose, onRefresh }) => {
     const { token } = useContext(AuthContext);
+    const { showConfirmModal } = useNotifications();
     const [hierarchy, setHierarchy] = useState([]);
     const [loading, setLoading] = useState(true);
     const [updating, setUpdating] = useState({});
@@ -26,11 +28,18 @@ const EnhancedTeamHierarchyModal = ({ teamLeader, onClose, onRefresh }) => {
         }
     };
 
-    // Confirm action function - simplified without dialog
+    // Confirm action function using custom modal
     const confirmAction = async (title, message, onConfirm) => {
-        if (window.confirm(`${title}: ${message}`)) {
-            await onConfirm();
-        }
+        showConfirmModal({
+            title,
+            message,
+            onConfirm: async () => {
+                await onConfirm();
+            },
+            type: 'danger',
+            confirmText: 'Επιβεβαίωση',
+            cancelText: 'Ακύρωση'
+        });
     };
 
     useEffect(() => {
@@ -258,6 +267,7 @@ const EnhancedTeamHierarchyModal = ({ teamLeader, onClose, onRefresh }) => {
 
 const AdminTeamManagementPage = () => {
     const { token } = useContext(AuthContext);
+    const { showConfirmModal } = useNotifications();
     const [teamLeaders, setTeamLeaders] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -281,11 +291,18 @@ const AdminTeamManagementPage = () => {
         }
     };
 
-    // Confirm action function - simplified without dialog
+    // Confirm action function using custom modal
     const confirmAction = async (title, message, onConfirm) => {
-        if (window.confirm(`${title}: ${message}`)) {
-            await onConfirm();
-        }
+        showConfirmModal({
+            title,
+            message,
+            onConfirm: async () => {
+                await onConfirm();
+            },
+            type: 'danger',
+            confirmText: 'Επιβεβαίωση',
+            cancelText: 'Ακύρωση'
+        });
     };
 
     const fetchTeamLeaders = async () => {

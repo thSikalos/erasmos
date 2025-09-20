@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
+import { useNotifications } from '../context/NotificationContext';
 import { apiUrl } from '../utils/api';
 
 const SimplePDFViewer = ({
@@ -8,6 +9,7 @@ const SimplePDFViewer = ({
     onMappingsSaved,
     onClose
 }) => {
+    const { showConfirmModal } = useNotifications();
     const [mappings, setMappings] = useState([]);
     const [selectedField, setSelectedField] = useState(null);
     const [savingMappings, setSavingMappings] = useState(false);
@@ -179,9 +181,16 @@ const SimplePDFViewer = ({
                 }}
                 onClick={(e) => {
                     e.stopPropagation();
-                    if (window.confirm(`Αφαίρεση του πεδίου "${mapping.fieldLabel}";`)) {
-                        handleRemoveMapping(mapping.id);
-                    }
+                    showConfirmModal({
+                        title: 'Αφαίρεση Πεδίου',
+                        message: `Αφαίρεση του πεδίου "${mapping.fieldLabel}";`,
+                        onConfirm: () => {
+                            handleRemoveMapping(mapping.id);
+                        },
+                        type: 'danger',
+                        confirmText: 'Αφαίρεση',
+                        cancelText: 'Ακύρωση'
+                    });
                 }}
                 title={`${mapping.fieldLabel} (${mapping.fieldType}) - Κλικ για διαγραφή`}
             >

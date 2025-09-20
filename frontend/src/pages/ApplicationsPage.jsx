@@ -2,11 +2,13 @@ import React, { useState, useEffect, useContext } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
+import { useNotifications } from '../context/NotificationContext';
 import ClawbackModal from '../components/ClawbackModal';
 import { apiUrl } from '../utils/api';
 
 const ApplicationsPage = () => {
     const { token, user } = useContext(AuthContext);
+    const { showConfirmModal } = useNotifications();
     const navigate = useNavigate();
     const [applications, setApplications] = useState([]);
     const [pendingApplications, setPendingApplications] = useState([]);
@@ -216,42 +218,52 @@ const ApplicationsPage = () => {
     };
 
     const handleDeleteDraft = async (draftId) => {
-        if (!window.confirm('Είστε σίγουροι ότι θέλετε να διαγράψετε αυτή την προσωρινή αίτηση;')) {
-            return;
-        }
+        showConfirmModal({
+            title: 'Διαγραφή Προσωρινής Αίτησης',
+            message: 'Είστε σίγουροι ότι θέλετε να διαγράψετε αυτή την προσωρινή αίτηση;',
+            onConfirm: async () => {
+                try {
+                    const config = { headers: { Authorization: `Bearer ${token}` } };
+                    await axios.delete(apiUrl(`/api/applications/drafts/${draftId}`), config);
 
-        try {
-            const config = { headers: { Authorization: `Bearer ${token}` } };
-            await axios.delete(apiUrl(`/api/applications/drafts/${draftId}`), config);
-
-            setSuccessMessage('Προσωρινή αίτηση διαγράφηκε επιτυχώς!');
-            setTimeout(() => setSuccessMessage(''), 3000);
-            fetchApplications(); // Refresh data
-        } catch (error) {
-            console.error("Failed to delete draft application", error);
-            setError('Σφάλμα κατά τη διαγραφή της προσωρινής αίτησης');
-            setTimeout(() => setError(''), 3000);
-        }
+                    setSuccessMessage('Προσωρινή αίτηση διαγράφηκε επιτυχώς!');
+                    setTimeout(() => setSuccessMessage(''), 3000);
+                    fetchApplications(); // Refresh data
+                } catch (error) {
+                    console.error("Failed to delete draft application", error);
+                    setError('Σφάλμα κατά τη διαγραφή της προσωρινής αίτησης');
+                    setTimeout(() => setError(''), 3000);
+                }
+            },
+            type: 'danger',
+            confirmText: 'Διαγραφή',
+            cancelText: 'Ακύρωση'
+        });
     };
 
     const handlePromoteDraft = async (draftId) => {
-        if (!window.confirm('Θέλετε να υποβάλετε αυτή την προσωρινή αίτηση; Θα μετατραπεί σε κανονική αίτηση.')) {
-            return;
-        }
+        showConfirmModal({
+            title: 'Υποβολή Προσωρινής Αίτησης',
+            message: 'Θέλετε να υποβάλετε αυτή την προσωρινή αίτηση; Θα μετατραπεί σε κανονική αίτηση.',
+            onConfirm: async () => {
+                try {
+                    const config = { headers: { Authorization: `Bearer ${token}` } };
+                    await axios.post(apiUrl(`/api/applications/drafts/${draftId}/promote`), {}, config);
 
-        try {
-            const config = { headers: { Authorization: `Bearer ${token}` } };
-            await axios.post(apiUrl(`/api/applications/drafts/${draftId}/promote`), {}, config);
-
-            setSuccessMessage('Η προσωρινή αίτηση υποβλήθηκε επιτυχώς!');
-            setTimeout(() => setSuccessMessage(''), 3000);
-            fetchApplications(); // Refresh data
-        } catch (error) {
-            console.error("Failed to promote draft application", error);
-            const errorMessage = error.response?.data?.message || 'Σφάλμα κατά την υποβολή της προσωρινής αίτησης';
-            setError(errorMessage);
-            setTimeout(() => setError(''), 5000);
-        }
+                    setSuccessMessage('Η προσωρινή αίτηση υποβλήθηκε επιτυχώς!');
+                    setTimeout(() => setSuccessMessage(''), 3000);
+                    fetchApplications(); // Refresh data
+                } catch (error) {
+                    console.error("Failed to promote draft application", error);
+                    const errorMessage = error.response?.data?.message || 'Σφάλμα κατά την υποβολή της προσωρινής αίτησης';
+                    setError(errorMessage);
+                    setTimeout(() => setError(''), 5000);
+                }
+            },
+            type: 'warning',
+            confirmText: 'Υποβολή',
+            cancelText: 'Ακύρωση'
+        });
     };
 
     // Handle simple application payment toggle

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import axios from 'axios';
+import { useNotifications } from '../context/NotificationContext';
 import { apiUrl } from '../utils/api';
 
 // Set up PDF.js worker - use bundled version to avoid CSP issues
@@ -15,6 +16,7 @@ const VisualPDFMapper = ({
     onMappingsSaved,
     onClose
 }) => {
+    const { showConfirmModal } = useNotifications();
     const [numPages, setNumPages] = useState(null);
     const [currentPage, setCurrentPage] = useState(1);
     const [selectedField, setSelectedField] = useState(null);
@@ -192,9 +194,37 @@ const VisualPDFMapper = ({
         });
 
         if (overlappingMapping) {
-            if (!window.confirm(`Υπάρχει ήδη το πεδίο "${overlappingMapping.fieldLabel}" κοντά σε αυτό το σημείο. Θέλετε να συνεχίσετε;`)) {
-                return;
-            }
+            showConfirmModal({
+                title: 'Συνεχίσετε την προσθήκη;',
+                message: `Υπάρχει ήδη το πεδίο "${overlappingMapping.fieldLabel}" κοντά σε αυτό το σημείο. Θέλετε να συνεχίσετε;`,
+                onConfirm: () => {
+                    // Continue with adding the mapping
+                    const newMapping = {
+                        id: Date.now(),
+                        fieldId: selectedField.id,
+                        fieldLabel: selectedField.label,
+                        fieldType: selectedField.type,
+                        isCustomerField: selectedField.isCustomerField || false,
+                        page: currentPage,
+                        position: {
+                            x: Math.round(x * 100) / 100,
+                            y: Math.round(y * 100) / 100,
+                            width: fieldWidth,
+                            height: fieldHeight
+                        },
+                        isRequired: true,
+                        timestamp: new Date().toISOString()
+                    };
+
+                    setMappings(prev => [...prev, newMapping]);
+                    console.log(`[VisualPDFMapper] Added precise mapping for "${selectedField.label}" at (${newMapping.position.x}%, ${newMapping.position.y}%) on page ${currentPage}`);
+                    showSuccessIndicator(event.target, newMapping);
+                },
+                type: 'warning',
+                confirmText: 'Συνέχεια',
+                cancelText: 'Ακύρωση'
+            });
+            return;
         }
 
         const newMapping = {
@@ -383,12 +413,49 @@ const VisualPDFMapper = ({
             }
 
             if (warnings.length > 0) {
-                const proceed = window.confirm(
-                    '⚠️ Βρέθηκαν προειδοποιήσεις:\n\n' +
-                    warnings.join('\n') +
-                    '\n\nΘέλετε να συνεχίσετε;'
-                );
-                if (!proceed) return;
+                showConfirmModal({
+                    title: 'Προειδοποιήσεις',
+                    message: '⚠️ Βρέθηκαν προειδοποιήσεις:\n\n' +
+                        warnings.join('\n') +
+                        '\n\nΘέλετε να συνεχίσετε;',
+                    onConfirm: async () => {
+                        // Continue with the save operation
+                        const token = localStorage.getItem('token');
+                        const config = { headers: { Authorization: `Bearer ${token}` } };
+
+                        // Convert mappings to API format
+                        const apiMappings = mappings.map(mapping => ({
+                            fieldId: mapping.fieldId,
+                            x: mapping.position.x,
+                            y: mapping.position.y,
+                            width: mapping.position.width,
+                            height: mapping.position.height,
+                            page: mapping.page
+                        }));
+
+                        try {
+                            await axios.post(
+                                apiUrl(`/api/pdf-templates/${templateId}/mappings`),
+                                { mappings: apiMappings },
+                                config
+                            );
+
+                            if (onMappingsSaved) {
+                                onMappingsSaved();
+                            }
+
+                            alert('Τα mappings αποθηκεύτηκαν επιτυχώς!');
+                            onClose();
+                        } catch (error) {
+                            console.error('Error saving mappings:', error);
+                            alert('Σφάλμα κατά την αποθήκευση των mappings');
+                        }
+                    },
+                    type: 'warning',
+                    confirmText: 'Συνέχεια',
+                    cancelText: 'Ακύρωση'
+                });
+                return;
             }
 
             const token = localStorage.getItem('token');

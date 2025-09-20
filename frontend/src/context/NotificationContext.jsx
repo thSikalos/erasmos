@@ -32,16 +32,16 @@ export const NotificationProvider = ({ children }) => {
         setToast(null);
     }, []);
 
-    // Modal utility functions - consistent with PaymentsPage pattern
-    const showConfirmModal = useCallback((title, message, type, onConfirm, options = {}) => {
+    // Modal utility functions - accepting object parameter
+    const showConfirmModal = useCallback((modalConfig) => {
         setConfirmModal({
-            title,
-            message,
-            type,
-            onConfirm,
-            confirmText: options.confirmText || "Επιβεβαίωση",
-            cancelText: options.cancelText || "Ακύρωση",
-            ...options
+            title: modalConfig.title,
+            message: modalConfig.message,
+            type: modalConfig.type,
+            onConfirm: modalConfig.onConfirm,
+            confirmText: modalConfig.confirmText || "Επιβεβαίωση",
+            cancelText: modalConfig.cancelText || "Ακύρωση",
+            ...modalConfig
         });
     }, []);
 

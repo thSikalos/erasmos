@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import axios from 'axios';
+import { useNotifications } from '../context/NotificationContext';
 import { apiUrl } from '../utils/api';
 
 const SignedPDFUpload = ({
@@ -9,6 +10,7 @@ const SignedPDFUpload = ({
     onUploadError,
     disabled = false
 }) => {
+    const { showConfirmModal } = useNotifications();
     const [uploading, setUploading] = useState(false);
     const [dragOver, setDragOver] = useState(false);
 
@@ -93,11 +95,11 @@ const SignedPDFUpload = ({
     };
 
     const handleRemoveSignedPDF = async () => {
-        if (!window.confirm('Είστε σίγουροι ότι θέλετε να αφαιρέσετε το υπογεγραμμένο PDF;')) {
-            return;
-        }
-
-        try {
+        showConfirmModal({
+            title: 'Αφαίρεση Υπογεγραμμένου PDF',
+            message: 'Είστε σίγουροι ότι θέλετε να αφαιρέσετε το υπογεγραμμένο PDF;',
+            onConfirm: async () => {
+                try {
             const token = localStorage.getItem('token');
             const config = { headers: { Authorization: `Bearer ${token}` } };
 
@@ -110,16 +112,21 @@ const SignedPDFUpload = ({
                 onUploadSuccess({ signedPDFRemoved: true });
             }
 
-        } catch (error) {
-            console.error('Error removing signed PDF:', error);
-            const errorMessage = error.response?.data?.message || 'Σφάλμα κατά την αφαίρεση';
+                } catch (error) {
+                    console.error('Error removing signed PDF:', error);
+                    const errorMessage = error.response?.data?.message || 'Σφάλμα κατά την αφαίρεση';
 
-            if (onUploadError) {
-                onUploadError(errorMessage);
-            } else {
-                alert(`Σφάλμα: ${errorMessage}`);
-            }
-        }
+                    if (onUploadError) {
+                        onUploadError(errorMessage);
+                    } else {
+                        alert(`Σφάλμα: ${errorMessage}`);
+                    }
+                }
+            },
+            type: 'danger',
+            confirmText: 'Αφαίρεση',
+            cancelText: 'Ακύρωση'
+        });
     };
 
     return (

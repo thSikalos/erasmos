@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { useNotifications } from '../context/NotificationContext';
 import PDFFieldMappingInterface from './PDFFieldMappingInterface';
 import LazyPDFMapper from './LazyPDFMapper';
 import SimplePDFViewer from './SimplePDFViewer';
 import { apiUrl } from '../utils/api';
 
 const PDFTemplateManager = ({ company, onClose }) => {
+    const { showConfirmModal } = useNotifications();
     const [templates, setTemplates] = useState([]);
     const [dropdownFields, setDropdownFields] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -243,11 +245,11 @@ const PDFTemplateManager = ({ company, onClose }) => {
     };
 
     const handleDeleteTemplate = async (templateId) => {
-        if (!window.confirm('Είστε σίγουροι ότι θέλετε να διαγράψετε αυτό το template;')) {
-            return;
-        }
-
-        try {
+        showConfirmModal({
+            title: 'Διαγραφή Template',
+            message: 'Είστε σίγουροι ότι θέλετε να διαγράψετε αυτό το template;',
+            onConfirm: async () => {
+                try {
             const token = localStorage.getItem('token');
             const config = { headers: { Authorization: `Bearer ${token}` } };
 
@@ -258,10 +260,15 @@ const PDFTemplateManager = ({ company, onClose }) => {
 
             alert('Template διαγράφηκε επιτυχώς');
             loadTemplates();
-        } catch (error) {
-            console.error('Error deleting template:', error);
-            alert('Σφάλμα κατά τη διαγραφή');
-        }
+                } catch (error) {
+                    console.error('Error deleting template:', error);
+                    alert('Σφάλμα κατά τη διαγραφή');
+                }
+            },
+            type: 'danger',
+            confirmText: 'Διαγραφή',
+            cancelText: 'Ακύρωση'
+        });
     };
 
     const getStatusBadge = (status) => {

@@ -8,7 +8,7 @@ import '../App.css';
 
 const AdminFieldsPage = () => {
     const { token, user } = useContext(AuthContext);
-    const { showDeleteConfirm, showSuccessToast, showErrorToast } = useNotifications();
+    const { showDeleteConfirm, showSuccessToast, showErrorToast, showConfirmModal } = useNotifications();
     const [fields, setFields] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -183,9 +183,16 @@ const AdminFieldsPage = () => {
                 `Αν θέλετε απλώς να την αποκρύψετε από τα νέα dropdown menus, ` +
                 `χρησιμοποιήστε το κουμπί απενεργοποίησης (❌) αντί αυτού.`;
 
-            if (window.confirm(message)) {
-                hardDeleteFieldOption(optionId);
-            }
+            showConfirmModal({
+                title: 'Διαγραφή Επιλογής',
+                message,
+                onConfirm: () => {
+                    hardDeleteFieldOption(optionId);
+                },
+                type: 'danger',
+                confirmText: 'Διαγραφή',
+                cancelText: 'Ακύρωση'
+            });
         } catch (err) {
             const errorMessage = err.response?.data?.message || 'Failed to check option usage';
             showErrorToast('Σφάλμα', errorMessage);
@@ -217,9 +224,16 @@ const AdminFieldsPage = () => {
                     `αλλά οι υπάρχουσες αιτήσεις θα διατηρήσουν την τιμή τους.\n\n` +
                     `Θέλετε να συνεχίσετε;`;
 
-                if (window.confirm(message)) {
-                    toggleFieldOptionActive(optionId);
-                }
+                showConfirmModal({
+                    title: 'Απενεργοποίηση Επιλογής',
+                    message,
+                    onConfirm: () => {
+                        toggleFieldOptionActive(optionId);
+                    },
+                    type: 'warning',
+                    confirmText: 'Απενεργοποίηση',
+                    cancelText: 'Ακύρωση'
+                });
             } else {
                 // Safe to deactivate
                 toggleFieldOptionActive(optionId);
