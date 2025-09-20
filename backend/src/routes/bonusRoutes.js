@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const authMiddleware = require('../middleware/authMiddleware');
-const { createBonus, getBonuses, getBonusProgress, getAllBonuses } = require('../controllers/bonusController');
+const { createBonus, getBonuses, getBonusProgress, getBonusProgressForDashboard, getAllBonuses } = require('../controllers/bonusController');
 
 router.use(authMiddleware); // Όλα τα routes για bonus απαιτούν σύνδεση
 
@@ -24,6 +24,12 @@ router.get('/user/:userId/progress', getBonusProgress);
 router.get('/my-progress', (req, res) => {
     req.params.userId = req.user.id;
     getBonusProgress(req, res);
+});
+
+// Route για την πρόοδο bonuses του τρέχοντος χρήστη (για dashboard - μετράει "Καταχωρήθηκε")
+router.get('/my-dashboard-progress', (req, res) => {
+    req.params.userId = req.user.id;
+    getBonusProgressForDashboard(req, res);
 });
 
 // Route για όλα τα bonuses (Admin/TeamLeader only)

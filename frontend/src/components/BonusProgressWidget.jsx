@@ -16,7 +16,7 @@ const BonusProgressWidget = () => {
             setError('');
             try {
                 const config = { headers: { 'Authorization': `Bearer ${token}` } };
-                const response = await axios.get(apiUrl('/api/bonuses/my-progress'), config);
+                const response = await axios.get(apiUrl('/api/bonuses/my-dashboard-progress'), config);
                 setBonusProgress(response.data);
             } catch (err) {
                 console.error('Failed to fetch bonus progress:', err);

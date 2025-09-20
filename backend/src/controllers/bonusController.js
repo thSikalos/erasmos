@@ -160,6 +160,89 @@ const getBonusProgress = async (req, res) => {
     }
 };
 
+// --- GET BONUS PROGRESS FOR DASHBOARD (counts "Καταχωρήθηκε" applications) ---
+const getBonusProgressForDashboard = async (req, res) => {
+    try {
+        const { userId } = req.params;
+        const targetUserId = userId || req.user.id;
+
+        const progressQuery = await pool.query(`
+            WITH bonus_progress AS (
+                SELECT
+                    b.id,
+                    b.name,
+                    b.application_count_target,
+                    b.bonus_amount_per_application,
+                    b.is_active,
+                    b.created_at,
+                    -- Count applications with status "Καταχωρήθηκε" this month
+                    (
+                        SELECT COUNT(*)
+                        FROM applications a
+                        WHERE a.user_id = b.target_user_id
+                        AND a.status = 'Καταχωρήθηκε'
+                        AND DATE_TRUNC('month', a.created_at) = DATE_TRUNC('month', CURRENT_DATE)
+                        AND (
+                            -- If bonus has specific companies, count only those
+                            EXISTS(SELECT 1 FROM bonus_companies bc WHERE bc.bonus_id = b.id)
+                            AND a.company_id IN (
+                                SELECT bc.company_id
+                                FROM bonus_companies bc
+                                WHERE bc.bonus_id = b.id
+                            )
+                            OR
+                            -- If no specific companies, count all applications
+                            NOT EXISTS(SELECT 1 FROM bonus_companies bc WHERE bc.bonus_id = b.id)
+                        )
+                    ) as current_applications,
+                    -- Get breakdown by company for current month
+                    COALESCE(json_agg(
+                        CASE WHEN bc.company_id IS NOT NULL
+                        THEN json_build_object(
+                            'company_id', c.id,
+                            'company_name', c.name,
+                            'application_count', (
+                                SELECT COUNT(*)
+                                FROM applications a2
+                                WHERE a2.user_id = b.target_user_id
+                                AND a2.company_id = c.id
+                                AND a2.status = 'Καταχωρήθηκε'
+                                AND DATE_TRUNC('month', a2.created_at) = DATE_TRUNC('month', CURRENT_DATE)
+                            )
+                        )
+                        ELSE NULL END
+                    ) FILTER (WHERE bc.company_id IS NOT NULL), '[]') as company_breakdown
+                FROM bonuses b
+                LEFT JOIN bonus_companies bc ON b.id = bc.bonus_id
+                LEFT JOIN companies c ON bc.company_id = c.id
+                WHERE b.target_user_id = $1
+                AND b.is_active = true
+                GROUP BY b.id
+            )
+            SELECT
+                *,
+                CASE
+                    WHEN current_applications >= application_count_target THEN true
+                    ELSE false
+                END as is_achieved,
+                CASE
+                    WHEN current_applications >= application_count_target
+                    THEN application_count_target * bonus_amount_per_application
+                    ELSE 0
+                END as earned_amount,
+                ROUND((current_applications::DECIMAL / application_count_target) * 100, 1) as progress_percentage,
+                TO_CHAR(CURRENT_DATE, 'Month YYYY') as current_month
+            FROM bonus_progress
+            ORDER BY created_at DESC
+        `, [targetUserId]);
+
+        res.json(progressQuery.rows);
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).send('Server Error');
+    }
+};
+
 // --- GET ALL BONUSES (Admin/TeamLeader only) ---
 const getAllBonuses = async (req, res) => {
     try {
@@ -194,5 +277,6 @@ module.exports = {
     createBonus,
     getBonuses,
     getBonusProgress,
+    getBonusProgressForDashboard,
     getAllBonuses
 };
